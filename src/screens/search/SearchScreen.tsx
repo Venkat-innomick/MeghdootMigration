@@ -18,6 +18,16 @@ import { spacing } from '../../theme/spacing';
 import { mastersService, userService, weatherService } from '../../api/services';
 import { useAppStore } from '../../store/appStore';
 import { DistrictMasterItem, StateMasterItem } from '../../types/domain';
+import {
+  buildByLocationPayload,
+  getLanguageLabel,
+  getUserProfileId,
+  isApiSuccess,
+  parseLocationWeatherList,
+  sameLocation,
+  toNum,
+  toText,
+} from '../../utils/locationApi';
 
 type SearchBlockItem = {
   blockID: number;
@@ -30,7 +40,7 @@ type SearchBlockItem = {
 
 export const SearchScreen = () => {
   const navigation = useNavigation<any>();
-  const user = useAppStore((s) => s.user);
+  const user: any = useAppStore((s) => s.user);
   const language = useAppStore((s) => s.language);
 
   const [loading, setLoading] = useState(false);
@@ -42,21 +52,20 @@ export const SearchScreen = () => {
   const [statePickerOpen, setStatePickerOpen] = useState(false);
   const [districtPickerOpen, setDistrictPickerOpen] = useState(false);
 
-  const userId = useMemo(() => user?.typeOfRole || user?.userProfileId || 0, [user]);
+  const userId = useMemo(() => getUserProfileId(user), [user]);
+  const languageLabel = useMemo(() => getLanguageLabel(language), [language]);
 
   const refreshFavouriteFlags = async (items: SearchBlockItem[]) => {
     if (!userId) return items;
-    const weather = await weatherService.getByLocation({
-      Id: userId,
-      LanguageType: language,
-      RefreshDateTime: new Date().toISOString().slice(0, 10),
-    });
-    const locations = (weather.result || weather.data || []) as any[];
+    const weather = await weatherService.getByLocation(buildByLocationPayload(userId, languageLabel));
+    const locations = parseLocationWeatherList(weather) as any[];
     return items.map((item) => {
       const exists = locations.some((loc) =>
-        item.isAsd
-          ? (loc.asdID || loc.AsdID) === item.blockID && (loc.districtID || loc.DistrictID) === item.districtID
-          : (loc.blockID || loc.BlockID) === item.blockID && (loc.districtID || loc.DistrictID) === item.districtID
+        sameLocation(loc, {
+          districtID: item.districtID,
+          blockID: item.isAsd ? 0 : item.blockID,
+          asdID: item.isAsd ? item.blockID : 0,
+        }),
       );
       return { ...item, favourite: exists };
     });
@@ -65,8 +74,15 @@ export const SearchScreen = () => {
   const loadStates = async () => {
     setLoading(true);
     try {
-      const list = await mastersService.getStates(language);
-      setStates(list.filter((s) => s.stateID !== 37));
+      const list = await mastersService.getStates(languageLabel);
+      const normalized = (list as any[])
+        .map((s, index) => ({
+          stateID: toNum(s.stateID ?? s.StateID, 0),
+          stateName: toText(s.stateName ?? s.StateName),
+        }))
+        .filter((s) => s.stateID > 0 && !!s.stateName && s.stateID !== 37);
+      const unique = normalized.filter((s, i, arr) => arr.findIndex((x) => x.stateID === s.stateID) === i);
+      setStates(unique);
     } catch (e: any) {
       Alert.alert('Error', e.message || 'Unable to load states');
     } finally {
@@ -76,7 +92,7 @@ export const SearchScreen = () => {
 
   useEffect(() => {
     loadStates();
-  }, []);
+  }, [languageLabel]);
 
   const selectState = async (state: StateMasterItem) => {
     setSelectedState(state);
@@ -84,8 +100,16 @@ export const SearchScreen = () => {
     setBlocks([]);
     setLoading(true);
     try {
-      const list = await mastersService.getDistricts(state.stateID, language);
-      setDistricts(list.filter((d) => d.stateID === state.stateID));
+      const list = await mastersService.getDistricts(state.stateID, languageLabel);
+      const normalized = (list as any[])
+        .map((d, index) => ({
+          districtID: toNum(d.districtID ?? d.DistrictID, 0),
+          districtName: toText(d.districtName ?? d.DistrictName),
+          stateID: toNum(d.stateID ?? d.StateID, state.stateID),
+        }))
+        .filter((d) => d.districtID > 0 && !!d.districtName && d.stateID === state.stateID);
+      const unique = normalized.filter((d, i, arr) => arr.findIndex((x) => x.districtID === d.districtID) === i);
+      setDistricts(unique);
     } catch (e: any) {
       Alert.alert('Error', e.message || 'Unable to load districts');
     } finally {
@@ -100,18 +124,21 @@ export const SearchScreen = () => {
     try {
       const isAsd = selectedState.stateID === 28 || selectedState.stateID === 36;
       const raw = isAsd
-        ? await mastersService.getAsd(district.districtID, language)
-        : await mastersService.getBlocks(district.districtID, language);
+        ? await mastersService.getAsd(district.districtID, languageLabel)
+        : await mastersService.getBlocks(district.districtID, languageLabel);
 
-      const mapped: SearchBlockItem[] = raw.map((item: any) => ({
-        blockID: item.asdID || item.AsdID || item.blockID || item.BlockID,
-        blockName: item.asdName || item.AsdName || item.blockName || item.BlockName,
+      const mapped: SearchBlockItem[] = (raw as any[])
+        .map((item: any, index: number) => ({
+        blockID: toNum(item.asdID ?? item.AsdID ?? item.blockID ?? item.BlockID, 0),
+        blockName: toText(item.asdName ?? item.AsdName ?? item.blockName ?? item.BlockName),
         districtID: district.districtID,
         stateID: selectedState.stateID,
         isAsd,
         favourite: false,
-      }));
-      const withFav = await refreshFavouriteFlags(mapped);
+      }))
+        .filter((item) => item.blockID > 0 && !!item.blockName);
+      const unique = mapped.filter((b, i, arr) => arr.findIndex((x) => x.blockID === b.blockID && x.districtID === b.districtID) === i);
+      const withFav = await refreshFavouriteFlags(unique);
       setBlocks(withFav);
     } catch (e: any) {
       Alert.alert('Error', e.message || 'Unable to load blocks');
@@ -121,11 +148,15 @@ export const SearchScreen = () => {
   };
 
   const addLocation = async (item: SearchBlockItem) => {
-    if (!userId) return;
+    if (!userId) {
+      Alert.alert('Failed', 'User profile not loaded. Please login again.');
+      return;
+    }
     try {
       const payload: Record<string, unknown> = {
         UALID: 0,
         UserProfileID: userId,
+        Id: userId,
         StateID: item.stateID,
         DistrictID: item.districtID,
         Createdby: userId,
@@ -134,33 +165,39 @@ export const SearchScreen = () => {
       if (item.isAsd) payload.AsdID = item.blockID;
       else payload.BlockID = item.blockID;
 
-      const response = await userService.saveLocation(payload);
-      if (response.isSuccessful === false) {
-        Alert.alert('Failed', response.errorMessage || 'Unable to add location');
+      const response: any = await userService.saveLocation(payload);
+      if (!isApiSuccess(response)) {
+        Alert.alert('Failed', response?.errorMessage || response?.ErrorMessage || 'Unable to add location');
         return;
       }
-      setBlocks((prev) => prev.map((b) => (b.blockID === item.blockID ? { ...b, favourite: true } : b)));
+      const refreshed = await refreshFavouriteFlags(blocks);
+      setBlocks(refreshed.map((b) => (b.blockID === item.blockID && b.districtID === item.districtID ? { ...b, favourite: true } : b)));
     } catch (e: any) {
       Alert.alert('Failed', e.message || 'Unable to add location');
     }
   };
 
   const removeLocation = async (item: SearchBlockItem) => {
-    if (!userId) return;
+    if (!userId) {
+      Alert.alert('Failed', 'User profile not loaded. Please login again.');
+      return;
+    }
     try {
       const payload: Record<string, unknown> = {
         UserProfileID: userId,
+        Id: userId,
         DistrictID: item.districtID,
       };
       if (item.isAsd) payload.AsdID = item.blockID;
       else payload.BlockID = item.blockID;
 
-      const response = await userService.deleteLocation(payload);
-      if (response.isSuccessful === false) {
-        Alert.alert('Failed', response.errorMessage || 'Unable to delete location');
+      const response: any = await userService.deleteLocation(payload);
+      if (!isApiSuccess(response)) {
+        Alert.alert('Failed', response?.errorMessage || response?.ErrorMessage || 'Unable to delete location');
         return;
       }
-      setBlocks((prev) => prev.map((b) => (b.blockID === item.blockID ? { ...b, favourite: false } : b)));
+      const refreshed = await refreshFavouriteFlags(blocks);
+      setBlocks(refreshed.map((b) => (b.blockID === item.blockID && b.districtID === item.districtID ? { ...b, favourite: false } : b)));
     } catch (e: any) {
       Alert.alert('Failed', e.message || 'Unable to delete location');
     }
@@ -212,7 +249,7 @@ export const SearchScreen = () => {
         ) : (
           <FlatList
             data={blocks}
-            keyExtractor={(item) => `${item.districtID}-${item.blockID}`}
+            keyExtractor={(item, index) => `${item.stateID}-${item.districtID}-${item.blockID}-${index}`}
             ListEmptyComponent={<Text style={styles.empty}>Select state and district to load blocks.</Text>}
             renderItem={({ item }) => (
               <View style={styles.row}>
@@ -242,7 +279,7 @@ export const SearchScreen = () => {
             <ScrollView>
               {states.map((item) => (
                 <Pressable
-                  key={item.stateID}
+                  key={`s-${item.stateID}-${item.stateName}`}
                   style={styles.modalItem}
                   onPress={() => {
                     selectState(item);
@@ -268,7 +305,7 @@ export const SearchScreen = () => {
             <ScrollView>
               {districts.map((item) => (
                 <Pressable
-                  key={item.districtID}
+                  key={`d-${item.districtID}-${item.districtName}`}
                   style={styles.modalItem}
                   onPress={() => {
                     selectDistrict(item);

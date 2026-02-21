@@ -16,6 +16,13 @@ import { colors } from '../../theme/colors';
 import { weatherService } from '../../api/services';
 import { DashboardLocation, WeatherForecastItem } from '../../types/domain';
 import { useAppStore } from '../../store/appStore';
+import {
+  buildByLocationPayload,
+  getLanguageLabel,
+  getUserProfileId,
+  parseLocationWeatherList,
+  toText as normalizeText,
+} from '../../utils/locationApi';
 
 const pickText = (...values: any[]) => {
   for (const value of values) {
@@ -66,6 +73,8 @@ const pickList = (payload: any): any[] => {
 export const ForecastScreen = () => {
   const user = useAppStore((s) => s.user);
   const language = useAppStore((s) => s.language);
+  const userId = getUserProfileId(user);
+  const languageLabel = getLanguageLabel(language);
 
   const [loading, setLoading] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -85,12 +94,9 @@ export const ForecastScreen = () => {
   }, [selectedLocation]);
 
   const loadLocations = async () => {
-    if (!user) return;
-    const response = await weatherService.getByLocation({
-      userProfileID: user.userProfileId,
-      languageType: language,
-    });
-    const list = (response.result || response.data || []) as DashboardLocation[];
+    if (!userId) return;
+    const response = await weatherService.getByLocation(buildByLocationPayload(userId, languageLabel));
+    const list = parseLocationWeatherList(response) as DashboardLocation[];
     setLocations(list);
     if (list.length) {
       setSelectedLocationIndex(0);
@@ -111,8 +117,8 @@ export const ForecastScreen = () => {
       const payload: Record<string, unknown> = {
         StateID: stateID,
         DistrictID: districtID,
-        LanguageType: language,
-        languageType: language,
+        LanguageType: languageLabel,
+        languageType: languageLabel,
         RefreshDateTime: new Date().toISOString().slice(0, 19).replace('T', ' '),
       };
 
@@ -130,7 +136,7 @@ export const ForecastScreen = () => {
 
   useEffect(() => {
     loadLocations();
-  }, [language, user?.userProfileId]);
+  }, [languageLabel, userId]);
 
   const selectLocation = async (index: number) => {
     const location = locations[index] as any;
@@ -249,7 +255,11 @@ export const ForecastScreen = () => {
                   const block = pickText(loc.blockName, loc.BlockName, loc.asdName, loc.AsdName, '');
                   const label = block !== '-' ? `${district} - ${block}` : district;
                   return (
-                    <Pressable key={`loc-${index}`} style={styles.modalItem} onPress={() => selectLocation(index)}>
+                    <Pressable
+                      key={`loc-${normalizeText(loc.stateID, loc.StateID, index)}-${normalizeText(loc.districtID, loc.DistrictID)}-${normalizeText(loc.blockID, loc.BlockID, loc.asdID, loc.AsdID)}`}
+                      style={styles.modalItem}
+                      onPress={() => selectLocation(index)}
+                    >
                       <Text style={styles.modalItemText}>{label}</Text>
                     </Pressable>
                   );

@@ -30,6 +30,7 @@ import { LANGUAGES } from "../../constants/languages";
 type Props = NativeStackScreenProps<AuthStackParamList, "Registration">;
 
 type Option = { id: number; label: string };
+type SafeOption = Option & { key: string };
 
 const LANGUAGE_ID_BY_CODE: Record<string, number> = {
   en: 2,
@@ -63,6 +64,24 @@ const Selector = ({
   borderColor?: string;
 }) => {
   const [open, setOpen] = useState(false);
+  const safeOptions = useMemo<SafeOption[]>(
+    () =>
+      options.map((item, index) => {
+        const hasValidId =
+          typeof item.id === "number" && Number.isFinite(item.id);
+        const safeId = hasValidId ? item.id : -(index + 1);
+        const safeLabel =
+          typeof item.label === "string" && item.label.trim()
+            ? item.label.trim()
+            : `Option ${index + 1}`;
+        return {
+          id: safeId,
+          label: safeLabel,
+          key: `${safeId}-${safeLabel}-${index}`,
+        };
+      }),
+    [options],
+  );
 
   return (
     <>
@@ -96,9 +115,9 @@ const Selector = ({
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>{title}</Text>
             <ScrollView>
-              {options.map((item) => (
+              {safeOptions.map((item) => (
                 <Pressable
-                  key={`${item.id}-${item.label}`}
+                  key={item.key}
                   style={styles.modalItem}
                   onPress={() => {
                     onSelect(item);
@@ -158,13 +177,24 @@ export const RegistrationScreen = ({ navigation }: Props) => {
           mastersService.getStates(languageLabel),
         ]);
 
-        setGenderOptions(
-          genders.map((g: any) => ({
-            id: g.genderID || g.GenderID,
-            label: g.genderName || g.GenderName,
-          })),
-        );
-        setStateOptions(states);
+        const mappedGenders = (genders || [])
+          .map((g: any, index: number) => ({
+            id: Number(g.genderID ?? g.GenderID ?? index + 1),
+            label: String(g.genderName ?? g.GenderName ?? "").trim(),
+          }))
+          .filter((g: Option) => Number.isFinite(g.id) && !!g.label);
+
+        const mappedStates = (states || [])
+          .map((s: any, index: number) => ({
+            stateID: Number(s.stateID ?? s.StateID ?? index + 1),
+            stateName: String(s.stateName ?? s.StateName ?? "").trim(),
+          }))
+          .filter(
+            (s: StateMasterItem) => Number.isFinite(s.stateID) && !!s.stateName,
+          );
+
+        setGenderOptions(mappedGenders);
+        setStateOptions(mappedStates);
       } catch (error: any) {
         Alert.alert("Error", error.message || "Unable to load master data");
       } finally {
@@ -193,7 +223,21 @@ export const RegistrationScreen = ({ navigation }: Props) => {
         state.stateID,
         languageLabel,
       );
-      setDistrictOptions(districts.filter((d) => d.stateID === state.stateID));
+      const mappedDistricts = (districts || [])
+        .map((d: any, index: number) => ({
+          districtID: Number(d.districtID ?? d.DistrictID ?? index + 1),
+          districtName: String(d.districtName ?? d.DistrictName ?? "").trim(),
+          stateID: Number(d.stateID ?? d.StateID ?? state.stateID),
+        }))
+        .filter(
+          (d: DistrictMasterItem) =>
+            Number.isFinite(d.districtID) &&
+            Number.isFinite(d.stateID) &&
+            !!d.districtName,
+        );
+      setDistrictOptions(
+        mappedDistricts.filter((d: DistrictMasterItem) => d.stateID === state.stateID),
+      );
     } catch (error: any) {
       Alert.alert("Error", error.message || "Unable to load districts");
     } finally {
@@ -217,9 +261,10 @@ export const RegistrationScreen = ({ navigation }: Props) => {
           languageLabel,
         );
         const mapped = (asd as AsdMasterItem[]).map((a: any) => ({
-          id: a.asdID || a.AsdID,
-          label: a.asdName || a.AsdName,
-        }));
+          id: Number(a.asdID ?? a.AsdID),
+          label: String(a.asdName ?? a.AsdName ?? "").trim(),
+        }))
+        .filter((a: Option) => Number.isFinite(a.id) && !!a.label);
         setBlockOptions(mapped);
       } else {
         const blocks = await mastersService.getBlocks(
@@ -227,9 +272,10 @@ export const RegistrationScreen = ({ navigation }: Props) => {
           languageLabel,
         );
         const mapped = (blocks as BlockMasterItem[]).map((b: any) => ({
-          id: b.blockID || b.BlockID,
-          label: b.blockName || b.BlockName,
-        }));
+          id: Number(b.blockID ?? b.BlockID),
+          label: String(b.blockName ?? b.BlockName ?? "").trim(),
+        }))
+        .filter((b: Option) => Number.isFinite(b.id) && !!b.label);
         setBlockOptions(mapped);
       }
     } catch (error: any) {

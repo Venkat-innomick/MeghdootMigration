@@ -42,20 +42,41 @@ export const LoginScreen = ({ navigation }: Props) => {
     }
     setLoading(true);
     try {
-      const response = await userService.login({ mobileNo: mobile, languageType: currentLanguageLabel });
-      const data = (response.result || response.data) as any;
-      if (data) {
+      // Match Xamarin payload contract for GetUserLoginDetails.
+      const response = await userService.login({
+        LogInId: mobile,
+        LogInPassword: '1234',
+        LanguageType: currentLanguageLabel,
+        Refreshdatetime: '2016-01-01',
+      });
+
+      const root: any = response || {};
+      const isSuccessful = Boolean(root.IsSuccessful ?? root.isSuccessful);
+      const users = (root.ObjUserList || root.objUserList || root.result || root.data || []) as any[];
+      const data = Array.isArray(users) ? users[0] : users;
+      const roleId = Number(data?.RoleId ?? data?.roleId ?? 0);
+      const typeOfRole = Number(data?.TypeOfRole ?? data?.typeOfRole ?? data?.UserProfileID ?? data?.userProfileId ?? 0);
+
+      if (isSuccessful && data && roleId === 1) {
         setUser({
-          userProfileId: data.userProfileId || data.typeOfRole || 0,
-          firstName: data.firstName || '',
-          lastName: data.lastName || '',
-          mobileNumber: mobile,
-          imagePath: data.imagePath,
+          userProfileId: typeOfRole,
+          firstName: data.FirstName || data.firstName || '',
+          lastName: data.LastName || data.lastName || '',
+          mobileNumber: data.LogInId || data.mobileNumber || mobile,
+          imagePath: data.ImagePath || data.imagePath,
           isLogout: false,
-          typeOfRole: data.typeOfRole,
+          typeOfRole,
+          // Persist location/profile fields used by other screens.
+          ...(data.StateName ? { stateName: data.StateName } : {}),
+          ...(data.DistrictName ? { districtName: data.DistrictName } : {}),
+          ...(data.BlockName ? { blockName: data.BlockName } : {}),
+          ...(data.AsdName ? { asdName: data.AsdName } : {}),
+          ...(data.VillageName ? { villageName: data.VillageName } : {}),
+          ...(data.PanchayatName ? { panchayatName: data.PanchayatName } : {}),
+          ...(data.LanguageName ? { languageName: data.LanguageName } : {}),
         });
       } else {
-        Alert.alert('Login failed', response.errorMessage || 'Unable to login');
+        Alert.alert('Login failed', root.ErrorMessage || root.errorMessage || 'Invalid credentials');
       }
     } catch (error: any) {
       Alert.alert('Login failed', error.message);

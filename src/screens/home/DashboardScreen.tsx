@@ -17,6 +17,12 @@ import { spacing } from '../../theme/spacing';
 import { cropService, weatherService } from '../../api/services';
 import { CropAdvisoryItem, DashboardLocation } from '../../types/domain';
 import { useAppStore } from '../../store/appStore';
+import {
+  buildByLocationPayload,
+  getLanguageLabel,
+  getUserProfileId,
+  parseLocationWeatherList,
+} from '../../utils/locationApi';
 
 const pickText = (...values: any[]) => {
   for (const value of values) {
@@ -39,34 +45,37 @@ export const DashboardScreen = () => {
   const navigation = useNavigation<any>();
   const user = useAppStore((s) => s.user);
   const language = useAppStore((s) => s.language);
+  const userId = useMemo(() => getUserProfileId(user), [user]);
+  const languageLabel = useMemo(() => getLanguageLabel(language), [language]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [locations, setLocations] = useState<DashboardLocation[]>([]);
   const [advisories, setAdvisories] = useState<CropAdvisoryItem[]>([]);
 
   const loadData = useCallback(async () => {
-    if (!user) {
+    if (!userId) {
       setLoading(false);
       return;
     }
 
     try {
-      const weather = await weatherService.getByLocation({
-        userProfileID: user.userProfileId,
-        languageType: language,
-      });
+      const weather = await weatherService.getByLocation(buildByLocationPayload(userId, languageLabel));
       const crop = await cropService.getAdvisoryTop({
-        userProfileID: user.userProfileId,
-        languageType: language,
+        Id: userId,
+        UserProfileID: userId,
+        userProfileID: userId,
+        LanguageType: languageLabel,
+        languageType: languageLabel,
+        RefreshDateTime: new Date().toISOString().slice(0, 10),
       });
 
-      setLocations((weather.result || weather.data || []) as DashboardLocation[]);
+      setLocations(parseLocationWeatherList(weather) as DashboardLocation[]);
       setAdvisories((crop.result || crop.data || []) as CropAdvisoryItem[]);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [language, user]);
+  }, [languageLabel, userId]);
 
   useEffect(() => {
     loadData();

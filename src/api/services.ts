@@ -15,6 +15,7 @@ import {
 
 const pickList = <T>(payload: any, keys: string[]): T[] => {
   if (!payload) return [];
+  if (Array.isArray(payload)) return payload as T[];
   for (const key of keys) {
     const value = payload?.[key];
     if (Array.isArray(value)) return value as T[];
@@ -23,7 +24,7 @@ const pickList = <T>(payload: any, keys: string[]): T[] => {
 };
 
 export const userService = {
-  login: async (payload: { mobileNo: string; languageType: string }) => {
+  login: async (payload: Record<string, unknown>) => {
     const { data } = await apiClient.post<ApiResponse<UserProfile>>(
       API_ENDPOINTS.users.getUserLoginDetails,
       payload,
