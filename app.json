@@ -1,0 +1,68 @@
+{
+  "expo": {
+    "name": "AGROMET",
+    "slug": "agromet-rn-eas",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/AppIcon.png",
+    "scheme": "meghdoot-app",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/images/ic_splashScreen.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#749C53"
+    },
+    "androidStatusBar": {
+      "backgroundColor": "#749C53",
+      "barStyle": "light-content",
+      "translucent": false
+    },
+    "androidNavigationBar": {
+      "backgroundColor": "#749C53",
+      "barStyle": "light-content"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.agromet.app"
+    },
+    "android": {
+      "package": "com.aas.meghdoot",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/AppIcon.png",
+        "backgroundColor": "#749C53"
+      },
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "POST_NOTIFICATIONS"
+      ],
+      "googleServicesFile": "./google-services.json"
+    },
+    "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/ic_splashScreen.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#749C53",
+          "imageWidth": 260
+        }
+      ],
+      "expo-location",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/AppIcon.png",
+          "color": "#749C53"
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "replace-with-your-eas-project-id"
+      },
+      "apiBaseUrl": "https://meghdoot-app.tropmet.res.in:8443"
+    }
+  }
+}
