@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -10,14 +10,20 @@ import {
   StyleSheet,
   Text,
   View,
-} from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { Screen } from '../../components/Screen';
-import { colors } from '../../theme/colors';
-import { spacing } from '../../theme/spacing';
-import { mastersService, userService, weatherService } from '../../api/services';
-import { useAppStore } from '../../store/appStore';
-import { DistrictMasterItem, StateMasterItem } from '../../types/domain';
+} from "react-native";
+import { StatusBar } from "expo-status-bar";
+import * as Location from "expo-location";
+import { useNavigation } from "@react-navigation/native";
+import { Screen } from "../../components/Screen";
+import { colors } from "../../theme/colors";
+import { spacing } from "../../theme/spacing";
+import {
+  mastersService,
+  userService,
+  weatherService,
+} from "../../api/services";
+import { useAppStore } from "../../store/appStore";
+import { DistrictMasterItem, StateMasterItem } from "../../types/domain";
 import {
   buildByLocationPayload,
   getLanguageLabel,
@@ -27,7 +33,8 @@ import {
   sameLocation,
   toNum,
   toText,
-} from '../../utils/locationApi';
+} from "../../utils/locationApi";
+import { useAndroidNavigationBar } from "../../hooks/useAndroidNavigationBar";
 
 type SearchBlockItem = {
   blockID: number;
@@ -39,16 +46,22 @@ type SearchBlockItem = {
 };
 
 export const SearchScreen = () => {
+  useAndroidNavigationBar(colors.background, "dark");
   const navigation = useNavigation<any>();
   const user: any = useAppStore((s) => s.user);
   const language = useAppStore((s) => s.language);
+  const setAppLocations = useAppStore((s) => s.setLocations);
+  const setSelectedLocation = useAppStore((s) => s.setSelectedLocation);
 
   const [loading, setLoading] = useState(false);
   const [states, setStates] = useState<StateMasterItem[]>([]);
   const [districts, setDistricts] = useState<DistrictMasterItem[]>([]);
   const [blocks, setBlocks] = useState<SearchBlockItem[]>([]);
-  const [selectedState, setSelectedState] = useState<StateMasterItem | null>(null);
-  const [selectedDistrict, setSelectedDistrict] = useState<DistrictMasterItem | null>(null);
+  const [selectedState, setSelectedState] = useState<StateMasterItem | null>(
+    null,
+  );
+  const [selectedDistrict, setSelectedDistrict] =
+    useState<DistrictMasterItem | null>(null);
   const [statePickerOpen, setStatePickerOpen] = useState(false);
   const [districtPickerOpen, setDistrictPickerOpen] = useState(false);
 
@@ -82,10 +95,12 @@ export const SearchScreen = () => {
           stateName: toText(s.stateName ?? s.StateName),
         }))
         .filter((s) => s.stateID > 0 && !!s.stateName && s.stateID !== 37);
-      const unique = normalized.filter((s, i, arr) => arr.findIndex((x) => x.stateID === s.stateID) === i);
+      const unique = normalized.filter(
+        (s, i, arr) => arr.findIndex((x) => x.stateID === s.stateID) === i,
+      );
       setStates(unique);
     } catch (e: any) {
-      Alert.alert('Error', e.message || 'Unable to load states');
+      Alert.alert("Error", e.message || "Unable to load states");
     } finally {
       setLoading(false);
     }
@@ -101,18 +116,27 @@ export const SearchScreen = () => {
     setBlocks([]);
     setLoading(true);
     try {
-      const list = await mastersService.getDistricts(state.stateID, languageLabel);
+      const list = await mastersService.getDistricts(
+        state.stateID,
+        languageLabel,
+      );
       const normalized = (list as any[])
         .map((d, index) => ({
           districtID: toNum(d.districtID ?? d.DistrictID, 0),
           districtName: toText(d.districtName ?? d.DistrictName),
           stateID: toNum(d.stateID ?? d.StateID, state.stateID),
         }))
-        .filter((d) => d.districtID > 0 && !!d.districtName && d.stateID === state.stateID);
-      const unique = normalized.filter((d, i, arr) => arr.findIndex((x) => x.districtID === d.districtID) === i);
+        .filter(
+          (d) =>
+            d.districtID > 0 && !!d.districtName && d.stateID === state.stateID,
+        );
+      const unique = normalized.filter(
+        (d, i, arr) =>
+          arr.findIndex((x) => x.districtID === d.districtID) === i,
+      );
       setDistricts(unique);
     } catch (e: any) {
-      Alert.alert('Error', e.message || 'Unable to load districts');
+      Alert.alert("Error", e.message || "Unable to load districts");
     } finally {
       setLoading(false);
     }
@@ -123,26 +147,37 @@ export const SearchScreen = () => {
     setSelectedDistrict(district);
     setLoading(true);
     try {
-      const isAsd = selectedState.stateID === 28 || selectedState.stateID === 36;
+      const isAsd =
+        selectedState.stateID === 28 || selectedState.stateID === 36;
       const raw = isAsd
         ? await mastersService.getAsd(district.districtID, languageLabel)
         : await mastersService.getBlocks(district.districtID, languageLabel);
 
       const mapped: SearchBlockItem[] = (raw as any[])
         .map((item: any, index: number) => ({
-        blockID: toNum(item.asdID ?? item.AsdID ?? item.blockID ?? item.BlockID, 0),
-        blockName: toText(item.asdName ?? item.AsdName ?? item.blockName ?? item.BlockName),
-        districtID: district.districtID,
-        stateID: selectedState.stateID,
-        isAsd,
-        favourite: false,
-      }))
+          blockID: toNum(
+            item.asdID ?? item.AsdID ?? item.blockID ?? item.BlockID,
+            0,
+          ),
+          blockName: toText(
+            item.asdName ?? item.AsdName ?? item.blockName ?? item.BlockName,
+          ),
+          districtID: district.districtID,
+          stateID: selectedState.stateID,
+          isAsd,
+          favourite: false,
+        }))
         .filter((item) => item.blockID > 0 && !!item.blockName);
-      const unique = mapped.filter((b, i, arr) => arr.findIndex((x) => x.blockID === b.blockID && x.districtID === b.districtID) === i);
+      const unique = mapped.filter(
+        (b, i, arr) =>
+          arr.findIndex(
+            (x) => x.blockID === b.blockID && x.districtID === b.districtID,
+          ) === i,
+      );
       const withFav = await refreshFavouriteFlags(unique);
       setBlocks(withFav);
     } catch (e: any) {
-      Alert.alert('Error', e.message || 'Unable to load blocks');
+      Alert.alert("Error", e.message || "Unable to load blocks");
     } finally {
       setLoading(false);
     }
@@ -150,14 +185,13 @@ export const SearchScreen = () => {
 
   const addLocation = async (item: SearchBlockItem) => {
     if (!userId) {
-      Alert.alert('Failed', 'User profile not loaded. Please login again.');
+      Alert.alert("Failed", "User profile not loaded. Please login again.");
       return;
     }
     try {
       const payload: Record<string, unknown> = {
         UALID: 0,
         UserProfileID: userId,
-        Id: userId,
         StateID: item.stateID,
         DistrictID: item.districtID,
         Createdby: userId,
@@ -168,25 +202,35 @@ export const SearchScreen = () => {
 
       const response: any = await userService.saveLocation(payload);
       if (!isApiSuccess(response)) {
-        Alert.alert('Failed', response?.errorMessage || response?.ErrorMessage || 'Unable to add location');
+        Alert.alert(
+          "Failed",
+          response?.errorMessage ||
+            response?.ErrorMessage ||
+            "Unable to add location",
+        );
         return;
       }
       const refreshed = await refreshFavouriteFlags(blocks);
-      setBlocks(refreshed.map((b) => (b.blockID === item.blockID && b.districtID === item.districtID ? { ...b, favourite: true } : b)));
+      setBlocks(
+        refreshed.map((b) =>
+          b.blockID === item.blockID && b.districtID === item.districtID
+            ? { ...b, favourite: true }
+            : b,
+        ),
+      );
     } catch (e: any) {
-      Alert.alert('Failed', e.message || 'Unable to add location');
+      Alert.alert("Failed", e.message || "Unable to add location");
     }
   };
 
   const removeLocation = async (item: SearchBlockItem) => {
     if (!userId) {
-      Alert.alert('Failed', 'User profile not loaded. Please login again.');
+      Alert.alert("Failed", "User profile not loaded. Please login again.");
       return;
     }
     try {
       const payload: Record<string, unknown> = {
         UserProfileID: userId,
-        Id: userId,
         DistrictID: item.districtID,
       };
       if (item.isAsd) payload.AsdID = item.blockID;
@@ -194,51 +238,151 @@ export const SearchScreen = () => {
 
       const response: any = await userService.deleteLocation(payload);
       if (!isApiSuccess(response)) {
-        Alert.alert('Failed', response?.errorMessage || response?.ErrorMessage || 'Unable to delete location');
+        Alert.alert(
+          "Failed",
+          response?.errorMessage ||
+            response?.ErrorMessage ||
+            "Unable to delete location",
+        );
         return;
       }
       const refreshed = await refreshFavouriteFlags(blocks);
-      setBlocks(refreshed.map((b) => (b.blockID === item.blockID && b.districtID === item.districtID ? { ...b, favourite: false } : b)));
+      setBlocks(
+        refreshed.map((b) =>
+          b.blockID === item.blockID && b.districtID === item.districtID
+            ? { ...b, favourite: false }
+            : b,
+        ),
+      );
     } catch (e: any) {
-      Alert.alert('Failed', e.message || 'Unable to delete location');
+      Alert.alert("Failed", e.message || "Unable to delete location");
+    }
+  };
+
+  const chooseCurrentLocation = async () => {
+    if (!userId) {
+      Alert.alert("Failed", "User profile not loaded. Please login again.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const permission = await Location.requestForegroundPermissionsAsync();
+      if (permission.status !== "granted") {
+        Alert.alert("Permission", "Location permission is required.");
+        return;
+      }
+
+      const current = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      const payload: Record<string, unknown> = {
+        ...buildByLocationPayload(userId, languageLabel),
+        Latitude: current.coords.latitude,
+        Longitude: current.coords.longitude,
+      };
+
+      const weather = await weatherService.getByLocation(payload);
+      const list = parseLocationWeatherList(weather) as any[];
+      if (!list.length) {
+        Alert.alert("Info", "No location data found for current position.");
+        return;
+      }
+
+      setAppLocations(list as any[]);
+      const target =
+        list.find((x: any) =>
+          Boolean(x.isCurrentLocation ?? x.IsCurrentLocation),
+        ) || list[0];
+      setSelectedLocation({
+        districtID: toNum(target?.districtID ?? target?.DistrictID),
+        blockID: toNum(target?.blockID ?? target?.BlockID),
+        asdID: toNum(target?.asdID ?? target?.AsdID),
+      });
+
+      if (navigation.canGoBack()) navigation.goBack();
+      else
+        navigation.navigate("Main", {
+          screen: "MainTabs",
+          params: { screen: "Home" },
+        });
+    } catch (e: any) {
+      Alert.alert("Failed", e.message || "Unable to get current location");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <Screen>
+      <StatusBar style="light" backgroundColor={colors.primary} />
       <View style={styles.root}>
         <View style={styles.header}>
-          <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Image source={require('../../../assets/images/back.png')} style={styles.backIcon} resizeMode="contain" />
+          <Pressable
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+          >
+            <Image
+              source={require("../../../assets/images/back.png")}
+              style={styles.backIcon}
+              resizeMode="contain"
+            />
           </Pressable>
 
           <View style={styles.selectorsWrap}>
-            <Pressable style={styles.selector} onPress={() => setStatePickerOpen(true)}>
-              <Text style={[styles.selectorText, !selectedState && styles.selectorPlaceholder]}>
-                {selectedState?.stateName || 'Select state'}
+            <Pressable
+              style={styles.selector}
+              onPress={() => setStatePickerOpen(true)}
+            >
+              <Text
+                style={[
+                  styles.selectorText,
+                  !selectedState && styles.selectorPlaceholder,
+                ]}
+              >
+                {selectedState?.stateName || "Select state"}
               </Text>
-              <Image source={require('../../../assets/images/dropdown.png')} style={styles.dropdownIcon} resizeMode="contain" />
+              <Image
+                source={require("../../../assets/images/dropdown.png")}
+                style={styles.dropdownIcon}
+                resizeMode="contain"
+              />
             </Pressable>
 
             {districts.length > 0 ? (
-              <Pressable style={[styles.selector, styles.secondSelector]} onPress={() => setDistrictPickerOpen(true)}>
-                <Text style={[styles.selectorText, !selectedDistrict && styles.selectorPlaceholder]}>
-                  {selectedDistrict?.districtName || 'Select district'}
+              <Pressable
+                style={[styles.selector, styles.secondSelector]}
+                onPress={() => setDistrictPickerOpen(true)}
+              >
+                <Text
+                  style={[
+                    styles.selectorText,
+                    !selectedDistrict && styles.selectorPlaceholder,
+                  ]}
+                >
+                  {selectedDistrict?.districtName || "Select district"}
                 </Text>
-                <Image source={require('../../../assets/images/dropdown.png')} style={styles.dropdownIcon} resizeMode="contain" />
+                <Image
+                  source={require("../../../assets/images/dropdown.png")}
+                  style={styles.dropdownIcon}
+                  resizeMode="contain"
+                />
               </Pressable>
             ) : null}
 
             <Pressable
               style={styles.currentLocationRow}
-              onPress={() => Alert.alert('Location', 'Current location support will be enabled next.')}
+              onPress={chooseCurrentLocation}
             >
               <Image
-                source={require('../../../assets/images/ic_currentLocation.png')}
+                source={require("../../../assets/images/ic_currentLocation.png")}
                 style={styles.currentLocationIcon}
                 resizeMode="contain"
               />
-              <Text style={styles.currentLocationText}>Choose current location</Text>
+              <Text style={styles.currentLocationText}>
+                Choose current location
+              </Text>
             </Pressable>
           </View>
         </View>
@@ -250,22 +394,35 @@ export const SearchScreen = () => {
         ) : (
           <FlatList
             data={blocks}
-            keyExtractor={(item, index) => `${item.stateID}-${item.districtID}-${item.blockID}-${index}`}
-            ListEmptyComponent={<Text style={styles.empty}>Select state and district to load blocks.</Text>}
+            keyExtractor={(item, index) =>
+              `${item.stateID}-${item.districtID}-${item.blockID}-${index}`
+            }
+            ListEmptyComponent={
+              <Text style={styles.empty}>
+                Select state and district to load blocks.
+              </Text>
+            }
             renderItem={({ item }) => (
               <View style={styles.row}>
                 <Text style={styles.rowName}>{item.blockName}</Text>
-                <Pressable style={styles.addedWrap} onPress={() => (item.favourite ? removeLocation(item) : addLocation(item))}>
+                <Pressable
+                  style={styles.addedWrap}
+                  onPress={() =>
+                    item.favourite ? removeLocation(item) : addLocation(item)
+                  }
+                >
                   <Image
                     source={
                       item.favourite
-                        ? require('../../../assets/images/ic_addedFav.png')
-                        : require('../../../assets/images/ic_searchfav.png')
+                        ? require("../../../assets/images/ic_addedFav.png")
+                        : require("../../../assets/images/ic_searchfav.png")
                     }
                     style={styles.addIcon}
                     resizeMode="contain"
                   />
-                  <Text style={styles.addText}>{item.favourite ? 'Added' : 'Add'}</Text>
+                  <Text style={styles.addText}>
+                    {item.favourite ? "Added" : "Add"}
+                  </Text>
                 </Pressable>
               </View>
             )}
@@ -274,8 +431,16 @@ export const SearchScreen = () => {
         )}
       </View>
 
-      <Modal visible={statePickerOpen} transparent animationType="fade" onRequestClose={() => setStatePickerOpen(false)}>
-        <Pressable style={styles.modalBackdrop} onPress={() => setStatePickerOpen(false)}>
+      <Modal
+        visible={statePickerOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setStatePickerOpen(false)}
+      >
+        <Pressable
+          style={styles.modalBackdrop}
+          onPress={() => setStatePickerOpen(false)}
+        >
           <View style={styles.modalCard}>
             <ScrollView>
               {states.map((item) => (
@@ -301,7 +466,10 @@ export const SearchScreen = () => {
         animationType="fade"
         onRequestClose={() => setDistrictPickerOpen(false)}
       >
-        <Pressable style={styles.modalBackdrop} onPress={() => setDistrictPickerOpen(false)}>
+        <Pressable
+          style={styles.modalBackdrop}
+          onPress={() => setDistrictPickerOpen(false)}
+        >
           <View style={styles.modalCard}>
             <ScrollView>
               {districts.map((item) => (
@@ -331,8 +499,8 @@ const styles = StyleSheet.create({
     paddingTop: 25,
     paddingBottom: 5,
     backgroundColor: colors.primary,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    alignItems: "flex-start",
   },
   backButton: {
     width: 25,
@@ -345,17 +513,17 @@ const styles = StyleSheet.create({
   selector: {
     height: 44,
     borderRadius: 2,
-    backgroundColor: '#F0F0F0',
+    backgroundColor: "#F0F0F0",
     borderWidth: 1,
     borderColor: colors.border,
     paddingHorizontal: 18,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   secondSelector: { marginTop: 15 },
   selectorText: {
-    fontFamily: 'RobotoRegular',
+    fontFamily: "RobotoRegular",
     fontSize: 14,
     color: colors.darkGreen,
   },
@@ -364,49 +532,63 @@ const styles = StyleSheet.create({
   currentLocationRow: {
     marginTop: 8,
     marginBottom: 2,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   currentLocationIcon: { width: 20, height: 20 },
   currentLocationText: {
     marginLeft: 5,
-    color: '#fff',
-    fontFamily: 'RobotoRegular',
+    color: "#fff",
+    fontFamily: "RobotoRegular",
     fontSize: 14,
   },
-  loaderWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loaderWrap: { flex: 1, justifyContent: "center", alignItems: "center" },
   row: {
     marginTop: 10,
     marginBottom: 5,
     paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   rowName: {
     flex: 1,
     color: colors.primary,
-    fontFamily: 'RobotoRegular',
+    fontFamily: "RobotoRegular",
     fontSize: 14,
   },
   addedWrap: {
     marginLeft: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   addIcon: { width: 20, height: 20 },
-  addText: { marginLeft: 2, color: colors.primary, fontFamily: 'RobotoRegular', fontSize: 14 },
-  separator: { height: 1, backgroundColor: colors.frameBorder, marginHorizontal: 0 },
-  empty: { textAlign: 'center', color: colors.muted, marginTop: spacing.xl, fontFamily: 'RobotoRegular' },
+  addText: {
+    marginLeft: 2,
+    color: colors.primary,
+    fontFamily: "RobotoRegular",
+    fontSize: 14,
+  },
+  separator: {
+    height: 1,
+    backgroundColor: colors.frameBorder,
+    marginHorizontal: 0,
+  },
+  empty: {
+    textAlign: "center",
+    color: colors.muted,
+    marginTop: spacing.xl,
+    fontFamily: "RobotoRegular",
+  },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: '#00000055',
-    justifyContent: 'center',
+    backgroundColor: "#00000055",
+    justifyContent: "center",
     paddingHorizontal: spacing.lg,
   },
   modalCard: {
-    maxHeight: '70%',
-    backgroundColor: '#fff',
+    maxHeight: "70%",
+    backgroundColor: "#fff",
     borderRadius: 12,
     paddingVertical: spacing.xs,
   },
@@ -414,11 +596,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopColor: "#f0f0f0",
   },
   modalItemText: {
     color: colors.text,
-    fontFamily: 'RobotoRegular',
+    fontFamily: "RobotoRegular",
     fontSize: 14,
   },
 });

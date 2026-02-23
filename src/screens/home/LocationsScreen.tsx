@@ -27,6 +27,7 @@ import {
   toNum,
   toText,
 } from '../../utils/locationApi';
+import { useAndroidNavigationBar } from '../../hooks/useAndroidNavigationBar';
 
 type LocationRow = {
   stateID: number;
@@ -52,6 +53,7 @@ const pickUri = (...values: any[]) => {
 };
 
 export const LocationsScreen = () => {
+  useAndroidNavigationBar(colors.darkGreen, 'light');
   const navigation = useNavigation<any>();
   const user: any = useAppStore((s) => s.user);
   const language = useAppStore((s) => s.language);
@@ -385,7 +387,7 @@ export const LocationsScreen = () => {
   const renderCard = (item: LocationRow, showDelete = true) => (
     <View style={styles.cardWrap}>
       <ImageBackground
-        source={item.cloudImage ? { uri: item.cloudImage } : require('../../../assets/images/ic_profileMenuBG.png')}
+        source={pickUri(item.cloudImage) ? { uri: pickUri(item.cloudImage) } : require('../../../assets/images/ic_profileMenuBG.png')}
         style={styles.card}
         imageStyle={styles.cardBg}
       >

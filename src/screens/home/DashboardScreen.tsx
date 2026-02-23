@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  FlatList as RNFlatList,
   FlatList,
   Image,
   ImageBackground,
@@ -8,6 +9,7 @@ import {
   RefreshControl,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
@@ -75,6 +77,7 @@ const parseAdvisoryList = (payload: any): CropAdvisoryItem[] => {
 
 export const DashboardScreen = () => {
   useAndroidNavigationBar(colors.darkGreen, "light");
+  const { width } = useWindowDimensions();
   const navigation = useNavigation<any>();
   const user = useAppStore((s) => s.user);
   const language = useAppStore((s) => s.language);
@@ -87,6 +90,8 @@ export const DashboardScreen = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [locations, setLocations] = useState<DashboardLocation[]>([]);
   const [advisories, setAdvisories] = useState<CropAdvisoryItem[]>([]);
+  const [activeTab, setActiveTab] = useState<"block" | "district">("block");
+  const [weatherIndex, setWeatherIndex] = useState(0);
 
   const loadData = useCallback(async () => {
     if (!userId) {
@@ -172,6 +177,25 @@ export const DashboardScreen = () => {
     return (match || locations[0]) as any;
   }, [locations, selectedLocation]);
 
+  const currentLocationIndex = useMemo(() => {
+    if (!locations.length) return 0;
+    if (!currentLocation) return 0;
+    const idx = locations.findIndex((item: any) => {
+      return (
+        toNum(item.districtID, item.DistrictID) ===
+          toNum((currentLocation as any).districtID, (currentLocation as any).DistrictID) &&
+        toNum(item.blockID, item.BlockID) ===
+          toNum((currentLocation as any).blockID, (currentLocation as any).BlockID) &&
+        toNum(item.asdID, item.AsdID) === toNum((currentLocation as any).asdID, (currentLocation as any).AsdID)
+      );
+    });
+    return idx >= 0 ? idx : 0;
+  }, [currentLocation, locations]);
+
+  useEffect(() => {
+    setWeatherIndex(currentLocationIndex);
+  }, [currentLocationIndex]);
+
   const weatherMetrics = useMemo(() => {
     if (!currentLocation) return [];
     return [
@@ -202,6 +226,31 @@ export const DashboardScreen = () => {
     ];
   }, [currentLocation]);
 
+  const advisoryRows = useMemo(() => {
+    if (!currentLocation) return advisories;
+    const districtId = toNum((currentLocation as any).districtID, (currentLocation as any).DistrictID);
+    const blockId = toNum((currentLocation as any).blockID, (currentLocation as any).BlockID);
+    const asdId = toNum((currentLocation as any).asdID, (currentLocation as any).AsdID);
+
+    return advisories.filter((row: any) => {
+      const rowDistrict = toNum(row.districtID, row.DistrictID);
+      const rowBlock = toNum(row.blockID, row.BlockID);
+      const rowAsd = toNum(row.asdID, row.AsdID);
+
+      // If API row has no location IDs, keep it visible.
+      if (!rowDistrict && !rowBlock && !rowAsd) return true;
+
+      if (activeTab === "district") {
+        return rowDistrict === districtId;
+      }
+
+      if (asdId > 0) return rowDistrict === districtId && rowAsd === asdId;
+      return rowDistrict === districtId && rowBlock === blockId;
+    });
+  }, [activeTab, advisories, currentLocation]);
+
+  const cardWidth = Math.max(width - 32, 280);
+
   if (loading) {
     return (
       <Screen>
@@ -225,94 +274,114 @@ export const DashboardScreen = () => {
             }}
           />
         }
-        data={advisories}
+        data={advisoryRows}
         keyExtractor={(item, index) =>
           `${(item as any).cropAdvisoryID || (item as any).CropAdvisoryID || index}`
         }
         ListHeaderComponent={
           <View>
             <View style={styles.topTabs}>
-              <View style={[styles.topTab, styles.topTabActive]}>
-                <Text style={styles.topTabTextActive}>Block/ASD</Text>
-              </View>
-              <View style={styles.topTab}>
-                <Text style={styles.topTabText}>District</Text>
-              </View>
+              <Pressable
+                style={[styles.topTab, activeTab === "block" && styles.topTabActive]}
+                onPress={() => setActiveTab("block")}
+              >
+                <Text style={activeTab === "block" ? styles.topTabTextActive : styles.topTabText}>Block/ASD</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.topTab, activeTab === "district" && styles.topTabActive]}
+                onPress={() => setActiveTab("district")}
+              >
+                <Text style={activeTab === "district" ? styles.topTabTextActive : styles.topTabText}>District</Text>
+              </Pressable>
             </View>
 
-            <Pressable
-              style={styles.weatherCardPress}
-              onPress={() => navigation.navigate("Forecast")}
-            >
-              <ImageBackground
-                source={
-                  pickUri(
-                    currentLocation?.cloudImage,
-                    currentLocation?.CloudImage,
-                  )
-                    ? {
-                        uri: pickUri(
-                          currentLocation?.cloudImage,
-                          currentLocation?.CloudImage,
-                        ),
-                      }
-                    : require("../../../assets/images/ic_profileMenuBG.png")
-                }
-                style={styles.weatherCard}
-                imageStyle={styles.weatherCardBg}
-              >
-                <Text style={styles.placeName}>
-                  {pickText(
-                    currentLocation?.placeName,
-                    currentLocation?.PlaceName,
-                    currentLocation?.districtName,
-                    currentLocation?.DistrictName,
-                    "Location",
-                  )}
-                </Text>
-                <Text style={styles.dateText}>
-                  {pickText(currentLocation?.date, currentLocation?.Date, "-")}
-                </Text>
-                <Text style={styles.minMaxText}>
-                  Min{" "}
-                  {pickText(
-                    currentLocation?.minTemp,
-                    currentLocation?.MinTemp,
-                    "-",
-                  )}{" "}
-                  C | Max{" "}
-                  {pickText(
-                    currentLocation?.maxTemp,
-                    currentLocation?.MaxTemp,
-                    "-",
-                  )}{" "}
-                  C
-                </Text>
-                <Text style={styles.weatherType}>
-                  {pickText(
-                    currentLocation?.weatherType,
-                    currentLocation?.WeatherType,
-                    "-",
-                  )}
-                </Text>
+            <RNFlatList
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              data={locations}
+              initialScrollIndex={0}
+              keyExtractor={(item: any, index) =>
+                `${toNum(item.stateID, item.StateID)}-${toNum(item.districtID, item.DistrictID)}-${toNum(item.blockID, item.BlockID)}-${toNum(item.asdID, item.AsdID)}-${index}`
+              }
+              getItemLayout={(_, index) => ({ length: cardWidth, offset: cardWidth * index, index })}
+              renderItem={({ item }) => {
+                const itemMetrics = [
+                  metric("Rainfall", pickText((item as any).rainFall, (item as any).RainFall, "-"), require("../../../assets/images/ic_rainfall.png")),
+                  metric("Wind Speed", pickText((item as any).windSpeed, (item as any).WindSpeed, "-"), require("../../../assets/images/ic_windspeed.png")),
+                  metric("Humidity", pickText((item as any).humidity, (item as any).Humidity, "-"), require("../../../assets/images/ic_humidity.png")),
+                  metric("Direction", pickText((item as any).windDirection, (item as any).WindDirection, "-"), require("../../../assets/images/ic_winddirection.png")),
+                ];
 
-                <View style={styles.metricsGrid}>
-                  {weatherMetrics.map((item) => (
-                    <View key={item.label} style={styles.metricRow}>
-                      <Image
-                        source={item.icon}
-                        style={styles.metricIcon}
-                        resizeMode="contain"
-                      />
-                      <View>
-                        <Text style={styles.metricLabel}>{item.label}</Text>
-                        <Text style={styles.metricValue}>{item.value}</Text>
+                return (
+                  <Pressable style={[styles.weatherCardPress, { width: cardWidth }]} onPress={() => navigation.navigate("Forecast")}>
+                    <ImageBackground
+                      source={
+                        pickUri((item as any)?.cloudImage, (item as any)?.CloudImage)
+                          ? { uri: pickUri((item as any)?.cloudImage, (item as any)?.CloudImage) }
+                          : require("../../../assets/images/ic_profileMenuBG.png")
+                      }
+                      style={styles.weatherCard}
+                      imageStyle={styles.weatherCardBg}
+                    >
+                      <Text style={styles.placeName}>
+                        {pickText((item as any)?.placeName, (item as any)?.PlaceName, (item as any)?.districtName, (item as any)?.DistrictName, "Location")}
+                      </Text>
+                      <Text style={styles.dateText}>{pickText((item as any)?.date, (item as any)?.Date, "-")}</Text>
+                      <Text style={styles.minMaxText}>
+                        Min {pickText((item as any)?.minTemp, (item as any)?.MinTemp, "-")} C | Max {pickText((item as any)?.maxTemp, (item as any)?.MaxTemp, "-")} C
+                      </Text>
+                      <Text style={styles.weatherType}>{pickText((item as any)?.weatherType, (item as any)?.WeatherType, "-")}</Text>
+
+                      <View style={styles.metricsGrid}>
+                        {itemMetrics.map((m) => (
+                          <View key={m.label} style={styles.metricRow}>
+                            <Image source={m.icon} style={styles.metricIcon} resizeMode="contain" />
+                            <View>
+                              <Text style={styles.metricLabel}>{m.label}</Text>
+                              <Text style={styles.metricValue}>{m.value}</Text>
+                            </View>
+                          </View>
+                        ))}
                       </View>
-                    </View>
-                  ))}
-                </View>
-              </ImageBackground>
-            </Pressable>
+                    </ImageBackground>
+                  </Pressable>
+                );
+              }}
+              onMomentumScrollEnd={(e) => {
+                const x = e.nativeEvent.contentOffset.x;
+                const index = Math.round(x / cardWidth);
+                const item: any = locations[index];
+                if (!item) return;
+                setWeatherIndex(index);
+                setSelectedLocation({
+                  districtID: toNum(item.districtID, item.DistrictID),
+                  blockID: toNum(item.blockID, item.BlockID),
+                  asdID: toNum(item.asdID, item.AsdID),
+                });
+              }}
+            />
+
+            {locations.length > 1 ? (
+              <View style={styles.dotsRow}>
+                {locations.map((_, idx) => (
+                  <View key={`dot-${idx}`} style={[styles.dot, idx === weatherIndex && styles.dotActive]} />
+                ))}
+              </View>
+            ) : null}
+
+            {pickText((currentLocation as any)?.warningMessage, (currentLocation as any)?.WarningMessage) ? (
+              <View
+                style={[
+                  styles.warningWrap,
+                  { backgroundColor: pickText((currentLocation as any)?.colorCode, (currentLocation as any)?.ColorCode) || "#F7CE52" },
+                ]}
+              >
+                <Text style={styles.warningText}>
+                  {pickText((currentLocation as any)?.warningMessage, (currentLocation as any)?.WarningMessage)}
+                </Text>
+              </View>
+            ) : null}
 
             <Text style={styles.recentTitle}>Recent crop advisories</Text>
           </View>
@@ -395,7 +464,7 @@ const styles = StyleSheet.create({
   topTabs: {
     marginHorizontal: 16,
     marginTop: 16,
-    marginBottom: 10,
+    marginBottom: 12,
     flexDirection: "row",
   },
   topTab: {
@@ -419,7 +488,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   weatherCardPress: {
-    marginHorizontal: 16,
+    paddingHorizontal: 16,
     marginBottom: 16,
   },
   weatherCard: {
@@ -487,6 +556,36 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginBottom: 5,
     color: colors.text,
+    fontFamily: "RobotoRegular",
+    fontSize: 14,
+  },
+  dotsRow: {
+    marginTop: -6,
+    marginBottom: 10,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 6,
+  },
+  dot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: "#C8C8C8",
+  },
+  dotActive: {
+    backgroundColor: colors.darkGreen,
+  },
+  warningWrap: {
+    marginHorizontal: 16,
+    marginTop: -4,
+    marginBottom: 10,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  warningText: {
+    textAlign: "center",
+    color: "#111",
     fontFamily: "RobotoRegular",
     fontSize: 14,
   },

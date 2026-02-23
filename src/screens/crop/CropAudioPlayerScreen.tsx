@@ -16,6 +16,13 @@ const formatTime = (ms: number) => {
 
 export const CropAudioPlayerScreen = ({ navigation, route }: Props) => {
   const { title = 'Audio', imageUrl = '', audioUrl = '' } = route.params;
+  const validImageUrl =
+    typeof imageUrl === 'string' &&
+    imageUrl.trim() &&
+    imageUrl.trim().toLowerCase() !== 'null' &&
+    imageUrl.trim().toLowerCase() !== 'undefined'
+      ? imageUrl.trim()
+      : '';
 
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [position, setPosition] = useState(0);
@@ -116,7 +123,7 @@ export const CropAudioPlayerScreen = ({ navigation, route }: Props) => {
 
         <View style={styles.artFrame}>
           <Image
-            source={imageUrl ? { uri: imageUrl } : require('../../../assets/images/defult_crop_plane.png')}
+            source={validImageUrl ? { uri: validImageUrl } : require('../../../assets/images/defult_crop_plane.png')}
             style={styles.art}
             resizeMode="cover"
           />

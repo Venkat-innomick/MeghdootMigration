@@ -8,6 +8,13 @@ type Props = NativeStackScreenProps<RootStackParamList, 'CropImagePreview'>;
 
 export const CropImagePreviewScreen = ({ navigation, route }: Props) => {
   const { imageUrl } = route.params;
+  const validImageUrl =
+    typeof imageUrl === 'string' &&
+    imageUrl.trim() &&
+    imageUrl.trim().toLowerCase() !== 'null' &&
+    imageUrl.trim().toLowerCase() !== 'undefined'
+      ? imageUrl.trim()
+      : '';
 
   return (
     <Screen>
@@ -17,7 +24,7 @@ export const CropImagePreviewScreen = ({ navigation, route }: Props) => {
         </Pressable>
 
         <Image
-          source={imageUrl ? { uri: imageUrl } : require('../../../assets/images/defult_crop_plane.png')}
+          source={validImageUrl ? { uri: validImageUrl } : require('../../../assets/images/defult_crop_plane.png')}
           style={styles.image}
           resizeMode="contain"
         />

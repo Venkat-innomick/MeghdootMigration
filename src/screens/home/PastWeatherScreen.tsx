@@ -24,6 +24,7 @@ import {
   parseLocationWeatherList,
   toText as normalizeText,
 } from '../../utils/locationApi';
+import { useAndroidNavigationBar } from '../../hooks/useAndroidNavigationBar';
 
 const pickText = (...values: any[]) => {
   for (const value of values) {
@@ -50,6 +51,15 @@ const pickUri = (...values: any[]) => {
   return '';
 };
 
+const pickColor = (...values: any[]) => {
+  for (const value of values) {
+    if (typeof value === 'string' && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(value.trim())) {
+      return value.trim();
+    }
+  }
+  return '#024764';
+};
+
 const pickList = (payload: any): any[] => {
   if (!payload) return [];
   if (Array.isArray(payload)) return payload;
@@ -72,6 +82,7 @@ const pickList = (payload: any): any[] => {
 };
 
 export const PastWeatherScreen = () => {
+  useAndroidNavigationBar(colors.darkGreen, 'light');
   const user = useAppStore((s) => s.user);
   const language = useAppStore((s) => s.language);
   const appLocations = useAppStore((s) => s.locations);
@@ -90,6 +101,10 @@ export const PastWeatherScreen = () => {
 
   const selectedLocation = locations[selectedLocationIndex] as any;
   const selectedDay = (days[selectedDayIndex] || {}) as any;
+  const heroTextColor = useMemo(
+    () => pickColor(selectedDay.textColor, selectedDay.TextColor),
+    [selectedDay],
+  );
 
   const locationLabel = useMemo(() => {
     if (!selectedLocation) return 'Select location';
@@ -233,16 +248,16 @@ export const PastWeatherScreen = () => {
               style={styles.hero}
               imageStyle={styles.heroImage}
             >
-              <Text style={styles.heroDate}>{pickText(selectedDay.date, selectedDay.Date, '-')}</Text>
-              <View style={styles.heroDivider} />
-              <Text style={styles.heroType}>{pickText(selectedDay.weatherType, selectedDay.WeatherType, '-')}</Text>
+              <Text style={[styles.heroDate, { color: heroTextColor }]}>{pickText(selectedDay.date, selectedDay.Date, '-')}</Text>
+              <View style={[styles.heroDivider, { backgroundColor: heroTextColor }]} />
+              <Text style={[styles.heroType, { color: heroTextColor }]}>{pickText(selectedDay.weatherType, selectedDay.WeatherType, '-')}</Text>
 
               <View style={styles.metricRow}>
                 <View style={styles.metricHalf}>
                   <Image source={require('../../../assets/images/ic_tempWeather.png')} style={styles.metricIcon} resizeMode="contain" />
                   <View>
-                    <Text style={styles.metricLabel}>Temperature</Text>
-                    <Text style={styles.metricValue}>
+                    <Text style={[styles.metricLabel, { color: heroTextColor }]}>Temperature</Text>
+                    <Text style={[styles.metricValue, { color: heroTextColor }]}>
                       Min {pickText(selectedDay.minTemp, selectedDay.MinTemp, '-')} | Max {pickText(selectedDay.maxTemp, selectedDay.MaxTemp, '-')}
                     </Text>
                   </View>
@@ -253,15 +268,15 @@ export const PastWeatherScreen = () => {
                 <View style={styles.metricHalf}>
                   <Image source={require('../../../assets/images/ic_rainfall.png')} style={styles.metricIcon} resizeMode="contain" />
                   <View>
-                    <Text style={styles.metricLabel}>Rainfall</Text>
-                    <Text style={styles.metricValue}>{pickText(selectedDay.rainFall, selectedDay.RainFall, selectedDay.rainfall, selectedDay.Rainfall, '-')}</Text>
+                    <Text style={[styles.metricLabel, { color: heroTextColor }]}>Rainfall</Text>
+                    <Text style={[styles.metricValue, { color: heroTextColor }]}>{pickText(selectedDay.rainFall, selectedDay.RainFall, selectedDay.rainfall, selectedDay.Rainfall, '-')}</Text>
                   </View>
                 </View>
                 <View style={styles.metricHalf}>
                   <Image source={require('../../../assets/images/ic_windspeed.png')} style={styles.metricIcon} resizeMode="contain" />
                   <View>
-                    <Text style={styles.metricLabel}>Wind Speed</Text>
-                    <Text style={styles.metricValue}>{pickText(selectedDay.windSpeed, selectedDay.WindSpeed, '-')}</Text>
+                    <Text style={[styles.metricLabel, { color: heroTextColor }]}>Wind Speed</Text>
+                    <Text style={[styles.metricValue, { color: heroTextColor }]}>{pickText(selectedDay.windSpeed, selectedDay.WindSpeed, '-')}</Text>
                   </View>
                 </View>
               </View>
@@ -270,19 +285,22 @@ export const PastWeatherScreen = () => {
                 <View style={styles.metricHalf}>
                   <Image source={require('../../../assets/images/ic_humidity.png')} style={styles.metricIcon} resizeMode="contain" />
                   <View>
-                    <Text style={styles.metricLabel}>Humidity</Text>
-                    <Text style={styles.metricValue}>{pickText(selectedDay.humidity, selectedDay.Humidity, '-')}</Text>
+                    <Text style={[styles.metricLabel, { color: heroTextColor }]}>Humidity</Text>
+                    <Text style={[styles.metricValue, { color: heroTextColor }]}>{pickText(selectedDay.humidity, selectedDay.Humidity, '-')}</Text>
                   </View>
                 </View>
                 <View style={styles.metricHalf}>
                   <Image source={require('../../../assets/images/ic_winddirection.png')} style={styles.metricIcon} resizeMode="contain" />
                   <View>
-                    <Text style={styles.metricLabel}>Wind Direction</Text>
-                    <Text style={styles.metricValue}>{pickText(selectedDay.windDirection, selectedDay.WindDirection, '-')}</Text>
+                    <Text style={[styles.metricLabel, { color: heroTextColor }]}>Wind Direction</Text>
+                    <Text style={[styles.metricValue, { color: heroTextColor }]}>{pickText(selectedDay.windDirection, selectedDay.WindDirection, '-')}</Text>
                   </View>
                 </View>
               </View>
             </ImageBackground>
+            {!days.length ? (
+              <Text style={styles.emptyText}>No data currently available.</Text>
+            ) : null}
           </ScrollView>
         )}
 
@@ -333,7 +351,7 @@ const styles = StyleSheet.create({
   dropDownIcon: { width: 21, height: 11 },
   daysStrip: {
     backgroundColor: '#1B4210',
-    minHeight: 120,
+    minHeight: 140,
   },
   daysContent: {
     paddingVertical: 10,
@@ -341,6 +359,7 @@ const styles = StyleSheet.create({
   },
   dayPill: {
     width: 75,
+    minHeight: 110,
     borderRadius: 30,
     backgroundColor: '#1B4210',
     marginHorizontal: 8,
@@ -419,6 +438,13 @@ const styles = StyleSheet.create({
     fontFamily: 'RobotoMedium',
     fontSize: 16,
     marginTop: 2,
+  },
+  emptyText: {
+    marginTop: 14,
+    textAlign: 'center',
+    color: colors.muted,
+    fontFamily: 'RobotoRegular',
+    fontSize: 14,
   },
   modalBackdrop: {
     flex: 1,

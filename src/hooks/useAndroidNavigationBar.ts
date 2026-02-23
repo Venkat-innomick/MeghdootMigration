@@ -1,13 +1,7 @@
 import { useCallback } from 'react';
 import { Platform } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-
-let AndroidNavigationBar: any = null;
-try {
-  AndroidNavigationBar = require('expo-navigation-bar');
-} catch {
-  AndroidNavigationBar = null;
-}
+import * as NavigationBar from 'expo-navigation-bar';
 
 export const useAndroidNavigationBar = (
   activeColor: string,
@@ -15,12 +9,12 @@ export const useAndroidNavigationBar = (
 ) => {
   useFocusEffect(
     useCallback(() => {
-      if (Platform.OS === 'android' && AndroidNavigationBar) {
-        if (typeof AndroidNavigationBar.setBackgroundColorAsync === 'function') {
-          AndroidNavigationBar.setBackgroundColorAsync(activeColor).catch(() => undefined);
+      if (Platform.OS === 'android') {
+        if (typeof NavigationBar.setBackgroundColorAsync === 'function') {
+          NavigationBar.setBackgroundColorAsync(activeColor).catch(() => undefined);
         }
-        if (typeof AndroidNavigationBar.setButtonStyleAsync === 'function') {
-          AndroidNavigationBar.setButtonStyleAsync(buttonStyle).catch(() => undefined);
+        if (typeof NavigationBar.setButtonStyleAsync === 'function') {
+          NavigationBar.setButtonStyleAsync(buttonStyle).catch(() => undefined);
         }
       }
       return undefined;

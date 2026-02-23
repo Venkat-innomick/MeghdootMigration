@@ -5,6 +5,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createDrawerNavigator, DrawerContentScrollView, DrawerItem } from '@react-navigation/drawer';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as NavigationBar from 'expo-navigation-bar';
 import { RootStackParamList, AuthStackParamList, OnboardingStackParamList } from './types';
 import { useAppStore } from '../store/appStore';
 import { colors } from '../theme/colors';
@@ -43,20 +44,12 @@ const OnboardingStack = createNativeStackNavigator<OnboardingStackParamList>();
 const Drawer = createDrawerNavigator();
 const Tabs = createBottomTabNavigator();
 
-let AndroidNavigationBar: any = null;
-try {
-  AndroidNavigationBar = require('expo-navigation-bar');
-} catch {
-  AndroidNavigationBar = null;
-}
-
 const setAndroidNavBar = (backgroundColor: string, buttonStyle: 'light' | 'dark') => {
-  if (!AndroidNavigationBar) return;
-  if (typeof AndroidNavigationBar.setBackgroundColorAsync === 'function') {
-    AndroidNavigationBar.setBackgroundColorAsync(backgroundColor).catch(() => undefined);
+  if (typeof NavigationBar.setBackgroundColorAsync === 'function') {
+    NavigationBar.setBackgroundColorAsync(backgroundColor).catch(() => undefined);
   }
-  if (typeof AndroidNavigationBar.setButtonStyleAsync === 'function') {
-    AndroidNavigationBar.setButtonStyleAsync(buttonStyle).catch(() => undefined);
+  if (typeof NavigationBar.setButtonStyleAsync === 'function') {
+    NavigationBar.setButtonStyleAsync(buttonStyle).catch(() => undefined);
   }
 };
 
@@ -94,21 +87,25 @@ const HomeTabs = () => {
         tabBarInactiveTintColor: '#fff',
         tabBarLabelStyle: { fontSize: 12, fontFamily: 'RobotoRegular', marginBottom: 2 },
         tabBarIcon: ({ focused }) => {
-          const map: Record<string, any> = {
-            Home: focused
+          let icon = require('../../assets/images/ic_home.png');
+          if (route.name === 'Home') {
+            icon = focused
               ? require('../../assets/images/ic_homeYellow.png')
-              : require('../../assets/images/ic_home.png'),
-            PastWeather: focused
+              : require('../../assets/images/ic_home.png');
+          } else if (route.name === 'PastWeather') {
+            icon = focused
               ? require('../../assets/images/ic_pastweatherYellow.png')
-              : require('../../assets/images/ic_pastweather.png'),
-            Forecast: focused
+              : require('../../assets/images/ic_pastweather.png');
+          } else if (route.name === 'Forecast') {
+            icon = focused
               ? require('../../assets/images/ic_forecastYellow.png')
-              : require('../../assets/images/ic_forecast.png'),
-            Locations: focused
+              : require('../../assets/images/ic_forecast.png');
+          } else if (route.name === 'Locations') {
+            icon = focused
               ? require('../../assets/images/ic_locationYellow.png')
-              : require('../../assets/images/ic_location.png'),
-          };
-          return <Image source={map[route.name]} style={{ width: 20, height: 20 }} resizeMode="contain" />;
+              : require('../../assets/images/ic_location.png');
+          }
+          return <Image source={icon} style={{ width: 20, height: 20 }} resizeMode="contain" />;
         },
       })}
     >

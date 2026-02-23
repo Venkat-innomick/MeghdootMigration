@@ -35,6 +35,8 @@
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
+        "CAMERA",
+        "READ_MEDIA_IMAGES",
         "POST_NOTIFICATIONS"
       ],
       "googleServicesFile": "./google-services.json"
@@ -50,6 +52,13 @@
         }
       ],
       "expo-location",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow AGROMET to access your photos.",
+          "cameraPermission": "Allow AGROMET to access your camera."
+        }
+      ],
       [
         "expo-notifications",
         {

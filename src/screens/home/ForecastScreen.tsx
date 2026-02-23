@@ -24,6 +24,7 @@ import {
   parseLocationWeatherList,
   toText as normalizeText,
 } from '../../utils/locationApi';
+import { useAndroidNavigationBar } from '../../hooks/useAndroidNavigationBar';
 
 const pickText = (...values: any[]) => {
   for (const value of values) {
@@ -72,6 +73,7 @@ const pickList = (payload: any): any[] => {
 };
 
 export const ForecastScreen = () => {
+  useAndroidNavigationBar(colors.darkGreen, 'light');
   const user = useAppStore((s) => s.user);
   const language = useAppStore((s) => s.language);
   const appLocations = useAppStore((s) => s.locations);
