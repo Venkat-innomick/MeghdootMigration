@@ -1,33 +1,52 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { Screen } from '../../components/Screen';
-import { colors } from '../../theme/colors';
-import { cropService } from '../../api/services';
-import { useAppStore } from '../../store/appStore';
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { useNavigation } from "@react-navigation/native";
+import { Screen } from "../../components/Screen";
+import { colors } from "../../theme/colors";
+import { cropService } from "../../api/services";
+import { useAppStore } from "../../store/appStore";
+import { useAndroidNavigationBar } from "../../hooks/useAndroidNavigationBar";
 
 const pickText = (...values: any[]) => {
   for (const value of values) {
-    if (typeof value === 'string' && value.trim()) return value;
+    if (typeof value === "string" && value.trim()) return value;
   }
-  return '';
+  return "";
 };
 
 const pickNum = (...values: any[]) => {
   for (const value of values) {
-    if (typeof value === 'number') return value;
-    if (typeof value === 'string' && value.trim() && !Number.isNaN(Number(value))) return Number(value);
+    if (typeof value === "number") return value;
+    if (
+      typeof value === "string" &&
+      value.trim() &&
+      !Number.isNaN(Number(value))
+    )
+      return Number(value);
   }
   return 0;
 };
 
 const pickUri = (...values: any[]) => {
   for (const value of values) {
-    if (typeof value === 'string' && (value.startsWith('http://') || value.startsWith('https://') || value.startsWith('file://'))) {
+    if (
+      typeof value === "string" &&
+      (value.startsWith("http://") ||
+        value.startsWith("https://") ||
+        value.startsWith("file://"))
+    ) {
       return value;
     }
   }
-  return '';
+  return "";
 };
 
 const pickList = (payload: any, keys: string[]) => {
@@ -40,6 +59,7 @@ const pickList = (payload: any, keys: string[]) => {
 };
 
 export const AllCropsScreen = () => {
+  useAndroidNavigationBar(colors.background, "dark");
   const navigation = useNavigation<any>();
   const user = useAppStore((s) => s.user);
   const language = useAppStore((s) => s.language);
@@ -60,14 +80,31 @@ export const AllCropsScreen = () => {
         });
 
         const list = pickList(response.result || response.data || response, [
-          'objCropAdvisoryCropMappList',
-          'ObjCropAdvisoryCropMappList',
-          'objPopListByCropCategoryId',
+          "objCropAdvisoryCropMappList",
+          "ObjCropAdvisoryCropMappList",
+          "objPopListByCropCategoryId",
         ]);
 
         const unique = list.filter((item: any, index: number, arr: any[]) => {
-          const id = pickNum(item.cropID, item.CropID, item.cropCategoryID, item.CropCategoryID, index);
-          return arr.findIndex((x) => pickNum(x.cropID, x.CropID, x.cropCategoryID, x.CropCategoryID, index) === id) === index;
+          const id = pickNum(
+            item.cropID,
+            item.CropID,
+            item.cropCategoryID,
+            item.CropCategoryID,
+            index,
+          );
+          return (
+            arr.findIndex(
+              (x) =>
+                pickNum(
+                  x.cropID,
+                  x.CropID,
+                  x.cropCategoryID,
+                  x.CropCategoryID,
+                  index,
+                ) === id,
+            ) === index
+          );
         });
 
         setItems(unique);
@@ -96,20 +133,50 @@ export const AllCropsScreen = () => {
       <FlatList
         data={items}
         numColumns={2}
-        keyExtractor={(item, index) => String(pickNum(item.cropID, item.CropID, item.cropCategoryID, item.CropCategoryID, index))}
+        keyExtractor={(item, index) =>
+          String(
+            pickNum(
+              item.cropID,
+              item.CropID,
+              item.cropCategoryID,
+              item.CropCategoryID,
+              index,
+            ),
+          )
+        }
         contentContainerStyle={styles.gridContent}
         renderItem={({ item }) => {
-          const name = pickText(item.cropName, item.CropName, item.varietyName, item.VarietyName, '--');
-          const image = pickUri(item.cropImageURL, item.CropImageURL, item.imagePath, item.ImagePath);
+          const name = pickText(
+            item.cropName,
+            item.CropName,
+            item.varietyName,
+            item.VarietyName,
+            "--",
+          );
+          const image = pickUri(
+            item.cropImageURL,
+            item.CropImageURL,
+            item.imagePath,
+            item.ImagePath,
+          );
 
           return (
-            <Pressable style={styles.card} onPress={() => navigation.navigate('CropAdvisory')}>
+            <Pressable
+              style={styles.card}
+              onPress={() => navigation.navigate("CropAdvisory")}
+            >
               <Image
-                source={image ? { uri: image } : require('../../../assets/images/defult_crop_plane.png')}
+                source={
+                  image
+                    ? { uri: image }
+                    : require("../../../assets/images/defult_crop_plane.png")
+                }
                 style={styles.cropImage}
                 resizeMode="cover"
               />
-              <Text style={styles.cropName} numberOfLines={2}>{name}</Text>
+              <Text style={styles.cropName} numberOfLines={2}>
+                {name}
+              </Text>
             </Pressable>
           );
         }}
@@ -123,45 +190,45 @@ export const AllCropsScreen = () => {
 const styles = StyleSheet.create({
   loaderWrap: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   gridContent: {
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
   card: {
-    width: '47%',
-    marginHorizontal: '1.5%',
+    width: "47%",
+    marginHorizontal: "1.5%",
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#E3E3E3',
-    backgroundColor: '#F8FAF5',
+    borderColor: "#E3E3E3",
+    backgroundColor: "#F8FAF5",
     borderRadius: 15,
     paddingVertical: 10,
-    alignItems: 'center',
+    alignItems: "center",
   },
   cropImage: {
     width: 75,
     height: 75,
     borderRadius: 38,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
   },
   cropName: {
     marginTop: 8,
-    color: '#363636',
-    fontFamily: 'RobotoRegular',
+    color: "#363636",
+    fontFamily: "RobotoRegular",
     fontSize: 16,
-    textAlign: 'center',
+    textAlign: "center",
     minHeight: 38,
     paddingHorizontal: 6,
   },
   empty: {
     flex: 1,
-    textAlign: 'center',
-    textAlignVertical: 'center',
-    color: '#999',
-    fontFamily: 'RobotoRegular',
+    textAlign: "center",
+    textAlignVertical: "center",
+    color: "#999",
+    fontFamily: "RobotoRegular",
     fontSize: 16,
   },
 });

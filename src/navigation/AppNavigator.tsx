@@ -43,6 +43,23 @@ const OnboardingStack = createNativeStackNavigator<OnboardingStackParamList>();
 const Drawer = createDrawerNavigator();
 const Tabs = createBottomTabNavigator();
 
+let AndroidNavigationBar: any = null;
+try {
+  AndroidNavigationBar = require('expo-navigation-bar');
+} catch {
+  AndroidNavigationBar = null;
+}
+
+const setAndroidNavBar = (backgroundColor: string, buttonStyle: 'light' | 'dark') => {
+  if (!AndroidNavigationBar) return;
+  if (typeof AndroidNavigationBar.setBackgroundColorAsync === 'function') {
+    AndroidNavigationBar.setBackgroundColorAsync(backgroundColor).catch(() => undefined);
+  }
+  if (typeof AndroidNavigationBar.setButtonStyleAsync === 'function') {
+    AndroidNavigationBar.setButtonStyleAsync(buttonStyle).catch(() => undefined);
+  }
+};
+
 const MainHeader = ({ navigation, title }: any) => ({
   title,
   headerStyle: { backgroundColor: colors.primary },
@@ -127,6 +144,14 @@ const OnboardingNavigator = () => {
 const MenuContent = (props: any) => {
   const logout = useAppStore((s) => s.logout);
   const user = useAppStore((s) => s.user);
+  const goMenu = (screen: string) => {
+    setAndroidNavBar(colors.background, 'dark');
+    props.navigation.navigate(screen);
+  };
+  const goHome = () => {
+    setAndroidNavBar(colors.darkGreen, 'light');
+    props.navigation.navigate('MainTabs');
+  };
 
   return (
     <DrawerContentScrollView {...props} style={{ backgroundColor: colors.gladeGreen }}>
@@ -137,13 +162,14 @@ const MenuContent = (props: any) => {
         <Image source={require('../../assets/images/ic_profileMenuBG.png')} style={{ width: '100%', height: 120, borderRadius: 8, marginBottom: 8 }} resizeMode="cover" />
         <Text style={{ color: '#fff', fontFamily: 'RobotoMedium', fontSize: 16 }}>{`${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'User'}</Text>
       </Pressable>
-      <DrawerItem label="All Crops" labelStyle={{ color: '#fff' }} icon={() => <Image source={require('../../assets/images/ic_allCrop.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />} onPress={() => props.navigation.navigate('AllCrops')} />
-      <DrawerItem label="My Favourites" labelStyle={{ color: '#fff' }} icon={() => <Image source={require('../../assets/images/ic_fav.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />} onPress={() => props.navigation.navigate('Favourites')} />
-      <DrawerItem label="Nowcast" labelStyle={{ color: '#fff' }} icon={() => <Image source={require('../../assets/images/ic_nowcast.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />} onPress={() => props.navigation.navigate('Nowcast')} />
-      <DrawerItem label="Notifications" labelStyle={{ color: '#fff' }} icon={() => <Image source={require('../../assets/images/ic_notification.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />} onPress={() => props.navigation.navigate('Notifications')} />
-      <DrawerItem label="Change Language" labelStyle={{ color: '#fff' }} icon={() => <Image source={require('../../assets/images/ic_languageWhite.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />} onPress={() => props.navigation.navigate('LanguageSettings')} />
-      <DrawerItem label="Disclaimer" labelStyle={{ color: '#fff' }} icon={() => <Image source={require('../../assets/images/ic_disclaimer.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />} onPress={() => props.navigation.navigate('Disclaimer')} />
-      <DrawerItem label="About" labelStyle={{ color: '#fff' }} icon={() => <Image source={require('../../assets/images/ic_about.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />} onPress={() => props.navigation.navigate('About')} />
+      <DrawerItem label="Home" labelStyle={{ color: '#fff' }} icon={() => <Image source={require('../../assets/images/ic_home.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />} onPress={goHome} />
+      <DrawerItem label="All Crops" labelStyle={{ color: '#fff' }} icon={() => <Image source={require('../../assets/images/ic_allCrop.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />} onPress={() => goMenu('AllCrops')} />
+      <DrawerItem label="My Favourites" labelStyle={{ color: '#fff' }} icon={() => <Image source={require('../../assets/images/ic_fav.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />} onPress={() => goMenu('Favourites')} />
+      <DrawerItem label="Nowcast" labelStyle={{ color: '#fff' }} icon={() => <Image source={require('../../assets/images/ic_nowcast.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />} onPress={() => goMenu('Nowcast')} />
+      <DrawerItem label="Notifications" labelStyle={{ color: '#fff' }} icon={() => <Image source={require('../../assets/images/ic_notification.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />} onPress={() => goMenu('Notifications')} />
+      <DrawerItem label="Change Language" labelStyle={{ color: '#fff' }} icon={() => <Image source={require('../../assets/images/ic_languageWhite.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />} onPress={() => goMenu('LanguageSettings')} />
+      <DrawerItem label="Disclaimer" labelStyle={{ color: '#fff' }} icon={() => <Image source={require('../../assets/images/ic_disclaimer.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />} onPress={() => goMenu('Disclaimer')} />
+      <DrawerItem label="About" labelStyle={{ color: '#fff' }} icon={() => <Image source={require('../../assets/images/ic_about.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />} onPress={() => goMenu('About')} />
       <DrawerItem label="Logout" labelStyle={{ color: '#fff' }} icon={() => <Image source={require('../../assets/images/ic_logout.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />} onPress={() => logout()} />
     </DrawerContentScrollView>
   );

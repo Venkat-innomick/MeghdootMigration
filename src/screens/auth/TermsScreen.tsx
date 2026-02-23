@@ -3,10 +3,12 @@ import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Screen } from '../../components/Screen';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
+import { useAndroidNavigationBar } from '../../hooks/useAndroidNavigationBar';
 
 const TERMS_URL = 'https://sites.google.com/view/meghdoot-terms-and-conditions/home';
 
 export const TermsScreen = () => {
+  useAndroidNavigationBar(colors.background, 'dark');
   return (
     <Screen>
       <View style={styles.container}>

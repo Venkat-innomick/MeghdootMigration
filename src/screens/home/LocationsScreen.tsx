@@ -254,7 +254,6 @@ export const LocationsScreen = () => {
     const payload: Record<string, unknown> = {
       UALID: 0,
       UserProfileID: userId,
-      Id: userId,
       StateID: selectedState.stateID,
       DistrictID: selectedDistrict.districtID,
       Createdby: userId,
@@ -321,6 +320,7 @@ export const LocationsScreen = () => {
         });
       }
       Alert.alert('Success', 'Location added successfully');
+      navigation.navigate('Home');
     } catch (e: any) {
       Alert.alert('Failed', e.message || 'Unable to add location');
     } finally {
@@ -330,9 +330,17 @@ export const LocationsScreen = () => {
 
   const deleteLocation = async (item: LocationRow) => {
     if (!userId) return;
+    if (normalizedLocations.length <= 1) {
+      Alert.alert('Info', `Cannot delete only location (${item.stateName}, ${item.cityName}).`);
+      return;
+    }
+    if (item.isCurrentLocation) {
+      Alert.alert('Info', 'Current location cannot be deleted.');
+      return;
+    }
+
     const payload: Record<string, unknown> = {
       UserProfileID: userId,
-      Id: userId,
       DistrictID: item.districtID,
     };
     if (item.asdID > 0) payload.AsdID = item.asdID;

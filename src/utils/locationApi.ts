@@ -54,6 +54,8 @@ export const parseLocationWeatherList = (response: any) =>
   pickList<any>((response as any)?.result || (response as any)?.data || response, [
     "objWeatherForecastNextList",
     "ObjWeatherForecastNextList",
+    "objWeatherForecastFinalList",
+    "ObjWeatherForecastFinalList",
     "objWeatherForecastList",
     "ObjWeatherForecastList",
     "locationWeatherList",

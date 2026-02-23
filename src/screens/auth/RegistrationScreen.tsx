@@ -26,6 +26,7 @@ import {
   StateMasterItem,
 } from "../../types/domain";
 import { LANGUAGES } from "../../constants/languages";
+import { useAndroidNavigationBar } from "../../hooks/useAndroidNavigationBar";
 
 type Props = NativeStackScreenProps<AuthStackParamList, "Registration">;
 
@@ -136,6 +137,7 @@ const Selector = ({
 };
 
 export const RegistrationScreen = ({ navigation }: Props) => {
+  useAndroidNavigationBar(colors.background, "dark");
   const [loading, setLoading] = useState(false);
 
   const [firstName, setFirstName] = useState("");
@@ -348,11 +350,12 @@ export const RegistrationScreen = ({ navigation }: Props) => {
 
     setLoading(true);
     try {
-      const response = await userService.register(payload);
-      if (response.isSuccessful === false) {
+      const response: any = await userService.register(payload);
+      const ok = Boolean(response?.isSuccessful ?? response?.IsSuccessful);
+      if (!ok) {
         Alert.alert(
           "Registration failed",
-          response.errorMessage || "Unable to register",
+          response?.errorMessage || response?.ErrorMessage || "Unable to register",
         );
       } else {
         Alert.alert("Success", "Registration done successfully");

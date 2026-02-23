@@ -19,10 +19,12 @@ import { useAppStore } from '../../store/appStore';
 import { userService } from '../../api/services';
 import { LANGUAGES } from '../../constants/languages';
 import i18n from '../../locales/i18n';
+import { useAndroidNavigationBar } from '../../hooks/useAndroidNavigationBar';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
 export const LoginScreen = ({ navigation }: Props) => {
+  useAndroidNavigationBar(colors.background, 'dark');
   const [mobile, setMobile] = useState('');
   const [loading, setLoading] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
