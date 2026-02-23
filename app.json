@@ -46,7 +46,7 @@
           "image": "./assets/images/ic_splashScreen.png",
           "resizeMode": "contain",
           "backgroundColor": "#749C53",
-          "imageWidth": 260
+          "imageWidth": 200
         }
       ],
       "expo-location",
@@ -62,7 +62,7 @@
       "eas": {
         "projectId": "replace-with-your-eas-project-id"
       },
-      "apiBaseUrl": "https://meghdoot-app.tropmet.res.in:8443"
+      "apiBaseUrl": "http://103.215.208.11"
     }
   }
 }

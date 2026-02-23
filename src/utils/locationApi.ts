@@ -46,13 +46,7 @@ export const getUserProfileId = (user: any) => {
 
 export const buildByLocationPayload = (userId: number, languageLabel: string) => ({
   Id: userId,
-  id: userId,
-  UserProfileID: userId,
-  userProfileID: userId,
-  UserId: userId,
-  userId: userId,
   LanguageType: languageLabel,
-  languageType: languageLabel,
   RefreshDateTime: new Date().toISOString().slice(0, 10),
 });
 

@@ -57,7 +57,8 @@ export const SearchScreen = () => {
 
   const refreshFavouriteFlags = async (items: SearchBlockItem[]) => {
     if (!userId) return items;
-    const weather = await weatherService.getByLocation(buildByLocationPayload(userId, languageLabel));
+    const payload = buildByLocationPayload(userId, languageLabel);
+    const weather = await weatherService.getByLocation(payload);
     const locations = parseLocationWeatherList(weather) as any[];
     return items.map((item) => {
       const exists = locations.some((loc) =>

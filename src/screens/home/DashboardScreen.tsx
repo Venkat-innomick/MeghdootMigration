@@ -40,11 +40,21 @@ const pickUri = (...values: any[]) => {
 };
 
 const metric = (label: string, value: string, icon: any) => ({ label, value, icon });
+const toNum = (...values: any[]) => {
+  for (const value of values) {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string' && value.trim() && !Number.isNaN(Number(value))) return Number(value);
+  }
+  return 0;
+};
 
 export const DashboardScreen = () => {
   const navigation = useNavigation<any>();
   const user = useAppStore((s) => s.user);
   const language = useAppStore((s) => s.language);
+  const setAppLocations = useAppStore((s) => s.setLocations);
+  const selectedLocation = useAppStore((s) => s.selectedLocation);
+  const setSelectedLocation = useAppStore((s) => s.setSelectedLocation);
   const userId = useMemo(() => getUserProfileId(user), [user]);
   const languageLabel = useMemo(() => getLanguageLabel(language), [language]);
   const [loading, setLoading] = useState(true);
@@ -59,7 +69,9 @@ export const DashboardScreen = () => {
     }
 
     try {
-      const weather = await weatherService.getByLocation(buildByLocationPayload(userId, languageLabel));
+      const payload = buildByLocationPayload(userId, languageLabel);
+      const weather = await weatherService.getByLocation(payload);
+      const locationList = parseLocationWeatherList(weather) as DashboardLocation[];
       const crop = await cropService.getAdvisoryTop({
         Id: userId,
         UserProfileID: userId,
@@ -69,19 +81,54 @@ export const DashboardScreen = () => {
         RefreshDateTime: new Date().toISOString().slice(0, 10),
       });
 
-      setLocations(parseLocationWeatherList(weather) as DashboardLocation[]);
+      setLocations(locationList);
+      setAppLocations(locationList);
+      if (locationList.length > 0) {
+        const match = selectedLocation
+          ? locationList.find((item: any) => {
+              const districtID = toNum(item.districtID, item.DistrictID);
+              const blockID = toNum(item.blockID, item.BlockID);
+              const asdID = toNum(item.asdID, item.AsdID);
+              return (
+                districtID === selectedLocation.districtID &&
+                blockID === selectedLocation.blockID &&
+                asdID === selectedLocation.asdID
+              );
+            })
+          : null;
+        const target: any = match || (locationList[0] as any);
+        setSelectedLocation({
+          districtID: toNum(target?.districtID, target?.DistrictID),
+          blockID: toNum(target?.blockID, target?.BlockID),
+          asdID: toNum(target?.asdID, target?.AsdID),
+        });
+      }
       setAdvisories((crop.result || crop.data || []) as CropAdvisoryItem[]);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [languageLabel, userId]);
+  }, [languageLabel, selectedLocation, setAppLocations, setSelectedLocation, userId]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  const currentLocation = useMemo(() => (locations.length ? (locations[0] as any) : null), [locations]);
+  const currentLocation = useMemo(() => {
+    if (!locations.length) return null;
+    if (!selectedLocation) return locations[0] as any;
+    const match = locations.find((item: any) => {
+      const districtID = toNum(item.districtID, item.DistrictID);
+      const blockID = toNum(item.blockID, item.BlockID);
+      const asdID = toNum(item.asdID, item.AsdID);
+      return (
+        districtID === selectedLocation.districtID &&
+        blockID === selectedLocation.blockID &&
+        asdID === selectedLocation.asdID
+      );
+    });
+    return (match || locations[0]) as any;
+  }, [locations, selectedLocation]);
 
   const weatherMetrics = useMemo(() => {
     if (!currentLocation) return [];

@@ -55,6 +55,9 @@ export const LocationsScreen = () => {
   const navigation = useNavigation<any>();
   const user: any = useAppStore((s) => s.user);
   const language = useAppStore((s) => s.language);
+  const appLocations = useAppStore((s) => s.locations);
+  const setAppLocations = useAppStore((s) => s.setLocations);
+  const setSelectedLocation = useAppStore((s) => s.setSelectedLocation);
 
   const [loading, setLoading] = useState(false);
   const [locations, setLocations] = useState<LocationRow[]>([]);
@@ -74,6 +77,36 @@ export const LocationsScreen = () => {
 
   const userId = useMemo(() => getUserProfileId(user), [user]);
   const languageLabel = useMemo(() => getLanguageLabel(language), [language]);
+
+  const mapRawLocations = React.useCallback((list: any[]): LocationRow[] => {
+    const mapped: LocationRow[] = (list || []).map((item: any) => {
+      const stateID = toNum(item.stateID ?? item.StateID ?? item.stateId ?? item.StateId);
+      const districtID = toNum(item.districtID ?? item.DistrictID ?? item.districtId ?? item.DistrictId);
+      const blockID = toNum(item.blockID ?? item.BlockID ?? item.blockId ?? item.BlockId);
+      const asdID = toNum(item.asdID ?? item.AsdID ?? item.asdId ?? item.AsdId);
+      const cityName =
+        toText(item.cityName ?? item.CityName) ||
+        toText(item.placeName ?? item.PlaceName) ||
+        toText(item.blockName ?? item.BlockName) ||
+        toText(item.asdName ?? item.AsdName) ||
+        toText(item.districtName ?? item.DistrictName) ||
+        'Location';
+
+      return {
+        stateID,
+        districtID,
+        blockID,
+        asdID,
+        stateName: toText(item.stateName ?? item.StateName) || '--',
+        cityName,
+        colorCode: toText(item.colorCode ?? item.ColorCode) || '#FFFFFF',
+        cloudImage: pickUri(item.cloudImage ?? item.CloudImage ?? item.imagePath ?? item.ImagePath),
+        isCurrentLocation: Boolean(item.isCurrentLocation ?? item.IsCurrentLocation),
+      };
+    });
+
+    return mapped.filter((x) => x.districtID > 0);
+  }, []);
 
   const normalizedLocations = useMemo(() => {
     const map = new Map<string, LocationRow>();
@@ -101,36 +134,11 @@ export const LocationsScreen = () => {
     }
     setLoading(true);
     try {
-      const response = await weatherService.getByLocation(buildByLocationPayload(userId, languageLabel));
+      const payload = buildByLocationPayload(userId, languageLabel);
+      const response = await weatherService.getByLocation(payload);
       const list = parseLocationWeatherList(response);
-
-      const mapped: LocationRow[] = (list as any[]).map((item: any) => {
-        const stateID = toNum(item.stateID ?? item.StateID ?? item.stateId ?? item.StateId);
-        const districtID = toNum(item.districtID ?? item.DistrictID ?? item.districtId ?? item.DistrictId);
-        const blockID = toNum(item.blockID ?? item.BlockID ?? item.blockId ?? item.BlockId);
-        const asdID = toNum(item.asdID ?? item.AsdID ?? item.asdId ?? item.AsdId);
-        const cityName =
-          toText(item.cityName ?? item.CityName) ||
-          toText(item.placeName ?? item.PlaceName) ||
-          toText(item.blockName ?? item.BlockName) ||
-          toText(item.asdName ?? item.AsdName) ||
-          toText(item.districtName ?? item.DistrictName) ||
-          'Location';
-
-        return {
-          stateID,
-          districtID,
-          blockID,
-          asdID,
-          stateName: toText(item.stateName ?? item.StateName) || '--',
-          cityName,
-          colorCode: toText(item.colorCode ?? item.ColorCode) || '#FFFFFF',
-          cloudImage: pickUri(item.cloudImage ?? item.CloudImage ?? item.imagePath ?? item.ImagePath),
-          isCurrentLocation: Boolean(item.isCurrentLocation ?? item.IsCurrentLocation),
-        };
-      });
-
-      const filtered = mapped.filter((x) => x.districtID > 0 && (x.blockID > 0 || x.asdID > 0 || x.isCurrentLocation));
+      setAppLocations(list as any[]);
+      const filtered = mapRawLocations(list as any[]);
       setLocations(filtered);
       return filtered;
     } catch {
@@ -140,6 +148,12 @@ export const LocationsScreen = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (appLocations?.length) {
+      setLocations(mapRawLocations(appLocations as any[]));
+    }
+  }, [appLocations, mapRawLocations]);
 
   const loadStates = async () => {
     const res = await mastersService.getStates(languageLabel);
@@ -349,7 +363,9 @@ export const LocationsScreen = () => {
   };
 
   useEffect(() => {
-    loadLocations();
+    if (!appLocations?.length) {
+      loadLocations();
+    }
   }, [userId, languageLabel]);
 
   useFocusEffect(
@@ -382,6 +398,15 @@ export const LocationsScreen = () => {
     </View>
   );
 
+  const openInHome = (item: LocationRow) => {
+    setSelectedLocation({
+      districtID: item.districtID,
+      blockID: item.blockID,
+      asdID: item.asdID,
+    });
+    navigation.navigate('Home');
+  };
+
   return (
     <Screen>
       <View style={styles.root}>
@@ -399,7 +424,7 @@ export const LocationsScreen = () => {
                 {currentLocation ? (
                   <>
                     <Text style={styles.currentLbl}>Current Locations</Text>
-                    <Pressable onPress={() => navigation.navigate('Home')}>{renderCard(currentLocation, false)}</Pressable>
+                    <Pressable onPress={() => openInHome(currentLocation)}>{renderCard(currentLocation, false)}</Pressable>
                     <View style={styles.separator} />
                   </>
                 ) : null}
@@ -407,7 +432,7 @@ export const LocationsScreen = () => {
               </>
             }
             ListEmptyComponent={<Text style={styles.empty}>No data currently available.</Text>}
-            renderItem={({ item }) => <Pressable onPress={() => navigation.navigate('Home')}>{renderCard(item, true)}</Pressable>}
+            renderItem={({ item }) => <Pressable onPress={() => openInHome(item)}>{renderCard(item, true)}</Pressable>}
           />
         )}
 

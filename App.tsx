@@ -16,7 +16,7 @@ export default function App() {
         <StatusBar style="light" backgroundColor={colors.onBoard} />
         <Image
           source={require('./assets/images/ic_splashScreen.png')}
-          style={{ width: 260, height: 260 }}
+          style={{ width: 200, height: 200 }}
           resizeMode="contain"
         />
         <ActivityIndicator color="#ffffff" style={{ marginTop: 12 }} />

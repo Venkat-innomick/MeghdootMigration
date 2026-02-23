@@ -26,6 +26,7 @@ const request = async <T>(
 ): Promise<ApiClientResponse<T>> => {
   const url = `${baseURL}${path}`;
   console.log("URL:", url);
+  console.log("payload", body);
   const response = await withTimeout(
     fetch(url, {
       method,

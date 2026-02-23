@@ -1,4 +1,4 @@
-export const API_BASE_URL = "https://meghdoot-app.tropmet.res.in:8443";
+export const API_BASE_URL = "http://103.215.208.11";
 
 export const API_ENDPOINTS = {
   crop: {

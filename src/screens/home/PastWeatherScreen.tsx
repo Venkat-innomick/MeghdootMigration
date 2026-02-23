@@ -11,6 +11,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { Screen } from '../../components/Screen';
 import { colors } from '../../theme/colors';
 import { weatherService } from '../../api/services';
@@ -73,6 +74,10 @@ const pickList = (payload: any): any[] => {
 export const PastWeatherScreen = () => {
   const user = useAppStore((s) => s.user);
   const language = useAppStore((s) => s.language);
+  const appLocations = useAppStore((s) => s.locations);
+  const setAppLocations = useAppStore((s) => s.setLocations);
+  const selectedLocationRef = useAppStore((s) => s.selectedLocation);
+  const setSelectedLocation = useAppStore((s) => s.setSelectedLocation);
   const userId = getUserProfileId(user);
   const languageLabel = getLanguageLabel(language);
 
@@ -95,12 +100,33 @@ export const PastWeatherScreen = () => {
 
   const loadLocations = async () => {
     if (!userId) return;
-    const response = await weatherService.getByLocation(buildByLocationPayload(userId, languageLabel));
+    const payload = buildByLocationPayload(userId, languageLabel);
+    const response = await weatherService.getByLocation(payload);
     const list = parseLocationWeatherList(response) as DashboardLocation[];
     setLocations(list);
+    setAppLocations(list);
     if (list.length) {
-      setSelectedLocationIndex(0);
-      await loadWeatherForLocation(list[0] as any);
+      const selectedIndex = selectedLocationRef
+        ? list.findIndex((loc: any) => {
+            const districtID = pickNum(loc.districtID, loc.DistrictID);
+            const blockID = pickNum(loc.blockID, loc.BlockID);
+            const asdID = pickNum(loc.asdID, loc.AsdID);
+            return (
+              districtID === selectedLocationRef.districtID &&
+              blockID === selectedLocationRef.blockID &&
+              asdID === selectedLocationRef.asdID
+            );
+          })
+        : -1;
+      const indexToUse = selectedIndex >= 0 ? selectedIndex : 0;
+      const target = list[indexToUse] as any;
+      setSelectedLocationIndex(indexToUse);
+      setSelectedLocation({
+        districtID: pickNum(target.districtID, target.DistrictID),
+        blockID: pickNum(target.blockID, target.BlockID),
+        asdID: pickNum(target.asdID, target.AsdID),
+      });
+      await loadWeatherForLocation(target);
     } else {
       setDays([]);
     }
@@ -135,13 +161,27 @@ export const PastWeatherScreen = () => {
   };
 
   useEffect(() => {
+    if (appLocations?.length) {
+      setLocations(appLocations as DashboardLocation[]);
+    }
     loadLocations();
   }, [languageLabel, userId]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      loadLocations();
+    }, [languageLabel, userId]),
+  );
 
   const selectLocation = async (index: number) => {
     const location = locations[index] as any;
     setSelectedLocationIndex(index);
     setPickerOpen(false);
+    setSelectedLocation({
+      districtID: pickNum(location?.districtID, location?.DistrictID),
+      blockID: pickNum(location?.blockID, location?.BlockID),
+      asdID: pickNum(location?.asdID, location?.AsdID),
+    });
     await loadWeatherForLocation(location);
   };
 
