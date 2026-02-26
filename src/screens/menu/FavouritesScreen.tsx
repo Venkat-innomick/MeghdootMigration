@@ -15,6 +15,7 @@ import { colors } from "../../theme/colors";
 import { cropService } from "../../api/services";
 import { useAppStore } from "../../store/appStore";
 import { useAndroidNavigationBar } from "../../hooks/useAndroidNavigationBar";
+import { getLanguageLabel, getUserProfileId } from "../../utils/locationApi";
 
 const pickText = (...values: any[]) => {
   for (const value of values) {
@@ -51,6 +52,15 @@ const pickUri = (...values: any[]) => {
   return "";
 };
 
+const pickList = (payload: any, keys: string[]) => {
+  if (!payload) return [];
+  if (Array.isArray(payload)) return payload;
+  for (const key of keys) {
+    if (Array.isArray(payload?.[key])) return payload[key];
+  }
+  return [];
+};
+
 const normalizeDate = (raw: string) => {
   if (!raw) return "-";
   const now = new Date();
@@ -77,25 +87,36 @@ export const FavouritesScreen = () => {
   const navigation = useNavigation<any>();
   const user = useAppStore((s) => s.user);
   const language = useAppStore((s) => s.language);
+  const userId = useMemo(() => getUserProfileId(user), [user]);
+  const languageLabel = useMemo(() => getLanguageLabel(language), [language]);
 
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<any[]>([]);
 
   const load = useCallback(async () => {
-    if (!user) return;
+    if (!userId) {
+      setItems([]);
+      return;
+    }
     setLoading(true);
     try {
       const response = await cropService.getFavourites({
-        Id: user.typeOfRole || user.userProfileId,
-        LanguageType: language,
+        Id: userId,
+        LanguageType: languageLabel,
         RefreshDateTime: "2019-01-01",
       });
-      const list = (response.result || response.data || []) as any[];
+      const base = response?.result || response?.data || response;
+      const list = pickList(base, [
+        "objCropAdvisoryFavList",
+        "ObjCropAdvisoryFavList",
+        "objCropAdvisoryFavouriteList",
+        "ObjCropAdvisoryFavouriteList",
+      ]) as any[];
       setItems(list);
     } finally {
       setLoading(false);
     }
-  }, [language, user]);
+  }, [languageLabel, userId]);
 
   useEffect(() => {
     load().catch(() => setItems([]));
@@ -193,7 +214,22 @@ export const FavouritesScreen = () => {
 
               <Pressable
                 style={styles.card}
-                onPress={() => navigation.navigate("CropAdvisory")}
+                onPress={() =>
+                  navigation.push("CropAdvisory", {
+                    advisoryId: pickNum(
+                      item.cropAdvisoryID,
+                      item.CropAdvisoryID,
+                      0,
+                    ),
+                    cropId: pickNum(item.cropID, item.CropID, 0),
+                    cropCategoryId: pickNum(
+                      item.cropCategoryID,
+                      item.CropCategoryID,
+                      0,
+                    ),
+                    cropName: pickText(item.cropName, item.CropName, ""),
+                  })
+                }
               >
                 <Image
                   source={

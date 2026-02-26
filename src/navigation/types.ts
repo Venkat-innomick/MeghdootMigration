@@ -2,7 +2,14 @@ export type RootStackParamList = {
   Onboarding: undefined;
   Auth: undefined;
   Main: undefined;
-  CropAdvisory: undefined;
+  CropAdvisory:
+    | {
+        advisoryId?: number;
+        cropId?: number;
+        cropCategoryId?: number;
+        cropName?: string;
+      }
+    | undefined;
   CropFeedback: {
     advisoryId: number;
     userProfileId: number;

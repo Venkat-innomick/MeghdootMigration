@@ -10,11 +10,12 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { Screen } from '../../components/Screen';
 import { colors } from '../../theme/colors';
 import { cropService } from '../../api/services';
 import { useAppStore } from '../../store/appStore';
+import { getLanguageLabel } from '../../utils/locationApi';
 
 const pickText = (...values: any[]) => {
   for (const value of values) {
@@ -75,8 +76,13 @@ const AdvisorySection = ({ title, open, onToggle, content }: AdvisorySectionProp
 
 export const CropAdvisoryScreen = () => {
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   const user = useAppStore((s) => s.user);
   const language = useAppStore((s) => s.language);
+  const languageLabel = useMemo(() => getLanguageLabel(language), [language]);
+  const requestedAdvisoryId = pickNum(route?.params?.advisoryId, route?.params?.CropAdvisoryID);
+  const requestedCropId = pickNum(route?.params?.cropId, route?.params?.CropID);
+  const requestedCropCategoryId = pickNum(route?.params?.cropCategoryId, route?.params?.CropCategoryID);
 
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<any[]>([]);
@@ -137,16 +143,59 @@ export const CropAdvisoryScreen = () => {
     const activeId = advisoryId;
     setLoading(true);
     try {
-      const response = await cropService.getAdvisoryTop({
-        userProfileID: userProfileId,
-        languageType: language,
-      });
-      const list = (response.result || response.data || []) as any[];
+      const response = requestedCropId
+        ? await cropService.getAdvisoryFavouriteRatingList({
+            Id: userProfileId,
+            LanguageType: languageLabel,
+            Type: 'Farmer',
+            CropID: requestedCropId,
+            RefreshDateTime: new Date().toISOString().slice(0, 10),
+          })
+        : await cropService.getAdvisoryTop({
+            Id: userProfileId,
+            UserProfileID: userProfileId,
+            userProfileID: userProfileId,
+            LanguageType: languageLabel,
+            languageType: languageLabel,
+            Type: 'Farmer',
+            RefreshDateTime: new Date().toISOString().slice(0, 10),
+          });
+      const base = response?.result || response?.data || response;
+      const list = pickList(base, [
+        'objCropAdvisoryDetailsList',
+        'ObjCropAdvisoryDetailsList',
+        'objCropAdvisoryTopList',
+        'ObjCropAdvisoryTopList',
+        'objCropAdvisoryFavouriteRatingList',
+        'ObjCropAdvisoryFavouriteRatingList',
+      ]) as any[];
       setItems(list);
       if (list.length) {
-        const matchedIndex = activeId
-          ? list.findIndex((item) => pickNum(item.cropAdvisoryID, item.CropAdvisoryID) === activeId)
+        const matchedByAdvisory = requestedAdvisoryId
+          ? list.findIndex(
+              (item) => pickNum(item.cropAdvisoryID, item.CropAdvisoryID) === requestedAdvisoryId
+            )
           : -1;
+        const matchedByCrop = matchedByAdvisory >= 0
+          ? -1
+          : requestedCropId
+          ? list.findIndex(
+              (item) => pickNum(item.cropID, item.CropID) === requestedCropId
+            )
+          : requestedCropCategoryId
+            ? list.findIndex(
+                (item) =>
+                  pickNum(item.cropCategoryID, item.CropCategoryID) ===
+                  requestedCropCategoryId
+              )
+            : -1;
+        const matchedIndex = matchedByAdvisory >= 0
+          ? matchedByAdvisory
+          : matchedByCrop >= 0
+            ? matchedByCrop
+          : activeId
+            ? list.findIndex((item) => pickNum(item.cropAdvisoryID, item.CropAdvisoryID) === activeId)
+            : -1;
         setIndex(matchedIndex >= 0 ? matchedIndex : 0);
       }
     } finally {
@@ -163,7 +212,7 @@ export const CropAdvisoryScreen = () => {
 
     const commonPayload = {
       CropAdvisoryID: cropId,
-      LanguageType: language,
+      LanguageType: languageLabel,
       RefreshDateTime: '2019-07-02',
     };
 
@@ -182,7 +231,7 @@ export const CropAdvisoryScreen = () => {
   useFocusEffect(
     useCallback(() => {
       loadAdvisories();
-    }, [userProfileId, language])
+    }, [userProfileId, languageLabel, requestedAdvisoryId, requestedCropCategoryId, requestedCropId])
   );
 
   useEffect(() => {
@@ -192,7 +241,7 @@ export const CropAdvisoryScreen = () => {
         setAudios([]);
       });
     }
-  }, [advisoryId, language]);
+  }, [advisoryId, languageLabel]);
 
   const toggleFavourite = async () => {
     if (!advisoryId || !userProfileId || isFavourite) return;

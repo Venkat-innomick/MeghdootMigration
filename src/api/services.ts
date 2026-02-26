@@ -128,6 +128,13 @@ export const cropService = {
     );
     return data;
   },
+  getAdvisoryFavouriteRatingList: async (payload: Record<string, unknown>) => {
+    const { data } = await apiClient.post<ApiResponse<CropAdvisoryItem[]>>(
+      API_ENDPOINTS.crop.getCropAdvisoryFavouriteRatingList,
+      payload,
+    );
+    return data;
+  },
   getFavourites: async (payload: Record<string, unknown>) => {
     const { data } = await apiClient.post<ApiResponse<CropAdvisoryItem[]>>(
       API_ENDPOINTS.crop.getCropAdvisoryFavouriteList,
@@ -158,7 +165,7 @@ export const cropService = {
   },
   getCategories: async (payload: Record<string, unknown>) => {
     const { data } = await apiClient.post<ApiResponse<any[]>>(
-      API_ENDPOINTS.crop.getCropCategory,
+      API_ENDPOINTS.crop.getCrops,
       payload,
     );
     return data;

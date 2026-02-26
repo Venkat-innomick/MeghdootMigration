@@ -8,12 +8,13 @@ import {
   Text,
   View,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { Screen } from "../../components/Screen";
 import { colors } from "../../theme/colors";
 import { cropService } from "../../api/services";
 import { useAppStore } from "../../store/appStore";
 import { useAndroidNavigationBar } from "../../hooks/useAndroidNavigationBar";
+import { getLanguageLabel, getUserProfileId } from "../../utils/locationApi";
 
 const pickText = (...values: any[]) => {
   for (const value of values) {
@@ -63,58 +64,82 @@ export const AllCropsScreen = () => {
   const navigation = useNavigation<any>();
   const user = useAppStore((s) => s.user);
   const language = useAppStore((s) => s.language);
+  const userId = useMemo(() => getUserProfileId(user), [user]);
+  const languageLabel = useMemo(() => getLanguageLabel(language), [language]);
 
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<any[]>([]);
 
+  const openCropAdvisory = (params: Record<string, unknown>) => {
+    const parent = navigation.getParent?.();
+    const root = parent?.getParent?.() || parent || navigation;
+    root.navigate("CropAdvisory", params);
+  };
+
+  const load = React.useCallback(async () => {
+    if (!userId) {
+      setItems([]);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Match Xamarin payload contract for GetCrops.
+      const response = await cropService.getCategories({
+        CropCategoryID: 0,
+        ID: userId,
+        RefreshDateTime: "2019-07-05",
+        LanguageType: languageLabel,
+      });
+
+      const base = response?.result || response?.data || response;
+      const list = pickList(base, [
+        "objCropAdvisoryCropMappList",
+        "ObjCropAdvisoryCropMappList",
+        "objPopListByCropCategoryId",
+        "ObjPopListByCropCategoryId",
+      ]);
+
+      const unique = list.filter((item: any, index: number, arr: any[]) => {
+        const id = pickNum(
+          item.cropID,
+          item.CropID,
+          item.cropCategoryID,
+          item.CropCategoryID,
+          index,
+        );
+        return (
+          arr.findIndex(
+            (x) =>
+              pickNum(
+                x.cropID,
+                x.CropID,
+                x.cropCategoryID,
+                x.CropCategoryID,
+                index,
+              ) === id,
+          ) === index
+        );
+      });
+
+      setItems(unique);
+    } catch {
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [languageLabel, userId]);
+
   useEffect(() => {
-    const load = async () => {
-      if (!user) return;
-      setLoading(true);
-      try {
-        const response = await cropService.getCategories({
-          CropCategoryID: 0,
-          ID: user.typeOfRole || user.userProfileId,
-          RefreshDateTime: new Date().toISOString().slice(0, 10),
-          LanguageType: language,
-        });
+    load();
+  }, [load]);
 
-        const list = pickList(response.result || response.data || response, [
-          "objCropAdvisoryCropMappList",
-          "ObjCropAdvisoryCropMappList",
-          "objPopListByCropCategoryId",
-        ]);
-
-        const unique = list.filter((item: any, index: number, arr: any[]) => {
-          const id = pickNum(
-            item.cropID,
-            item.CropID,
-            item.cropCategoryID,
-            item.CropCategoryID,
-            index,
-          );
-          return (
-            arr.findIndex(
-              (x) =>
-                pickNum(
-                  x.cropID,
-                  x.CropID,
-                  x.cropCategoryID,
-                  x.CropCategoryID,
-                  index,
-                ) === id,
-            ) === index
-          );
-        });
-
-        setItems(unique);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    load().catch(() => setItems([]));
-  }, [language, user]);
+  useFocusEffect(
+    React.useCallback(() => {
+      load();
+      return undefined;
+    }, [load])
+  );
 
   const content = useMemo(() => {
     if (loading) {
@@ -146,6 +171,17 @@ export const AllCropsScreen = () => {
         }
         contentContainerStyle={styles.gridContent}
         renderItem={({ item }) => {
+          const cropId = pickNum(item.cropID, item.CropID, 0);
+          const cropCategoryId = pickNum(
+            item.cropCategoryID,
+            item.CropCategoryID,
+            0,
+          );
+          const advisoryId = pickNum(
+            item.cropAdvisoryID,
+            item.CropAdvisoryID,
+            0,
+          );
           const name = pickText(
             item.cropName,
             item.CropName,
@@ -163,7 +199,14 @@ export const AllCropsScreen = () => {
           return (
             <Pressable
               style={styles.card}
-              onPress={() => navigation.navigate("CropAdvisory")}
+              onPress={() =>
+                openCropAdvisory({
+                  cropId,
+                  cropCategoryId,
+                  advisoryId: advisoryId || undefined,
+                  cropName: name || "--",
+                })
+              }
             >
               <Image
                 source={

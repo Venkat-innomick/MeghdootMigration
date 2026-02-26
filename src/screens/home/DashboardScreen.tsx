@@ -93,6 +93,12 @@ export const DashboardScreen = () => {
   const [activeTab, setActiveTab] = useState<"block" | "district">("block");
   const [weatherIndex, setWeatherIndex] = useState(0);
 
+  const openCropAdvisory = (params: Record<string, unknown>) => {
+    const parent = navigation.getParent?.();
+    const root = parent?.getParent?.() || parent || navigation;
+    root.navigate("CropAdvisory", params);
+  };
+
   const loadData = useCallback(async () => {
     if (!userId) {
       setLoading(false);
@@ -414,7 +420,14 @@ export const DashboardScreen = () => {
           return (
             <Pressable
               style={styles.advisoryCard}
-              onPress={() => navigation.navigate("CropAdvisory")}
+              onPress={() =>
+                openCropAdvisory({
+                  advisoryId: toNum(row.cropAdvisoryID, row.CropAdvisoryID),
+                  cropId: toNum(row.cropID, row.CropID),
+                  cropCategoryId: toNum(row.cropCategoryID, row.CropCategoryID),
+                  cropName: pickText(row.cropName, row.CropName, row.title, row.Title, "Crop Advisory"),
+                })
+              }
             >
               <Image
                 source={
