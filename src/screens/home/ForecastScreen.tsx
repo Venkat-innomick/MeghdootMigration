@@ -84,6 +84,24 @@ const weatherBgImageMap: Record<string, ImageSourcePropType> = {
   cloudy: require('../../../assets/images/Cloudy.png'),
 };
 
+const cloudKeyByCover = (cloudCover: number) => {
+  if (cloudCover < 0) return '';
+  if (cloudCover === 0) return 'clearsky_new';
+  if (cloudCover === 1 || cloudCover === 2) return 'mainly_clear';
+  if (cloudCover === 3 || cloudCover === 4) return 'partly_cloudy';
+  if (cloudCover === 5 || cloudCover === 6 || cloudCover === 7) return 'generally_cloudy';
+  return 'cloudy';
+};
+
+const cloudKeyByWeatherText = (value: string) => {
+  const text = value.toLowerCase();
+  if (text.includes('clear')) return 'clearsky_new';
+  if (text.includes('partly')) return 'partly_cloudy';
+  if (text.includes('mainly')) return 'mainly_clear';
+  if (text.includes('cloud')) return 'generally_cloudy';
+  return '';
+};
+
 const normalizeImageKey = (value: unknown) => {
   if (typeof value !== 'string' || !value.trim()) return '';
   const file = value.split('/').pop() || value;
@@ -222,7 +240,12 @@ export const ForecastScreen = () => {
   const heroBackgroundSource = useMemo(() => {
     const cloudUri = pickUri(selectedDay.cloudImage, selectedDay.CloudImage);
     if (cloudUri) return { uri: cloudUri };
-    const key = normalizeImageKey(selectedDay.cloudImage || selectedDay.CloudImage);
+    const key =
+      normalizeImageKey(selectedDay.cloudImage || selectedDay.CloudImage) ||
+      cloudKeyByCover(pickNum(selectedDay.cloudCover, selectedDay.CloudCover, -1)) ||
+      cloudKeyByWeatherText(
+        pickText(selectedDay.weatherType, selectedDay.WeatherType, selectedDay.cloud, selectedDay.Cloud, ''),
+      );
     return weatherBgImageMap[key] || require('../../../assets/images/Clearsky_new.png');
   }, [selectedDay]);
 
@@ -342,7 +365,9 @@ export const ForecastScreen = () => {
                   style={[styles.dayPill, selected && styles.dayPillSelected]}
                   onPress={() => setSelectedDayIndex(index)}
                 >
-                  <Text style={[styles.dayText, selected && styles.dayTextSelected]} numberOfLines={1}>{dayDate}</Text>
+                  <Text style={[styles.dayDateText, selected && styles.dayTextSelected]} numberOfLines={2}>
+                    {dayDate}
+                  </Text>
                   <Text style={[styles.dayText, selected && styles.dayTextSelected]}>{pickText(row.minTemp, row.MinTemp, '-')}</Text>
                   <Text style={[styles.dayText, selected && styles.dayTextSelected]}>{pickText(row.maxTemp, row.MaxTemp, '-')}</Text>
                   <Image source={metricIcons.temp} style={styles.tempIcon} resizeMode="contain" />
@@ -477,8 +502,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 0,
   },
   dayPill: {
-    width: 55,
-    minHeight: 110,
+    width: 70,
+    minHeight: 116,
     borderRadius: 30,
     backgroundColor: '#1B4210',
     marginHorizontal: 10,
@@ -495,6 +520,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 16,
     textAlign: 'center',
+  },
+  dayDateText: {
+    color: '#fff',
+    fontFamily: 'RobotoRegular',
+    fontSize: 11,
+    lineHeight: 14,
+    textAlign: 'center',
+    minHeight: 30,
   },
   dayTextSelected: {
     color: colors.darkGreen,

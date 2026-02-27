@@ -95,12 +95,22 @@ const iconImageMap: Record<string, ImageSourcePropType> = {
 };
 
 const cloudKeyByCover = (cloudCover: number) => {
+  if (cloudCover < 0) return "";
   if (cloudCover === 0) return "clearsky_new";
   if (cloudCover === 1 || cloudCover === 2) return "mainly_clear";
   if (cloudCover === 3 || cloudCover === 4) return "partly_cloudy";
   if (cloudCover === 5 || cloudCover === 6 || cloudCover === 7)
     return "generally_cloudy";
   return "cloudy";
+};
+
+const cloudKeyByWeatherText = (value: string) => {
+  const text = value.toLowerCase();
+  if (text.includes("clear")) return "clearsky_new";
+  if (text.includes("partly")) return "partly_cloudy";
+  if (text.includes("mainly")) return "mainly_clear";
+  if (text.includes("cloud")) return "generally_cloudy";
+  return "";
 };
 
 const parseAdvisoryList = (payload: any): CropAdvisoryItem[] => {
@@ -463,7 +473,17 @@ export const DashboardScreen = () => {
                 const cloudKey =
                   normalizeImageKey(
                     (item as any)?.cloudImage || (item as any)?.CloudImage,
-                  ) || cloudKeyByCover(cloudCover);
+                  ) ||
+                  cloudKeyByCover(cloudCover) ||
+                  cloudKeyByWeatherText(
+                    pickText(
+                      (item as any)?.weatherType,
+                      (item as any)?.WeatherType,
+                      (item as any)?.cloud,
+                      (item as any)?.Cloud,
+                      "",
+                    ),
+                  );
                 const cardBackground =
                   cloudUri
                     ? { uri: cloudUri }

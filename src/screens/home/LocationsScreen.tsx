@@ -5,6 +5,7 @@ import {
   FlatList,
   Image,
   ImageBackground,
+  ImageSourcePropType,
   Modal,
   Pressable,
   ScrollView,
@@ -42,6 +43,8 @@ type LocationRow = {
   cityName: string;
   colorCode: string;
   cloudImage: string;
+  cloudCover: number;
+  weatherType: string;
   isCurrentLocation: boolean;
 };
 
@@ -53,6 +56,38 @@ const pickUri = (...values: any[]) => {
       return v;
     }
   }
+  return '';
+};
+
+const normalizeImageKey = (value: unknown) => {
+  if (typeof value !== 'string' || !value.trim()) return '';
+  const file = value.split('/').pop() || value;
+  const noExt = file.replace(/\.[a-z0-9]+$/i, '');
+  return noExt.trim().toLowerCase();
+};
+
+const locationBgImageMap: Record<string, ImageSourcePropType> = {
+  clearsky_new: require('../../../assets/images/Clearsky_new.png'),
+  mainly_clear: require('../../../assets/images/Mainly_Clear.png'),
+  partly_cloudy: require('../../../assets/images/Partly_Cloudy.png'),
+  generally_cloudy: require('../../../assets/images/generally_cloudy.png'),
+  cloudy: require('../../../assets/images/Cloudy.png'),
+};
+
+const cloudKeyByCover = (cloudCover: number) => {
+  if (cloudCover === 0) return 'clearsky_new';
+  if (cloudCover === 1 || cloudCover === 2) return 'mainly_clear';
+  if (cloudCover === 3 || cloudCover === 4) return 'partly_cloudy';
+  if (cloudCover === 5 || cloudCover === 6 || cloudCover === 7) return 'generally_cloudy';
+  return 'cloudy';
+};
+
+const cloudKeyByWeatherText = (value: string) => {
+  const text = value.toLowerCase();
+  if (text.includes('clear')) return 'clearsky_new';
+  if (text.includes('partly')) return 'partly_cloudy';
+  if (text.includes('mainly')) return 'mainly_clear';
+  if (text.includes('cloud')) return 'generally_cloudy';
   return '';
 };
 
@@ -94,6 +129,8 @@ export const LocationsScreen = () => {
       const tempDistrictID = toNum(item.tempDistrictID ?? item.TempDistrictID ?? item.tempdistrictID);
       const tempBlockID = toNum(item.tempBlockID ?? item.TempBlockID ?? item.tempblockID);
       const tempAsdID = toNum(item.tempAsdID ?? item.TempAsdID ?? item.tempasdID);
+      const cloudCover = toNum(item.cloudCover ?? item.CloudCover, -1);
+      const weatherType = toText(item.weatherType ?? item.WeatherType ?? item.cloud ?? item.Cloud);
       const cityName =
         toText(item.cityName ?? item.CityName) ||
         toText(item.placeName ?? item.PlaceName) ||
@@ -114,7 +151,11 @@ export const LocationsScreen = () => {
         stateName: toText(item.stateName ?? item.StateName) || '--',
         cityName,
         colorCode: toText(item.colorCode ?? item.ColorCode) || '#FFFFFF',
-        cloudImage: pickUri(item.cloudImage ?? item.CloudImage ?? item.imagePath ?? item.ImagePath),
+        cloudImage: toText(
+          item.cloudImage ?? item.CloudImage ?? item.imagePath ?? item.ImagePath,
+        ),
+        cloudCover,
+        weatherType,
         isCurrentLocation: Boolean(item.isCurrentLocation ?? item.IsCurrentLocation),
       };
     });
@@ -298,6 +339,8 @@ export const LocationsScreen = () => {
         cityName: selectedBlock.label,
         colorCode: '#FFFFFF',
         cloudImage: '',
+        cloudCover: -1,
+        weatherType: '',
         isCurrentLocation: false,
       };
 
@@ -410,8 +453,20 @@ export const LocationsScreen = () => {
 
   const renderCard = (item: LocationRow, showDelete = true) => (
     <View style={styles.cardWrap}>
+      {(() => {
+        const uri = pickUri(item.cloudImage);
+        const localKey =
+          normalizeImageKey(item.cloudImage) ||
+          cloudKeyByCover(item.cloudCover) ||
+          cloudKeyByWeatherText(item.weatherType);
+        const source =
+          uri
+            ? { uri }
+            : locationBgImageMap[localKey] ||
+              require('../../../assets/images/Clearsky_new.png');
+        return (
       <ImageBackground
-        source={pickUri(item.cloudImage) ? { uri: pickUri(item.cloudImage) } : require('../../../assets/images/ic_profileMenuBG.png')}
+        source={source}
         style={styles.card}
         imageStyle={styles.cardBg}
       >
@@ -422,6 +477,8 @@ export const LocationsScreen = () => {
           {item.stateName || '--'}
         </Text>
       </ImageBackground>
+        );
+      })()}
 
       {showDelete ? (
         <Pressable style={styles.deleteButton} onPress={() => deleteLocation(item)}>
@@ -612,7 +669,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 19,
   },
-  cardBg: { borderRadius: 10 },
+  cardBg: { borderRadius: 10, resizeMode: 'cover' },
   cityText: { color: '#fff', fontFamily: 'RobotoMedium', fontSize: 16 },
   stateText: { color: '#fff', fontFamily: 'RobotoRegular', fontSize: 14, marginTop: 2 },
   deleteButton: {
