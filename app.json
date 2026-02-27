@@ -8,7 +8,7 @@
     "scheme": "meghdoot-app",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/images/AppIcon.png",
+      "image": "./assets/images/ic_splashScreen.png",
       "resizeMode": "contain",
       "backgroundColor": "#749C53",
       "imageWidth": 170
@@ -46,7 +46,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/AppIcon.png",
+          "image": "./assets/images/ic_splashScreen.png",
           "resizeMode": "contain",
           "backgroundColor": "#749C53",
           "imageWidth": 170
