@@ -8,9 +8,10 @@
     "scheme": "meghdoot-app",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/images/ic_splashScreen.png",
+      "image": "./assets/images/AppIcon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#749C53"
+      "backgroundColor": "#749C53",
+      "imageWidth": 170
     },
     "androidStatusBar": {
       "backgroundColor": "#749C53",
@@ -45,10 +46,10 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/ic_splashScreen.png",
+          "image": "./assets/images/AppIcon.png",
           "resizeMode": "contain",
           "backgroundColor": "#749C53",
-          "imageWidth": 200
+          "imageWidth": 170
         }
       ],
       "expo-location",
