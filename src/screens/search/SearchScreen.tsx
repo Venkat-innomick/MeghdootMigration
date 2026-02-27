@@ -85,6 +85,31 @@ export const SearchScreen = () => {
     });
   };
 
+  const syncUserLocations = async () => {
+    if (!userId) return [];
+    const payload = buildByLocationPayload(userId, languageLabel);
+    const weather = await weatherService.getByLocation(payload);
+    const list = parseLocationWeatherList(weather) as any[];
+    setAppLocations(list);
+    return list;
+  };
+
+  const moveToHomeForItem = async (item: SearchBlockItem) => {
+    setSelectedLocation({
+      districtID: item.districtID,
+      blockID: item.isAsd ? 0 : item.blockID,
+      asdID: item.isAsd ? item.blockID : 0,
+    });
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+    navigation.navigate("Main", {
+      screen: "MainTabs",
+      params: { screen: "Home" },
+    });
+  };
+
   const loadStates = async () => {
     setLoading(true);
     try {
@@ -218,6 +243,7 @@ export const SearchScreen = () => {
             : b,
         ),
       );
+      await syncUserLocations();
     } catch (e: any) {
       Alert.alert("Failed", e.message || "Unable to add location");
     }
@@ -254,8 +280,25 @@ export const SearchScreen = () => {
             : b,
         ),
       );
+      await syncUserLocations();
     } catch (e: any) {
       Alert.alert("Failed", e.message || "Unable to delete location");
+    }
+  };
+
+  const onRowPress = async (item: SearchBlockItem) => {
+    setLoading(true);
+    try {
+      if (!item.favourite) {
+        await addLocation(item);
+      } else {
+        await syncUserLocations();
+      }
+      await moveToHomeForItem(item);
+    } catch (e: any) {
+      Alert.alert("Failed", e?.message || "Unable to open selected location");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -315,7 +358,7 @@ export const SearchScreen = () => {
   };
 
   return (
-    <Screen>
+    <Screen edges={["top", "left", "right", "bottom"]}>
       <StatusBar style="light" backgroundColor={colors.primary} />
       <View style={styles.root}>
         <View style={styles.header}>
@@ -403,13 +446,14 @@ export const SearchScreen = () => {
               </Text>
             }
             renderItem={({ item }) => (
-              <View style={styles.row}>
+              <Pressable style={styles.row} onPress={() => onRowPress(item)}>
                 <Text style={styles.rowName}>{item.blockName}</Text>
                 <Pressable
                   style={styles.addedWrap}
-                  onPress={() =>
+                  onPress={(event) => {
+                    event.stopPropagation();
                     item.favourite ? removeLocation(item) : addLocation(item)
-                  }
+                  }}
                 >
                   <Image
                     source={
@@ -424,7 +468,7 @@ export const SearchScreen = () => {
                     {item.favourite ? "Added" : "Add"}
                   </Text>
                 </Pressable>
-              </View>
+              </Pressable>
             )}
             ItemSeparatorComponent={() => <View style={styles.separator} />}
           />

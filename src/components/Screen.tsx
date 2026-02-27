@@ -11,7 +11,7 @@ interface ScreenProps extends PropsWithChildren {
 export const Screen = ({
   children,
   backgroundColor = colors.background,
-  edges = ['top', 'left', 'right', 'bottom'],
+  edges = ['left', 'right', 'bottom'],
 }: ScreenProps) => {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor }]} edges={edges}>

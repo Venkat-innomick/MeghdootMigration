@@ -34,6 +34,10 @@ type LocationRow = {
   districtID: number;
   blockID: number;
   asdID: number;
+  tempStateID: number;
+  tempDistrictID: number;
+  tempBlockID: number;
+  tempAsdID: number;
   stateName: string;
   cityName: string;
   colorCode: string;
@@ -86,6 +90,10 @@ export const LocationsScreen = () => {
       const districtID = toNum(item.districtID ?? item.DistrictID ?? item.districtId ?? item.DistrictId);
       const blockID = toNum(item.blockID ?? item.BlockID ?? item.blockId ?? item.BlockId);
       const asdID = toNum(item.asdID ?? item.AsdID ?? item.asdId ?? item.AsdId);
+      const tempStateID = toNum(item.tempStateID ?? item.TempStateID ?? item.tempstateID);
+      const tempDistrictID = toNum(item.tempDistrictID ?? item.TempDistrictID ?? item.tempdistrictID);
+      const tempBlockID = toNum(item.tempBlockID ?? item.TempBlockID ?? item.tempblockID);
+      const tempAsdID = toNum(item.tempAsdID ?? item.TempAsdID ?? item.tempasdID);
       const cityName =
         toText(item.cityName ?? item.CityName) ||
         toText(item.placeName ?? item.PlaceName) ||
@@ -99,6 +107,10 @@ export const LocationsScreen = () => {
         districtID,
         blockID,
         asdID,
+        tempStateID,
+        tempDistrictID,
+        tempBlockID,
+        tempAsdID,
         stateName: toText(item.stateName ?? item.StateName) || '--',
         cityName,
         colorCode: toText(item.colorCode ?? item.ColorCode) || '#FFFFFF',
@@ -278,6 +290,10 @@ export const LocationsScreen = () => {
         districtID: selectedDistrict.districtID,
         blockID: selectedState.stateID === 28 || selectedState.stateID === 36 ? 0 : selectedBlock.id,
         asdID: selectedState.stateID === 28 || selectedState.stateID === 36 ? selectedBlock.id : 0,
+        tempStateID: selectedState.stateID,
+        tempDistrictID: selectedDistrict.districtID,
+        tempBlockID: selectedState.stateID === 28 || selectedState.stateID === 36 ? 0 : selectedBlock.id,
+        tempAsdID: selectedState.stateID === 28 || selectedState.stateID === 36 ? selectedBlock.id : 0,
         stateName: selectedState.stateName,
         cityName: selectedBlock.label,
         colorCode: '#FFFFFF',
@@ -341,21 +357,29 @@ export const LocationsScreen = () => {
       return;
     }
 
+    const resolvedStateID = item.tempStateID || item.stateID;
+    const resolvedDistrictID = item.tempDistrictID || item.districtID;
+    const resolvedBlockID = item.tempBlockID || item.blockID;
+    const resolvedAsdID = item.tempAsdID || item.asdID;
+
     const payload: Record<string, unknown> = {
       UserProfileID: userId,
-      DistrictID: item.districtID,
+      DistrictID: resolvedDistrictID,
     };
-    if (item.asdID > 0) payload.AsdID = item.asdID;
-    else payload.BlockID = item.blockID;
+    if (resolvedStateID === 28 || resolvedStateID === 36) {
+      payload.AsdID = resolvedAsdID;
+    } else {
+      payload.BlockID = resolvedBlockID;
+    }
 
     try {
       setLocations((prev) =>
         prev.filter(
           (x) =>
             !(
-              x.districtID === item.districtID &&
-              x.blockID === item.blockID &&
-              x.asdID === item.asdID &&
+              (x.tempDistrictID || x.districtID) === resolvedDistrictID &&
+              (x.tempBlockID || x.blockID) === resolvedBlockID &&
+              (x.tempAsdID || x.asdID) === resolvedAsdID &&
               !x.isCurrentLocation
             )
         )

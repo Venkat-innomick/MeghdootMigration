@@ -5,6 +5,7 @@ import {
   FlatList,
   Image,
   ImageBackground,
+  ImageSourcePropType,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -12,6 +13,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
+import * as Location from "expo-location";
 import { useNavigation } from "@react-navigation/native";
 import { Screen } from "../../components/Screen";
 import { colors } from "../../theme/colors";
@@ -65,6 +67,42 @@ const toNum = (...values: any[]) => {
   return 0;
 };
 
+const normalizeImageKey = (value: unknown) => {
+  if (typeof value !== "string" || !value.trim()) return "";
+  const file = value.split("/").pop() || value;
+  const noExt = file.replace(/\.[a-z0-9]+$/i, "");
+  return noExt.trim().toLowerCase();
+};
+
+const weatherBgImageMap: Record<string, ImageSourcePropType> = {
+  clearsky_new: require("../../../assets/images/Clearsky_new.png"),
+  mainly_clear: require("../../../assets/images/Mainly_Clear.png"),
+  partly_cloudy: require("../../../assets/images/Partly_Cloudy.png"),
+  generally_cloudy: require("../../../assets/images/generally_cloudy.png"),
+  cloudy: require("../../../assets/images/Cloudy.png"),
+};
+
+const iconImageMap: Record<string, ImageSourcePropType> = {
+  ic_rainfall: require("../../../assets/images/ic_rainfall.png"),
+  ic_pastrainfall: require("../../../assets/images/ic_pastRainfall.png"),
+  ic_humidity: require("../../../assets/images/ic_humidity.png"),
+  ic_pasthumidity: require("../../../assets/images/ic_pastHumidity.png"),
+  ic_windspeed: require("../../../assets/images/ic_windspeed.png"),
+  ic_pastwindspeed: require("../../../assets/images/ic_pastWindSpeed.png"),
+  ic_winddirection: require("../../../assets/images/ic_winddirection.png"),
+  wind_direction_wh: require("../../../assets/images/wind_direction_wh.png"),
+  east: require("../../../assets/images/east.png"),
+};
+
+const cloudKeyByCover = (cloudCover: number) => {
+  if (cloudCover === 0) return "clearsky_new";
+  if (cloudCover === 1 || cloudCover === 2) return "mainly_clear";
+  if (cloudCover === 3 || cloudCover === 4) return "partly_cloudy";
+  if (cloudCover === 5 || cloudCover === 6 || cloudCover === 7)
+    return "generally_cloudy";
+  return "cloudy";
+};
+
 const parseAdvisoryList = (payload: any): CropAdvisoryItem[] => {
   const base = payload?.result || payload?.data || payload;
   if (Array.isArray(base)) return base as CropAdvisoryItem[];
@@ -73,6 +111,30 @@ const parseAdvisoryList = (payload: any): CropAdvisoryItem[] => {
     base?.objCropAdvisoryTopList ||
     base?.ObjCropAdvisoryTopList ||
     []) as CropAdvisoryItem[];
+};
+
+const buildHomeCropPayload = async (
+  userId: number,
+  languageLabel: string,
+) => {
+  const payload: Record<string, unknown> = {
+    Id: userId,
+    LanguageType: languageLabel,
+    Type: "Farmer",
+    RefreshDateTime: "2025-12-26",
+  };
+
+  try {
+    const lastKnown = await Location.getLastKnownPositionAsync();
+    if (lastKnown?.coords) {
+      payload.Latitude = lastKnown.coords.latitude;
+      payload.Longitude = lastKnown.coords.longitude;
+    }
+  } catch {
+    // Keep payload without GPS when unavailable, same as old fallback path.
+  }
+
+  return payload;
 };
 
 export const DashboardScreen = () => {
@@ -111,42 +173,44 @@ export const DashboardScreen = () => {
       const locationList = parseLocationWeatherList(
         weather,
       ) as DashboardLocation[];
-      const crop = await cropService.getAdvisoryTop({
-        Id: userId,
-        UserProfileID: userId,
-        userProfileID: userId,
-        LanguageType: languageLabel,
-        languageType: languageLabel,
-        Type: "Farmer",
-        RefreshDateTime: new Date().toISOString().slice(0, 10),
-      });
+      const cropPayload = await buildHomeCropPayload(userId, languageLabel);
+      const crop = await cropService.getAdvisoryTop(cropPayload);
 
       setLocations(locationList);
       setAppLocations(locationList);
       if (locationList.length > 0) {
-        const match = selectedLocation
+        const currentSelected = useAppStore.getState().selectedLocation;
+        const match = currentSelected
           ? locationList.find((item: any) => {
               const districtID = toNum(item.districtID, item.DistrictID);
               const blockID = toNum(item.blockID, item.BlockID);
               const asdID = toNum(item.asdID, item.AsdID);
               return (
-                districtID === selectedLocation.districtID &&
-                blockID === selectedLocation.blockID &&
-                asdID === selectedLocation.asdID
+                districtID === currentSelected.districtID &&
+                blockID === currentSelected.blockID &&
+                asdID === currentSelected.asdID
               );
             })
           : null;
         const target: any = match || (locationList[0] as any);
-        setSelectedLocation({
+        const nextSelected = {
           districtID: toNum(target?.districtID, target?.DistrictID),
           blockID: toNum(target?.blockID, target?.BlockID),
           asdID: toNum(target?.asdID, target?.AsdID),
-        });
+        };
+        if (
+          !currentSelected ||
+          currentSelected.districtID !== nextSelected.districtID ||
+          currentSelected.blockID !== nextSelected.blockID ||
+          currentSelected.asdID !== nextSelected.asdID
+        ) {
+          setSelectedLocation(nextSelected);
+        }
       }
       setAdvisories(parseAdvisoryList(crop));
     } catch {
       // Keep previously available local/store data on transient API failures.
-      if (!locations.length) {
+      if (!useAppStore.getState().locations?.length) {
         const fallback = useAppStore.getState().locations || [];
         setLocations(fallback as DashboardLocation[]);
       }
@@ -156,8 +220,6 @@ export const DashboardScreen = () => {
     }
   }, [
     languageLabel,
-    locations.length,
-    selectedLocation,
     setAppLocations,
     setSelectedLocation,
     userId,
@@ -312,40 +374,134 @@ export const DashboardScreen = () => {
               }
               getItemLayout={(_, index) => ({ length: cardWidth, offset: cardWidth * index, index })}
               renderItem={({ item }) => {
+                const cloudCover = toNum(
+                  (item as any).cloudCover,
+                  (item as any).CloudCover,
+                );
+                const whiteTheme = cloudCover === 3 || cloudCover === 4;
+                const metricColor = whiteTheme ? "#FFFFFF" : "#223C67";
+                const rainImage =
+                  iconImageMap[
+                    normalizeImageKey(
+                      (item as any).rainFallImage || (item as any).RainFallImage,
+                    )
+                  ] ||
+                  (whiteTheme
+                    ? require("../../../assets/images/ic_rainfall.png")
+                    : require("../../../assets/images/ic_pastRainfall.png"));
+                const humidityImage =
+                  iconImageMap[
+                    normalizeImageKey(
+                      (item as any).humidityImage || (item as any).HumidityImage,
+                    )
+                  ] ||
+                  (whiteTheme
+                    ? require("../../../assets/images/ic_humidity.png")
+                    : require("../../../assets/images/ic_pastHumidity.png"));
+                const windSpeedImage =
+                  iconImageMap[
+                    normalizeImageKey(
+                      (item as any).windSpeedImage || (item as any).WindSpeedImage,
+                    )
+                  ] ||
+                  (whiteTheme
+                    ? require("../../../assets/images/ic_windspeed.png")
+                    : require("../../../assets/images/ic_pastWindSpeed.png"));
+                const windDirectionImage =
+                  iconImageMap[
+                    normalizeImageKey(
+                      (item as any).windDirectionImage ||
+                        (item as any).WindDirectionImage,
+                    )
+                  ] ||
+                  (whiteTheme
+                    ? require("../../../assets/images/wind_direction_wh.png")
+                    : require("../../../assets/images/east.png"));
+                const windDirectionAngle = toNum(
+                  (item as any).windDirectionAngle,
+                  (item as any).WindDirectionAngle,
+                );
+
                 const itemMetrics = [
-                  metric("Rainfall", pickText((item as any).rainFall, (item as any).RainFall, "-"), require("../../../assets/images/ic_rainfall.png")),
-                  metric("Wind Speed", pickText((item as any).windSpeed, (item as any).WindSpeed, "-"), require("../../../assets/images/ic_windspeed.png")),
-                  metric("Humidity", pickText((item as any).humidity, (item as any).Humidity, "-"), require("../../../assets/images/ic_humidity.png")),
-                  metric("Direction", pickText((item as any).windDirection, (item as any).WindDirection, "-"), require("../../../assets/images/ic_winddirection.png")),
+                  metric(
+                    "Rainfall",
+                    pickText((item as any).rainFall, (item as any).RainFall, "-"),
+                    rainImage,
+                  ),
+                  metric(
+                    "Wind Speed",
+                    pickText(
+                      (item as any).windSpeed,
+                      (item as any).WindSpeed,
+                      "-",
+                    ),
+                    windSpeedImage,
+                  ),
+                  metric(
+                    "Humidity",
+                    pickText(
+                      (item as any).humidity,
+                      (item as any).Humidity,
+                      "-",
+                    ),
+                    humidityImage,
+                  ),
+                  metric(
+                    "Direction",
+                    pickText(
+                      (item as any).windDirection,
+                      (item as any).WindDirection,
+                      "-",
+                    ),
+                    windDirectionImage,
+                  ),
                 ];
+                const cloudUri = pickUri(
+                  (item as any)?.cloudImage,
+                  (item as any)?.CloudImage,
+                );
+                const cloudKey =
+                  normalizeImageKey(
+                    (item as any)?.cloudImage || (item as any)?.CloudImage,
+                  ) || cloudKeyByCover(cloudCover);
+                const cardBackground =
+                  cloudUri
+                    ? { uri: cloudUri }
+                    : weatherBgImageMap[cloudKey] ||
+                      require("../../../assets/images/Clearsky_new.png");
 
                 return (
                   <Pressable style={[styles.weatherCardPress, { width: cardWidth }]} onPress={() => navigation.navigate("Forecast")}>
                     <ImageBackground
-                      source={
-                        pickUri((item as any)?.cloudImage, (item as any)?.CloudImage)
-                          ? { uri: pickUri((item as any)?.cloudImage, (item as any)?.CloudImage) }
-                          : require("../../../assets/images/ic_profileMenuBG.png")
-                      }
+                      source={cardBackground}
                       style={styles.weatherCard}
                       imageStyle={styles.weatherCardBg}
                     >
-                      <Text style={styles.placeName}>
+                      <Text style={[styles.placeName, { color: metricColor }]}>
                         {pickText((item as any)?.placeName, (item as any)?.PlaceName, (item as any)?.districtName, (item as any)?.DistrictName, "Location")}
                       </Text>
-                      <Text style={styles.dateText}>{pickText((item as any)?.date, (item as any)?.Date, "-")}</Text>
-                      <Text style={styles.minMaxText}>
+                      <Text style={[styles.dateText, { color: metricColor }]}>{pickText((item as any)?.date, (item as any)?.Date, "-")}</Text>
+                      <Text style={[styles.minMaxText, { color: metricColor }]}>
                         Min {pickText((item as any)?.minTemp, (item as any)?.MinTemp, "-")} C | Max {pickText((item as any)?.maxTemp, (item as any)?.MaxTemp, "-")} C
                       </Text>
-                      <Text style={styles.weatherType}>{pickText((item as any)?.weatherType, (item as any)?.WeatherType, "-")}</Text>
+                      <Text style={[styles.weatherType, { color: metricColor }]}>{pickText((item as any)?.weatherType, (item as any)?.WeatherType, "-")}</Text>
 
                       <View style={styles.metricsGrid}>
-                        {itemMetrics.map((m) => (
+                        {itemMetrics.map((m, metricIndex) => (
                           <View key={m.label} style={styles.metricRow}>
-                            <Image source={m.icon} style={styles.metricIcon} resizeMode="contain" />
+                            <Image
+                              source={m.icon}
+                              style={[
+                                styles.metricIcon,
+                                metricIndex === 3
+                                  ? { transform: [{ rotate: `${windDirectionAngle}deg` }] }
+                                  : null,
+                              ]}
+                              resizeMode="contain"
+                            />
                             <View>
-                              <Text style={styles.metricLabel}>{m.label}</Text>
-                              <Text style={styles.metricValue}>{m.value}</Text>
+                              <Text style={[styles.metricLabel, { color: metricColor }]}>{m.label}</Text>
+                              <Text style={[styles.metricValue, { color: metricColor }]}>{m.value}</Text>
                             </View>
                           </View>
                         ))}

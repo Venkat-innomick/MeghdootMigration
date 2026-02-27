@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -198,7 +198,6 @@ export const PastWeatherScreen = () => {
   useAndroidNavigationBar(colors.darkGreen, 'light');
   const user = useAppStore((s) => s.user);
   const language = useAppStore((s) => s.language);
-  const appLocations = useAppStore((s) => s.locations);
   const setAppLocations = useAppStore((s) => s.setLocations);
   const selectedLocationRef = useAppStore((s) => s.selectedLocation);
   const setSelectedLocation = useAppStore((s) => s.setSelectedLocation);
@@ -303,7 +302,7 @@ export const PastWeatherScreen = () => {
         DistrictID: districtID,
         LanguageType: languageLabel,
         languageType: languageLabel,
-        RefreshDateTime: new Date().toISOString().slice(0, 19).replace('T', ' '),
+        RefreshDateTime: '2025-12-26',
       };
 
       if (stateID === 28 || stateID === 36) payload.AsdID = asdID || blockID;
@@ -319,15 +318,12 @@ export const PastWeatherScreen = () => {
     }
   };
 
-  useEffect(() => {
-    if (appLocations?.length) {
-      setLocations(appLocations as DashboardLocation[]);
-    }
-    loadLocations();
-  }, [languageLabel, userId]);
-
   useFocusEffect(
     React.useCallback(() => {
+      const cachedLocations = useAppStore.getState().locations;
+      if (cachedLocations?.length) {
+        setLocations(cachedLocations as DashboardLocation[]);
+      }
       loadLocations();
     }, [languageLabel, userId]),
   );
@@ -357,7 +353,9 @@ export const PastWeatherScreen = () => {
           <FlatList
             data={days}
             horizontal
-            keyExtractor={(item: any, index) => `p-day-${pickText(item.WeatherForecastID, item.weatherForecastID, item.Date, index)}`}
+            keyExtractor={(item: any, index) =>
+              `p-day-${normalizeText(item.WeatherForecastID, item.weatherForecastID, item.Date, 'na')}-${index}`
+            }
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.daysContent}
             renderItem={({ item, index }) => {
@@ -384,7 +382,7 @@ export const PastWeatherScreen = () => {
             <ActivityIndicator color={colors.primary} />
           </View>
         ) : (
-          <ScrollView contentContainerStyle={styles.detailsContainer}>
+          <ScrollView style={styles.detailsScroll} contentContainerStyle={styles.detailsContainer}>
             <ImageBackground
               source={heroBackgroundSource}
               style={styles.hero}
@@ -532,8 +530,10 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   loaderWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  detailsContainer: { paddingBottom: 20 },
+  detailsScroll: { flex: 1 },
+  detailsContainer: { flexGrow: 1, paddingBottom: 0 },
   hero: {
+    flexGrow: 1,
     minHeight: 460,
     paddingHorizontal: 16,
     paddingVertical: 20,

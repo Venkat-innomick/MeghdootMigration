@@ -2,7 +2,11 @@ import { LANGUAGES } from "../constants/languages";
 
 export const toNum = (value: unknown, fallback = 0): number => {
   if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (typeof value === "string" && value.trim() && !Number.isNaN(Number(value))) {
+  if (
+    typeof value === "string" &&
+    value.trim() &&
+    !Number.isNaN(Number(value))
+  ) {
     return Number(value);
   }
   return fallback;
@@ -11,7 +15,8 @@ export const toNum = (value: unknown, fallback = 0): number => {
 export const toText = (...values: unknown[]): string => {
   for (const value of values) {
     if (typeof value === "string" && value.trim()) return value.trim();
-    if (typeof value === "number" && Number.isFinite(value)) return String(value);
+    if (typeof value === "number" && Number.isFinite(value))
+      return String(value);
   }
   return "";
 };
@@ -44,25 +49,31 @@ export const getUserProfileId = (user: any) => {
   return 0;
 };
 
-export const buildByLocationPayload = (userId: number, languageLabel: string) => ({
+export const buildByLocationPayload = (
+  userId: number,
+  languageLabel: string,
+) => ({
   Id: userId,
   LanguageType: languageLabel,
-  RefreshDateTime: new Date().toISOString().slice(0, 10),
+  RefreshDateTime: "2025-12-26",
 });
 
 export const parseLocationWeatherList = (response: any) =>
-  pickList<any>((response as any)?.result || (response as any)?.data || response, [
-    "objWeatherForecastNextList",
-    "ObjWeatherForecastNextList",
-    "objWeatherForecastFinalList",
-    "ObjWeatherForecastFinalList",
-    "objWeatherForecastList",
-    "ObjWeatherForecastList",
-    "locationWeatherList",
-    "LocationWeatherList",
-    "weatherCollection",
-    "WeatherCollection",
-  ]);
+  pickList<any>(
+    (response as any)?.result || (response as any)?.data || response,
+    [
+      "objWeatherForecastNextList",
+      "ObjWeatherForecastNextList",
+      "objWeatherForecastFinalList",
+      "ObjWeatherForecastFinalList",
+      "objWeatherForecastList",
+      "ObjWeatherForecastList",
+      "locationWeatherList",
+      "LocationWeatherList",
+      "weatherCollection",
+      "WeatherCollection",
+    ],
+  );
 
 export const isApiSuccess = (response: any) => {
   const value = response?.isSuccessful ?? response?.IsSuccessful;
