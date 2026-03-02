@@ -37,6 +37,7 @@ import { CropAudioPlayerScreen } from '../screens/crop/CropAudioPlayerScreen';
 import { CropImagePreviewScreen } from '../screens/crop/CropImagePreviewScreen';
 import { SearchScreen } from '../screens/search/SearchScreen';
 import { LanguageSettingsScreen } from '../screens/menu/LanguageSettingsScreen';
+import { SplashScreen } from '../screens/splash/SplashScreen';
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
@@ -202,33 +203,20 @@ const MainDrawer = () => {
 };
 
 export const AppNavigator = () => {
-  const isHydrated = useAppStore((s) => s.isHydrated);
-  const onboardingDone = useAppStore((s) => s.onboardingDone);
-  const user = useAppStore((s) => s.user);
-
-  if (!isHydrated) {
-    return null;
-  }
-
   return (
     <NavigationContainer>
-      <RootStack.Navigator>
-        {!onboardingDone ? (
-          <RootStack.Screen name="Onboarding" component={OnboardingNavigator} options={{ headerShown: false }} />
-        ) : !user ? (
-          <RootStack.Screen name="Auth" component={AuthNavigator} options={{ headerShown: false }} />
-        ) : (
-          <>
-            <RootStack.Screen name="Main" component={MainDrawer} options={{ headerShown: false }} />
-            <RootStack.Screen name="CropAdvisory" component={CropAdvisoryScreen} options={{ headerStyle: { backgroundColor: colors.primary }, headerTintColor: '#fff', title: 'Crop Advisory' }} />
-            <RootStack.Screen name="CropFeedback" component={CropFeedbackScreen} options={{ headerStyle: { backgroundColor: colors.primary }, headerTintColor: '#fff', title: 'Crop Advisory Feedback' }} />
-            <RootStack.Screen name="CropAudioPlayer" component={CropAudioPlayerScreen} options={{ headerShown: false, presentation: 'transparentModal', animation: 'slide_from_bottom' }} />
-            <RootStack.Screen name="CropImagePreview" component={CropImagePreviewScreen} options={{ headerShown: false }} />
-            <RootStack.Screen name="Notifications" component={NotificationsScreen} options={{ headerStyle: { backgroundColor: colors.primary }, headerTintColor: '#fff', title: 'Notifications' }} />
-            <RootStack.Screen name="Search" component={SearchScreen} options={{ headerShown: false }} />
-            <RootStack.Screen name="Profile" component={ProfileScreen} options={{ headerStyle: { backgroundColor: colors.primary }, headerTintColor: '#fff', title: 'Profile' }} />
-          </>
-        )}
+      <RootStack.Navigator initialRouteName="Splash">
+        <RootStack.Screen name="Splash" component={SplashScreen} options={{ headerShown: false }} />
+        <RootStack.Screen name="Onboarding" component={OnboardingNavigator} options={{ headerShown: false }} />
+        <RootStack.Screen name="Auth" component={AuthNavigator} options={{ headerShown: false }} />
+        <RootStack.Screen name="Main" component={MainDrawer} options={{ headerShown: false }} />
+        <RootStack.Screen name="CropAdvisory" component={CropAdvisoryScreen} options={{ headerStyle: { backgroundColor: colors.primary }, headerTintColor: '#fff', title: 'Crop Advisory' }} />
+        <RootStack.Screen name="CropFeedback" component={CropFeedbackScreen} options={{ headerStyle: { backgroundColor: colors.primary }, headerTintColor: '#fff', title: 'Crop Advisory Feedback' }} />
+        <RootStack.Screen name="CropAudioPlayer" component={CropAudioPlayerScreen} options={{ headerShown: false, presentation: 'transparentModal', animation: 'slide_from_bottom' }} />
+        <RootStack.Screen name="CropImagePreview" component={CropImagePreviewScreen} options={{ headerShown: false }} />
+        <RootStack.Screen name="Notifications" component={NotificationsScreen} options={{ headerStyle: { backgroundColor: colors.primary }, headerTintColor: '#fff', title: 'Notifications' }} />
+        <RootStack.Screen name="Search" component={SearchScreen} options={{ headerShown: false }} />
+        <RootStack.Screen name="Profile" component={ProfileScreen} options={{ headerStyle: { backgroundColor: colors.primary }, headerTintColor: '#fff', title: 'Profile' }} />
       </RootStack.Navigator>
     </NavigationContainer>
   );
