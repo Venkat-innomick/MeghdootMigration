@@ -52,11 +52,21 @@ export const getUserProfileId = (user: any) => {
 export const buildByLocationPayload = (
   userId: number,
   languageLabel: string,
-) => ({
-  Id: userId,
-  LanguageType: languageLabel,
-  RefreshDateTime: "2025-12-26",
-});
+  coords?: { latitude: number; longitude: number } | null,
+) => {
+  const payload: Record<string, unknown> = {
+    Id: userId,
+    LanguageType: languageLabel,
+    RefreshDateTime: "2025-12-26",
+  };
+
+  if (coords) {
+    payload.Latitude = coords.latitude;
+    payload.Longitude = coords.longitude;
+  }
+
+  return payload;
+};
 
 export const parseLocationWeatherList = (response: any) =>
   pickList<any>(

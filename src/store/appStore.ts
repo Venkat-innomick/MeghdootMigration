@@ -10,6 +10,11 @@ interface SelectedLocationRef {
   asdID: number;
 }
 
+interface CurrentLocationOverride {
+  latitude: number;
+  longitude: number;
+}
+
 interface AppState {
   isHydrated: boolean;
   onboardingDone: boolean;
@@ -18,6 +23,9 @@ interface AppState {
   user: UserProfile | null;
   locations: DashboardLocation[];
   selectedLocation: SelectedLocationRef | null;
+  currentLocationOverride: CurrentLocationOverride | null;
+  temporarySearchLocations: DashboardLocation[];
+  temporarySearchAdvisories: any[];
   setHydrated: (ready: boolean) => void;
   beginOnboarding: () => void;
   completeOnboarding: () => void;
@@ -25,6 +33,12 @@ interface AppState {
   setUser: (user: UserProfile | null) => void;
   setLocations: (locations: DashboardLocation[]) => void;
   setSelectedLocation: (location: SelectedLocationRef | null) => void;
+  setCurrentLocationOverride: (location: CurrentLocationOverride | null) => void;
+  setTemporarySearchData: (payload: {
+    locations: DashboardLocation[];
+    advisories: any[];
+  }) => void;
+  clearTemporarySearchData: () => void;
   logout: () => void;
 }
 
@@ -38,6 +52,9 @@ export const useAppStore = create<AppState>()(
       user: null,
       locations: [],
       selectedLocation: null,
+      currentLocationOverride: null,
+      temporarySearchLocations: [],
+      temporarySearchAdvisories: [],
       setHydrated: (ready) => set({ isHydrated: ready }),
       beginOnboarding: () => set({ onboardingStarted: true }),
       completeOnboarding: () => set({ onboardingDone: true, onboardingStarted: true }),
@@ -45,12 +62,38 @@ export const useAppStore = create<AppState>()(
       setUser: (user) => set({ user }),
       setLocations: (locations) => set({ locations }),
       setSelectedLocation: (selectedLocation) => set({ selectedLocation }),
-      logout: () => set({ user: null, selectedLocation: null, locations: [] }),
+      setCurrentLocationOverride: (currentLocationOverride) =>
+        set({ currentLocationOverride }),
+      setTemporarySearchData: ({ locations, advisories }) =>
+        set({
+          temporarySearchLocations: locations,
+          temporarySearchAdvisories: advisories,
+        }),
+      clearTemporarySearchData: () =>
+        set({ temporarySearchLocations: [], temporarySearchAdvisories: [] }),
+      logout: () =>
+        set({
+          user: null,
+          selectedLocation: null,
+          currentLocationOverride: null,
+          locations: [],
+          temporarySearchLocations: [],
+          temporarySearchAdvisories: [],
+        }),
     }),
     {
       name: STORAGE_KEYS.auth,
       version: 4,
       storage: createJSONStorage(() => AsyncStorage),
+      partialize: (state) => ({
+        onboardingDone: state.onboardingDone,
+        onboardingStarted: state.onboardingStarted,
+        language: state.language,
+        user: state.user,
+        locations: state.locations,
+        selectedLocation: state.selectedLocation,
+        currentLocationOverride: state.currentLocationOverride,
+      }),
       migrate: (persistedState: any, version) => {
         // Force onboarding to show once after migration from older app state.
         if (version < 2 && persistedState) {

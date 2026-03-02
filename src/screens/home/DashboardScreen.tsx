@@ -14,7 +14,7 @@ import {
   View,
 } from "react-native";
 import * as Location from "expo-location";
-import { useNavigation } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { Screen } from "../../components/Screen";
 import { colors } from "../../theme/colors";
 import { spacing } from "../../theme/spacing";
@@ -123,18 +123,82 @@ const parseAdvisoryList = (payload: any): CropAdvisoryItem[] => {
     []) as CropAdvisoryItem[];
 };
 
+const sameLocationRef = (
+  item: any,
+  target: { districtID: number; blockID: number; asdID: number } | null,
+) => {
+  if (!target) return false;
+  const districtID = toNum(item?.districtID ?? item?.DistrictID);
+  const blockID = toNum(item?.blockID ?? item?.BlockID);
+  const asdID = toNum(item?.asdID ?? item?.AsdID);
+  return (
+    districtID === target.districtID &&
+    blockID === target.blockID &&
+    asdID === target.asdID
+  );
+};
+
+const mergeLocations = (primary: any[], secondary: any[]) => {
+  const merged: any[] = [];
+  [...primary, ...secondary].forEach((item) => {
+    const exists = merged.some(
+      (row) =>
+        toNum(row?.districtID ?? row?.DistrictID) ===
+          toNum(item?.districtID ?? item?.DistrictID) &&
+        toNum(row?.blockID ?? row?.BlockID) ===
+          toNum(item?.blockID ?? item?.BlockID) &&
+        toNum(row?.asdID ?? row?.AsdID) === toNum(item?.asdID ?? item?.AsdID),
+    );
+    if (!exists) merged.push(item);
+  });
+  return merged;
+};
+
+const mergeAdvisories = (primary: any[], secondary: any[]) => {
+  const merged: any[] = [];
+  [...primary, ...secondary].forEach((item, index) => {
+    const advisoryId = toNum(item?.cropAdvisoryID ?? item?.CropAdvisoryID, index + 1);
+    const exists = merged.some(
+      (row, rowIndex) =>
+        toNum(row?.cropAdvisoryID ?? row?.CropAdvisoryID, rowIndex + 1) === advisoryId,
+    );
+    if (!exists) merged.push(item);
+  });
+  return merged;
+};
+
+const orderLocationsBySelected = (
+  items: DashboardLocation[],
+  selected: { districtID: number; blockID: number; asdID: number } | null,
+) => {
+  if (!selected) return items;
+  const next = [...items];
+  const index = next.findIndex((item) => sameLocationRef(item, selected));
+  if (index <= 0) return next;
+  const [target] = next.splice(index, 1);
+  next.unshift(target);
+  return next;
+};
+
 const buildHomeCropPayload = async (
   userId: number,
   languageLabel: string,
+  coords?: { latitude: number; longitude: number } | null,
 ) => {
   const payload: Record<string, unknown> = {
     Id: userId,
     LanguageType: languageLabel,
     Type: "Farmer",
-    RefreshDateTime: "2025-12-26",
+    RefreshDateTime: new Date().toISOString().slice(0, 10),
   };
 
   try {
+    if (coords) {
+      payload.Latitude = coords.latitude;
+      payload.Longitude = coords.longitude;
+      return payload;
+    }
+
     const lastKnown = await Location.getLastKnownPositionAsync();
     if (lastKnown?.coords) {
       payload.Latitude = lastKnown.coords.latitude;
@@ -156,6 +220,10 @@ export const DashboardScreen = () => {
   const setAppLocations = useAppStore((s) => s.setLocations);
   const selectedLocation = useAppStore((s) => s.selectedLocation);
   const setSelectedLocation = useAppStore((s) => s.setSelectedLocation);
+  const currentLocationOverride = useAppStore((s) => s.currentLocationOverride);
+  const temporarySearchLocations = useAppStore((s) => s.temporarySearchLocations);
+  const temporarySearchAdvisories = useAppStore((s) => s.temporarySearchAdvisories);
+  const clearTemporarySearchData = useAppStore((s) => s.clearTemporarySearchData);
   const userId = useMemo(() => getUserProfileId(user), [user]);
   const languageLabel = useMemo(() => getLanguageLabel(language), [language]);
   const [loading, setLoading] = useState(true);
@@ -178,18 +246,34 @@ export const DashboardScreen = () => {
     }
 
     try {
-      const payload = buildByLocationPayload(userId, languageLabel);
+      const payload = buildByLocationPayload(
+        userId,
+        languageLabel,
+        currentLocationOverride,
+      );
       const weather = await weatherService.getByLocation(payload);
       const locationList = parseLocationWeatherList(
         weather,
       ) as DashboardLocation[];
-      const cropPayload = await buildHomeCropPayload(userId, languageLabel);
+      const cropPayload = await buildHomeCropPayload(
+        userId,
+        languageLabel,
+        currentLocationOverride,
+      );
       const crop = await cropService.getAdvisoryTop(cropPayload);
 
-      setLocations(locationList);
+      const mergedLocations = mergeLocations(
+        temporarySearchLocations,
+        locationList,
+      ) as DashboardLocation[];
+      const currentSelected = useAppStore.getState().selectedLocation;
+      const nextLocations = orderLocationsBySelected(
+        mergedLocations,
+        currentSelected,
+      );
+      setLocations(nextLocations);
       setAppLocations(locationList);
       if (locationList.length > 0) {
-        const currentSelected = useAppStore.getState().selectedLocation;
         const match = currentSelected
           ? locationList.find((item: any) => {
               const districtID = toNum(item.districtID, item.DistrictID);
@@ -202,7 +286,7 @@ export const DashboardScreen = () => {
               );
             })
           : null;
-        const target: any = match || (locationList[0] as any);
+        const target: any = match || (nextLocations[0] as any);
         const nextSelected = {
           districtID: toNum(target?.districtID, target?.DistrictID),
           blockID: toNum(target?.blockID, target?.BlockID),
@@ -217,12 +301,24 @@ export const DashboardScreen = () => {
           setSelectedLocation(nextSelected);
         }
       }
-      setAdvisories(parseAdvisoryList(crop));
+      const nextAdvisories = mergeAdvisories(
+        temporarySearchAdvisories,
+        parseAdvisoryList(crop),
+      ) as CropAdvisoryItem[];
+      setAdvisories(nextAdvisories);
+      if (temporarySearchLocations.length || temporarySearchAdvisories.length) {
+        clearTemporarySearchData();
+      }
     } catch {
       // Keep previously available local/store data on transient API failures.
       if (!useAppStore.getState().locations?.length) {
         const fallback = useAppStore.getState().locations || [];
-        setLocations(fallback as DashboardLocation[]);
+        setLocations(
+          mergeLocations(
+            temporarySearchLocations,
+            fallback as DashboardLocation[],
+          ) as DashboardLocation[],
+        );
       }
     } finally {
       setLoading(false);
@@ -230,14 +326,20 @@ export const DashboardScreen = () => {
     }
   }, [
     languageLabel,
+    currentLocationOverride,
     setAppLocations,
+    clearTemporarySearchData,
     setSelectedLocation,
+    temporarySearchAdvisories,
+    temporarySearchLocations,
     userId,
   ]);
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData]),
+  );
 
   const currentLocation = useMemo(() => {
     if (!locations.length) return null;

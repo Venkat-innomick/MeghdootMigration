@@ -366,8 +366,12 @@ export const RegistrationScreen = ({ navigation }: Props) => {
             "Unable to register",
         );
       } else {
-        Alert.alert("Success", "Registration done successfully");
-        navigation.navigate("Login");
+        Alert.alert("Success", "Registration done successfully", [
+          {
+            text: "OK",
+            onPress: () => navigation.replace("Login"),
+          },
+        ]);
       }
     } catch (error: any) {
       Alert.alert("Registration failed", error.message || "Unable to register");
@@ -549,7 +553,7 @@ export const RegistrationScreen = ({ navigation }: Props) => {
 
           <Pressable
             style={styles.backRow}
-            onPress={() => navigation.navigate("Login")}
+            onPress={() => navigation.replace("Login")}
           >
             <Text style={styles.backText}>
               <Text style={styles.backPrefix}>Back to </Text>

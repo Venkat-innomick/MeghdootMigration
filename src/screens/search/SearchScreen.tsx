@@ -18,6 +18,7 @@ import { Screen } from "../../components/Screen";
 import { colors } from "../../theme/colors";
 import { spacing } from "../../theme/spacing";
 import {
+  cropService,
   mastersService,
   userService,
   weatherService,
@@ -52,6 +53,10 @@ export const SearchScreen = () => {
   const language = useAppStore((s) => s.language);
   const setAppLocations = useAppStore((s) => s.setLocations);
   const setSelectedLocation = useAppStore((s) => s.setSelectedLocation);
+  const setCurrentLocationOverride = useAppStore(
+    (s) => s.setCurrentLocationOverride,
+  );
+  const setTemporarySearchData = useAppStore((s) => s.setTemporarySearchData);
 
   const [loading, setLoading] = useState(false);
   const [states, setStates] = useState<StateMasterItem[]>([]);
@@ -108,6 +113,50 @@ export const SearchScreen = () => {
       screen: "MainTabs",
       params: { screen: "Home" },
     });
+  };
+
+  const parseSelectedAdvisories = (payload: any) => {
+    const base = payload?.result || payload?.data || payload;
+    if (Array.isArray(base)) return base;
+    return (
+      base?.objCropAdvisoryDetailsList ||
+      base?.ObjCropAdvisoryDetailsList ||
+      base?.objCropAdvisoryTopList ||
+      base?.ObjCropAdvisoryTopList ||
+      []
+    ) as any[];
+  };
+
+  const loadSelectedLocationData = async (item: SearchBlockItem) => {
+    const weatherPayload: Record<string, unknown> = {
+      StateID: item.stateID,
+      DistrictID: item.districtID,
+      LanguageType: languageLabel,
+      RefreshDateTime: new Date().toISOString().slice(0, 10),
+    };
+    const cropPayload: Record<string, unknown> = {
+      StateID: item.stateID,
+      DistrictID: item.districtID,
+      LanguageType: languageLabel,
+    };
+
+    if (item.isAsd) {
+      weatherPayload.AsdID = item.blockID;
+      cropPayload.AsdID = item.blockID;
+    } else {
+      weatherPayload.BlockID = item.blockID;
+      cropPayload.BlockID = item.blockID;
+    }
+
+    const [weather, crop] = await Promise.all([
+      weatherService.getTodayWeather(weatherPayload),
+      cropService.getGpsAdvisoryTop(cropPayload),
+    ]);
+
+    return {
+      locations: parseLocationWeatherList(weather) as any[],
+      advisories: parseSelectedAdvisories(crop),
+    };
   };
 
   const loadStates = async () => {
@@ -289,11 +338,12 @@ export const SearchScreen = () => {
   const onRowPress = async (item: SearchBlockItem) => {
     setLoading(true);
     try {
-      if (!item.favourite) {
-        await addLocation(item);
-      } else {
-        await syncUserLocations();
+      const result = await loadSelectedLocationData(item);
+      if (!result.locations.length && !result.advisories.length) {
+        Alert.alert("Info", "No data found for selected location.");
+        return;
       }
+      setTemporarySearchData(result);
       await moveToHomeForItem(item);
     } catch (e: any) {
       Alert.alert("Failed", e?.message || "Unable to open selected location");
@@ -319,30 +369,13 @@ export const SearchScreen = () => {
       const current = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
       });
-
-      const payload: Record<string, unknown> = {
-        ...buildByLocationPayload(userId, languageLabel),
-        Latitude: current.coords.latitude,
-        Longitude: current.coords.longitude,
-      };
-
-      const weather = await weatherService.getByLocation(payload);
-      const list = parseLocationWeatherList(weather) as any[];
-      if (!list.length) {
-        Alert.alert("Info", "No location data found for current position.");
-        return;
-      }
-
-      setAppLocations(list as any[]);
-      const target =
-        list.find((x: any) =>
-          Boolean(x.isCurrentLocation ?? x.IsCurrentLocation),
-        ) || list[0];
-      setSelectedLocation({
-        districtID: toNum(target?.districtID ?? target?.DistrictID),
-        blockID: toNum(target?.blockID ?? target?.BlockID),
-        asdID: toNum(target?.asdID ?? target?.AsdID),
+      setCurrentLocationOverride({
+        latitude: current.coords.latitude,
+        longitude: current.coords.longitude,
       });
+      setTemporarySearchData({ locations: [], advisories: [] });
+      setAppLocations([]);
+      setSelectedLocation(null);
 
       if (navigation.canGoBack()) navigation.goBack();
       else

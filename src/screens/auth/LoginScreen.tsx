@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { CommonActions } from "@react-navigation/native";
 import {
   Alert,
   Image,
@@ -89,6 +90,14 @@ export const LoginScreen = ({ navigation }: Props) => {
           ...(data.PanchayatName ? { panchayatName: data.PanchayatName } : {}),
           ...(data.LanguageName ? { languageName: data.LanguageName } : {}),
         });
+        navigation
+          .getParent()
+          ?.dispatch(
+            CommonActions.reset({
+              index: 0,
+              routes: [{ name: "Main" }],
+            }),
+          );
       } else {
         Alert.alert(
           "Login failed",
