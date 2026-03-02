@@ -2,17 +2,20 @@ import React from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { OnboardingStackParamList } from '../../navigation/types';
 import { OnboardingScreen } from './OnboardingScreen';
+import { useAppStore } from '../../store/appStore';
 
 type Props = NativeStackScreenProps<OnboardingStackParamList, 'OnboardingTwo'>;
 
 export const OnboardingTwoScreen = ({ navigation }: Props) => {
+  const completeOnboarding = useAppStore((s) => s.completeOnboarding);
+
   return (
     <OnboardingScreen
-      title="Crop Advisory"
-      description="View crop advisories in simple language for your selected location."
+      title="Supports Different Languages"
+      description="The app facilitates the information in English and 12 Indian languages (Hindi, Telugu, Assamese, Gujarati, Kannada, Malayalam, Marathi, Odia, Tamil, Mizo, Bengali and Punjabi). It is a user-friendly interface for easy navigation and querying by farmers."
       image={require('../../../assets/images/ic_onBoardTwo.png')}
       onNext={() => navigation.navigate('OnboardingThree')}
-      onSkip={() => navigation.navigate('OnboardingThree')}
+      onSkip={completeOnboarding}
     />
   );
 };

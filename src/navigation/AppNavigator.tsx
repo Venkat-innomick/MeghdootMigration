@@ -128,8 +128,13 @@ const AuthNavigator = () => {
 };
 
 const OnboardingNavigator = () => {
+  const onboardingStarted = useAppStore((s) => s.onboardingStarted);
+
   return (
-    <OnboardingStack.Navigator screenOptions={{ headerShown: false }}>
+    <OnboardingStack.Navigator
+      initialRouteName={onboardingStarted ? 'OnboardingOne' : 'Language'}
+      screenOptions={{ headerShown: false }}
+    >
       <OnboardingStack.Screen name="Language" component={LanguageSelectionScreen} />
       <OnboardingStack.Screen name="OnboardingOne" component={OnboardingOneScreen} />
       <OnboardingStack.Screen name="OnboardingTwo" component={OnboardingTwoScreen} />
@@ -197,8 +202,13 @@ const MainDrawer = () => {
 };
 
 export const AppNavigator = () => {
+  const isHydrated = useAppStore((s) => s.isHydrated);
   const onboardingDone = useAppStore((s) => s.onboardingDone);
   const user = useAppStore((s) => s.user);
+
+  if (!isHydrated) {
+    return null;
+  }
 
   return (
     <NavigationContainer>

@@ -7,8 +7,8 @@ export const OnboardingThreeScreen = () => {
 
   return (
     <OnboardingScreen
-      title="Notifications"
-      description="Get nowcast warnings and important weather alerts instantly."
+      title="Real Time Weather Update"
+      description="The app displayed a quantitative weather forecast for critical weather parameters (rainfall, temperatures, wind, relative humidity, and cloudiness) for the next five days, encompassing all districts and blocks across the country."
       image={require('../../../assets/images/ic_onBoardThress.png')}
       onNext={completeOnboarding}
       onSkip={completeOnboarding}

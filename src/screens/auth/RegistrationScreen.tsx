@@ -14,6 +14,7 @@ import {
   View,
 } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AuthStackParamList } from "../../navigation/types";
 import { Screen } from "../../components/Screen";
 import { spacing } from "../../theme/spacing";
@@ -138,6 +139,7 @@ const Selector = ({
 
 export const RegistrationScreen = ({ navigation }: Props) => {
   useAndroidNavigationBar(colors.background, "dark");
+  const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(false);
 
   const [firstName, setFirstName] = useState("");
@@ -238,7 +240,9 @@ export const RegistrationScreen = ({ navigation }: Props) => {
             !!d.districtName,
         );
       setDistrictOptions(
-        mappedDistricts.filter((d: DistrictMasterItem) => d.stateID === state.stateID),
+        mappedDistricts.filter(
+          (d: DistrictMasterItem) => d.stateID === state.stateID,
+        ),
       );
     } catch (error: any) {
       Alert.alert("Error", error.message || "Unable to load districts");
@@ -262,22 +266,24 @@ export const RegistrationScreen = ({ navigation }: Props) => {
           district.districtID,
           languageLabel,
         );
-        const mapped = (asd as AsdMasterItem[]).map((a: any) => ({
-          id: Number(a.asdID ?? a.AsdID),
-          label: String(a.asdName ?? a.AsdName ?? "").trim(),
-        }))
-        .filter((a: Option) => Number.isFinite(a.id) && !!a.label);
+        const mapped = (asd as AsdMasterItem[])
+          .map((a: any) => ({
+            id: Number(a.asdID ?? a.AsdID),
+            label: String(a.asdName ?? a.AsdName ?? "").trim(),
+          }))
+          .filter((a: Option) => Number.isFinite(a.id) && !!a.label);
         setBlockOptions(mapped);
       } else {
         const blocks = await mastersService.getBlocks(
           district.districtID,
           languageLabel,
         );
-        const mapped = (blocks as BlockMasterItem[]).map((b: any) => ({
-          id: Number(b.blockID ?? b.BlockID),
-          label: String(b.blockName ?? b.BlockName ?? "").trim(),
-        }))
-        .filter((b: Option) => Number.isFinite(b.id) && !!b.label);
+        const mapped = (blocks as BlockMasterItem[])
+          .map((b: any) => ({
+            id: Number(b.blockID ?? b.BlockID),
+            label: String(b.blockName ?? b.BlockName ?? "").trim(),
+          }))
+          .filter((b: Option) => Number.isFinite(b.id) && !!b.label);
         setBlockOptions(mapped);
       }
     } catch (error: any) {
@@ -355,7 +361,9 @@ export const RegistrationScreen = ({ navigation }: Props) => {
       if (!ok) {
         Alert.alert(
           "Registration failed",
-          response?.errorMessage || response?.ErrorMessage || "Unable to register",
+          response?.errorMessage ||
+            response?.ErrorMessage ||
+            "Unable to register",
         );
       } else {
         Alert.alert("Success", "Registration done successfully");
@@ -369,7 +377,7 @@ export const RegistrationScreen = ({ navigation }: Props) => {
   };
 
   return (
-    <Screen>
+    <Screen edges={["top", "left", "right", "bottom"]}>
       <KeyboardAvoidingView
         style={styles.keyboardWrap}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -379,9 +387,9 @@ export const RegistrationScreen = ({ navigation }: Props) => {
           contentContainerStyle={styles.container}
           keyboardShouldPersistTaps="handled"
         >
-          <Text style={styles.title}>REGISTRATION</Text>
+          <Text style={styles.title}>Registration</Text>
           <Text style={styles.subtitle}>
-            Register to get weather and crop advisory updates
+            A Mobile App to Assist Farmers for Weather Based Farm Management
           </Text>
 
           <View style={styles.fieldWrap}>
@@ -566,10 +574,8 @@ const styles = StyleSheet.create({
   },
   container: {
     paddingHorizontal: 25,
-    paddingTop: 20,
     paddingBottom: 30,
     flexGrow: 1,
-    gap: 12,
   },
   title: {
     textAlign: "center",
@@ -583,10 +589,11 @@ const styles = StyleSheet.create({
     fontFamily: "RobotoRegular",
     fontSize: 14,
     color: colors.lightGreen,
-    marginBottom: 8,
+    marginTop: 10,
+    marginBottom: 30,
   },
   fieldWrap: {
-    marginTop: 4,
+    marginTop: 10,
   },
   floatLabel: {
     alignSelf: "flex-start",
@@ -632,11 +639,11 @@ const styles = StyleSheet.create({
   selectorPlaceholder: {
     color: colors.muted,
   },
-  selectorArrowIcon: { width: 21, height: 11 },
+  selectorArrowIcon: { width: 15, height: 15 },
   termsRow: {
-    marginTop: 8,
+    marginTop: 10,
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 10,
   },
   checkbox: {
@@ -678,7 +685,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     borderRadius: 22,
     alignItems: "center",
-    paddingVertical: 12,
+    justifyContent: "center",
+    minHeight: 44,
   },
   registerButtonText: {
     color: "#fff",
@@ -687,7 +695,8 @@ const styles = StyleSheet.create({
   },
   backRow: {
     alignItems: "center",
-    marginTop: 8,
+    marginTop: 10,
+    marginBottom: 30,
   },
   backText: {
     color: colors.muted,

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState } from "react";
 import {
   Alert,
   Image,
@@ -10,22 +10,24 @@ import {
   Text,
   TextInput,
   View,
-} from 'react-native';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { AuthStackParamList } from '../../navigation/types';
-import { Screen } from '../../components/Screen';
-import { colors } from '../../theme/colors';
-import { useAppStore } from '../../store/appStore';
-import { userService } from '../../api/services';
-import { LANGUAGES } from '../../constants/languages';
-import i18n from '../../locales/i18n';
-import { useAndroidNavigationBar } from '../../hooks/useAndroidNavigationBar';
+} from "react-native";
+import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { AuthStackParamList } from "../../navigation/types";
+import { Screen } from "../../components/Screen";
+import { colors } from "../../theme/colors";
+import { useAppStore } from "../../store/appStore";
+import { userService } from "../../api/services";
+import { LANGUAGES } from "../../constants/languages";
+import i18n from "../../locales/i18n";
+import { useAndroidNavigationBar } from "../../hooks/useAndroidNavigationBar";
 
-type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
+type Props = NativeStackScreenProps<AuthStackParamList, "Login">;
 
 export const LoginScreen = ({ navigation }: Props) => {
-  useAndroidNavigationBar(colors.background, 'dark');
-  const [mobile, setMobile] = useState('');
+  useAndroidNavigationBar(colors.background, "dark");
+  const insets = useSafeAreaInsets();
+  const [mobile, setMobile] = useState("");
   const [loading, setLoading] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
   const setUser = useAppStore((s) => s.setUser);
@@ -33,13 +35,13 @@ export const LoginScreen = ({ navigation }: Props) => {
   const setLanguage = useAppStore((s) => s.setLanguage);
 
   const currentLanguageLabel = useMemo(
-    () => LANGUAGES.find((l) => l.code === language)?.label || 'English',
-    [language]
+    () => LANGUAGES.find((l) => l.code === language)?.label || "English",
+    [language],
   );
 
   const login = async () => {
     if (mobile.length !== 10) {
-      Alert.alert('Validation', 'Please enter valid mobile number');
+      Alert.alert("Validation", "Please enter valid mobile number");
       return;
     }
     setLoading(true);
@@ -47,23 +49,33 @@ export const LoginScreen = ({ navigation }: Props) => {
       // Match Xamarin payload contract for GetUserLoginDetails.
       const response = await userService.login({
         LogInId: mobile,
-        LogInPassword: '1234',
+        LogInPassword: "1234",
         LanguageType: currentLanguageLabel,
-        Refreshdatetime: '2016-01-01',
+        Refreshdatetime: "2016-01-01",
       });
 
       const root: any = response || {};
       const isSuccessful = Boolean(root.IsSuccessful ?? root.isSuccessful);
-      const users = (root.ObjUserList || root.objUserList || root.result || root.data || []) as any[];
+      const users = (root.ObjUserList ||
+        root.objUserList ||
+        root.result ||
+        root.data ||
+        []) as any[];
       const data = Array.isArray(users) ? users[0] : users;
       const roleId = Number(data?.RoleId ?? data?.roleId ?? 0);
-      const typeOfRole = Number(data?.TypeOfRole ?? data?.typeOfRole ?? data?.UserProfileID ?? data?.userProfileId ?? 0);
+      const typeOfRole = Number(
+        data?.TypeOfRole ??
+          data?.typeOfRole ??
+          data?.UserProfileID ??
+          data?.userProfileId ??
+          0,
+      );
 
       if (isSuccessful && data && roleId === 1) {
         setUser({
           userProfileId: typeOfRole,
-          firstName: data.FirstName || data.firstName || '',
-          lastName: data.LastName || data.lastName || '',
+          firstName: data.FirstName || data.firstName || "",
+          lastName: data.LastName || data.lastName || "",
           mobileNumber: data.LogInId || data.mobileNumber || mobile,
           imagePath: data.ImagePath || data.imagePath,
           isLogout: false,
@@ -78,30 +90,42 @@ export const LoginScreen = ({ navigation }: Props) => {
           ...(data.LanguageName ? { languageName: data.LanguageName } : {}),
         });
       } else {
-        Alert.alert('Login failed', root.ErrorMessage || root.errorMessage || 'Invalid credentials');
+        Alert.alert(
+          "Login failed",
+          root.ErrorMessage || root.errorMessage || "Invalid credentials",
+        );
       }
     } catch (error: any) {
-      Alert.alert('Login failed', error.message);
+      Alert.alert("Login failed", error.message);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Screen>
+    <Screen edges={["top", "left", "right", "bottom"]}>
       <KeyboardAvoidingView
         style={styles.keyboardWrap}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 12 : 0}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 12 : 0}
       >
-        <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-          <View>
-            <Text style={styles.title}>LOGIN / SIGN UP</Text>
-            <Text style={styles.subtitle}>Register to get weather and crop advisory updates</Text>
-            <Image source={require('../../../assets/images/ic_logo.png')} style={styles.logo} resizeMode="contain" />
+        <ScrollView
+          contentContainerStyle={[styles.container, { paddingTop: insets.top }]}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.headerBlock}>
+            <Text style={styles.title}>Login to Meghdoot</Text>
+            <Text style={styles.subtitle}>
+              A Mobile App to Assist Farmers for Weather Based Farm Management
+            </Text>
+            <Image
+              source={require("../../../assets/images/ic_logo.png")}
+              style={styles.logo}
+              resizeMode="contain"
+            />
           </View>
 
-          <View>
+          <View style={styles.formBlock}>
             <View style={styles.fieldWrap}>
               <Text style={styles.floatLabel}>Enter Mobile Number</Text>
               <TextInput
@@ -117,9 +141,18 @@ export const LoginScreen = ({ navigation }: Props) => {
 
             <View style={styles.fieldWrap}>
               <Text style={styles.floatLabel}>Select Language</Text>
-              <Pressable style={styles.langHeader} onPress={() => setLangOpen((s) => !s)}>
-                <Text style={styles.langHeaderText}>{currentLanguageLabel}</Text>
-                <Image source={require('../../../assets/images/dropdown.png')} style={styles.dropdownIcon} resizeMode="contain" />
+              <Pressable
+                style={styles.langHeader}
+                onPress={() => setLangOpen((s) => !s)}
+              >
+                <Text style={styles.langHeaderText}>
+                  {currentLanguageLabel}
+                </Text>
+                <Image
+                  source={require("../../../assets/images/dropdown.png")}
+                  style={styles.dropdownIcon}
+                  resizeMode="contain"
+                />
               </Pressable>
               {langOpen && (
                 <View style={styles.langList}>
@@ -142,13 +175,22 @@ export const LoginScreen = ({ navigation }: Props) => {
           </View>
 
           <View style={styles.actionsWrap}>
-            <Pressable style={[styles.primaryButton, loading && styles.buttonDisabled]} onPress={login} disabled={loading}>
-              <Text style={styles.primaryButtonText}>{loading ? 'Signing In...' : 'Login'}</Text>
+            <Pressable
+              style={[styles.primaryButton, loading && styles.buttonDisabled]}
+              onPress={login}
+              disabled={loading}
+            >
+              <Text style={styles.primaryButtonText}>
+                {loading ? "Signing In..." : "Login"}
+              </Text>
             </Pressable>
 
             <Text style={styles.orText}>or</Text>
 
-            <Pressable style={styles.outlineButton} onPress={() => navigation.navigate('Registration')}>
+            <Pressable
+              style={styles.outlineButton}
+              onPress={() => navigation.navigate("Registration")}
+            >
               <Text style={styles.outlineButtonText}>Sign-Up</Text>
             </Pressable>
           </View>
@@ -165,27 +207,28 @@ const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 25,
     paddingBottom: 20,
-    paddingTop: 0,
     flexGrow: 1,
-    justifyContent: 'space-between',
   },
+  headerBlock: {},
+  formBlock: {},
   title: {
     marginTop: 40,
-    textAlign: 'center',
-    fontFamily: 'RobotoMedium',
+    textAlign: "center",
+    fontFamily: "RobotoMedium",
     fontSize: 24,
     color: colors.darkGreen,
   },
   subtitle: {
     marginTop: 10,
-    textAlign: 'center',
-    fontFamily: 'RobotoRegular',
+    textAlign: "center",
+    fontFamily: "RobotoRegular",
     fontSize: 14,
     color: colors.lightGreen,
   },
   logo: {
-    alignSelf: 'center',
+    alignSelf: "center",
     marginTop: 10,
+    marginBottom: 15,
     width: 150,
     height: 150,
   },
@@ -193,14 +236,14 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   floatLabel: {
-    alignSelf: 'flex-start',
+    alignSelf: "flex-start",
     marginLeft: 22,
     marginBottom: -9,
     zIndex: 1,
     paddingHorizontal: 6,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     color: colors.muted,
-    fontFamily: 'RobotoRegular',
+    fontFamily: "RobotoRegular",
     fontSize: 14,
   },
   input: {
@@ -209,10 +252,10 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     paddingHorizontal: 18,
     paddingVertical: 12,
-    fontFamily: 'RobotoRegular',
+    fontFamily: "RobotoRegular",
     fontSize: 14,
     color: colors.text,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
   },
   langHeader: {
     borderWidth: 1,
@@ -220,36 +263,36 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     paddingHorizontal: 18,
     paddingVertical: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#fff',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#fff",
   },
   langHeaderText: {
-    fontFamily: 'RobotoRegular',
+    fontFamily: "RobotoRegular",
     color: colors.text,
     fontSize: 14,
   },
   dropdownIcon: {
-    width: 21,
-    height: 11,
+    width: 15,
+    height: 15,
   },
   langList: {
     marginTop: 8,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 12,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     maxHeight: 220,
   },
   langItem: {
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: "#f0f0f0",
   },
   langItemText: {
-    fontFamily: 'RobotoRegular',
+    fontFamily: "RobotoRegular",
     fontSize: 14,
     color: colors.text,
   },
@@ -258,22 +301,22 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     borderRadius: 22,
     paddingVertical: 12,
-    alignItems: 'center',
+    alignItems: "center",
   },
   actionsWrap: {
-    marginTop: 24,
+    marginTop: 40,
     marginBottom: 15,
   },
   buttonDisabled: { opacity: 0.7 },
   primaryButtonText: {
-    color: '#fff',
-    fontFamily: 'RobotoMedium',
+    color: "#fff",
+    fontFamily: "RobotoMedium",
     fontSize: 16,
   },
   orText: {
     marginTop: 10,
-    textAlign: 'center',
-    fontFamily: 'RobotoRegular',
+    textAlign: "center",
+    fontFamily: "RobotoRegular",
     color: colors.muted,
   },
   outlineButton: {
@@ -282,12 +325,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 22,
     paddingVertical: 12,
-    alignItems: 'center',
-    backgroundColor: '#fff',
+    alignItems: "center",
+    backgroundColor: "#fff",
   },
   outlineButtonText: {
     color: colors.primary,
-    fontFamily: 'RobotoMedium',
+    fontFamily: "RobotoMedium",
     fontSize: 16,
   },
 });

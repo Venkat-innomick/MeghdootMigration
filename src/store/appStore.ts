@@ -13,11 +13,13 @@ interface SelectedLocationRef {
 interface AppState {
   isHydrated: boolean;
   onboardingDone: boolean;
+  onboardingStarted: boolean;
   language: string;
   user: UserProfile | null;
   locations: DashboardLocation[];
   selectedLocation: SelectedLocationRef | null;
   setHydrated: (ready: boolean) => void;
+  beginOnboarding: () => void;
   completeOnboarding: () => void;
   setLanguage: (language: string) => void;
   setUser: (user: UserProfile | null) => void;
@@ -31,12 +33,14 @@ export const useAppStore = create<AppState>()(
     (set) => ({
       isHydrated: false,
       onboardingDone: false,
+      onboardingStarted: false,
       language: 'en',
       user: null,
       locations: [],
       selectedLocation: null,
       setHydrated: (ready) => set({ isHydrated: ready }),
-      completeOnboarding: () => set({ onboardingDone: true }),
+      beginOnboarding: () => set({ onboardingStarted: true }),
+      completeOnboarding: () => set({ onboardingDone: true, onboardingStarted: true }),
       setLanguage: (language) => set({ language }),
       setUser: (user) => set({ user }),
       setLocations: (locations) => set({ locations }),
@@ -45,15 +49,29 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: STORAGE_KEYS.auth,
-      version: 3,
+      version: 4,
       storage: createJSONStorage(() => AsyncStorage),
       migrate: (persistedState: any, version) => {
         // Force onboarding to show once after migration from older app state.
         if (version < 2 && persistedState) {
-          return { ...persistedState, onboardingDone: false, selectedLocation: null };
+          return {
+            ...persistedState,
+            onboardingDone: false,
+            onboardingStarted: false,
+            selectedLocation: null,
+          };
         }
         if (version < 3 && persistedState) {
-          return { ...persistedState, selectedLocation: null };
+          return { ...persistedState, onboardingStarted: false, selectedLocation: null };
+        }
+        if (version < 4 && persistedState) {
+          return {
+            ...persistedState,
+            onboardingStarted: Boolean(
+              persistedState.onboardingStarted ??
+                (persistedState.onboardingDone ? true : persistedState.language)
+            ),
+          };
         }
         return persistedState as AppState;
       },
