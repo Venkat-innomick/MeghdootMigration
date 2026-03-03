@@ -103,7 +103,7 @@ export const FavouritesScreen = () => {
       const response = await cropService.getFavourites({
         Id: userId,
         LanguageType: languageLabel,
-        RefreshDateTime: "2019-01-01",
+        RefreshDateTime: "2025-12-26",
       });
       const base = response?.result || response?.data || response;
       const list = pickList(base, [

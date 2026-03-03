@@ -5,6 +5,21 @@ const baseURL =
   (Constants.expoConfig?.extra?.apiBaseUrl as string | undefined) ||
   API_BASE_URL;
 
+export const extractApiErrorMessage = (payload: any): string => {
+  const candidates = [
+    payload?.errorMessage,
+    payload?.ErrorMessage,
+    payload?.message,
+    payload?.Message,
+  ];
+
+  for (const value of candidates) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+
+  return "";
+};
+
 type ApiClientResponse<T> = { data: T };
 
 const withTimeout = async <T>(promise: Promise<T>, ms: number): Promise<T> => {

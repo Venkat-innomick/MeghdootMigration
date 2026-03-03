@@ -1,6 +1,6 @@
 import React from 'react';
-import { Image, Pressable, Text, View } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import { Alert, Image, Pressable, Text, View } from 'react-native';
+import { CommonActions, NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createDrawerNavigator, DrawerContentScrollView, DrawerItem } from '@react-navigation/drawer';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -155,6 +155,27 @@ const MenuContent = (props: any) => {
     setAndroidNavBar(colors.darkGreen, 'light');
     props.navigation.navigate('MainTabs');
   };
+  const handleLogout = () => {
+    Alert.alert('Logout', 'Are you sure to Logout?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'OK',
+        onPress: () => {
+          logout();
+          setAndroidNavBar(colors.background, 'dark');
+          props.navigation.closeDrawer();
+          props.navigation
+            .getParent?.()
+            ?.dispatch(
+              CommonActions.reset({
+                index: 0,
+                routes: [{ name: 'Auth' }],
+              })
+            );
+        },
+      },
+    ]);
+  };
 
   return (
     <DrawerContentScrollView {...props} style={{ backgroundColor: colors.gladeGreen }}>
@@ -173,7 +194,7 @@ const MenuContent = (props: any) => {
       <DrawerItem label="Change Language" labelStyle={{ color: '#fff' }} icon={() => <Image source={require('../../assets/images/ic_languageWhite.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />} onPress={() => goMenu('LanguageSettings')} />
       <DrawerItem label="Disclaimer" labelStyle={{ color: '#fff' }} icon={() => <Image source={require('../../assets/images/ic_disclaimer.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />} onPress={() => goMenu('Disclaimer')} />
       <DrawerItem label="About" labelStyle={{ color: '#fff' }} icon={() => <Image source={require('../../assets/images/ic_about.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />} onPress={() => goMenu('About')} />
-      <DrawerItem label="Logout" labelStyle={{ color: '#fff' }} icon={() => <Image source={require('../../assets/images/ic_logout.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />} onPress={() => logout()} />
+      <DrawerItem label="Logout" labelStyle={{ color: '#fff' }} icon={() => <Image source={require('../../assets/images/ic_logout.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />} onPress={handleLogout} />
     </DrawerContentScrollView>
   );
 };

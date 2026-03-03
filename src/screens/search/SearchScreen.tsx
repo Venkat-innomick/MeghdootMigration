@@ -46,6 +46,8 @@ type SearchBlockItem = {
   favourite: boolean;
 };
 
+const usesAsdMasters = (stateID: number) => stateID === 28 || stateID === 36;
+
 export const SearchScreen = () => {
   useAndroidNavigationBar(colors.background, "dark");
   const navigation = useNavigation<any>();
@@ -127,12 +129,48 @@ export const SearchScreen = () => {
     ) as any[];
   };
 
+  const shapeSelectedWeatherRows = (item: SearchBlockItem, rows: any[]) => {
+    const districtRows = rows.filter(
+      (row: any) =>
+        toNum(row?.districtID ?? row?.DistrictID) === item.districtID &&
+        toNum(row?.blockID ?? row?.BlockID) === 0 &&
+        toNum(row?.asdID ?? row?.AsdID) === 0,
+    );
+
+    const exactRows = rows.filter((row: any) => {
+      const districtID = toNum(row?.districtID ?? row?.DistrictID);
+      const blockID = toNum(row?.blockID ?? row?.BlockID);
+      const asdID = toNum(row?.asdID ?? row?.AsdID);
+
+      if (districtID !== item.districtID) return false;
+      if (item.isAsd) return asdID === item.blockID;
+      return blockID === item.blockID;
+    });
+
+    return [...exactRows, ...districtRows];
+  };
+
+  const shapeSelectedAdvisoryRows = (item: SearchBlockItem, rows: any[]) =>
+    rows.filter((row: any) => {
+      const districtID = toNum(row?.districtID ?? row?.DistrictID);
+      const blockID = toNum(row?.blockID ?? row?.BlockID);
+      const asdID = toNum(row?.asdID ?? row?.AsdID);
+
+      if (districtID && districtID !== item.districtID) return false;
+      if (item.isAsd) {
+        if (asdID && asdID !== item.blockID) return false;
+      } else if (blockID && blockID !== item.blockID) {
+        return false;
+      }
+      return true;
+    });
+
   const loadSelectedLocationData = async (item: SearchBlockItem) => {
     const weatherPayload: Record<string, unknown> = {
       StateID: item.stateID,
       DistrictID: item.districtID,
       LanguageType: languageLabel,
-      RefreshDateTime: new Date().toISOString().slice(0, 10),
+      RefreshDateTime: "2025-12-26",
     };
     const cropPayload: Record<string, unknown> = {
       StateID: item.stateID,
@@ -154,8 +192,11 @@ export const SearchScreen = () => {
     ]);
 
     return {
-      locations: parseLocationWeatherList(weather) as any[],
-      advisories: parseSelectedAdvisories(crop),
+      locations: shapeSelectedWeatherRows(
+        item,
+        parseLocationWeatherList(weather) as any[],
+      ),
+      advisories: shapeSelectedAdvisoryRows(item, parseSelectedAdvisories(crop)),
     };
   };
 
@@ -217,31 +258,39 @@ export const SearchScreen = () => {
   };
 
   const selectDistrict = async (district: DistrictMasterItem) => {
-    if (!selectedState) return;
     setSelectedDistrict(district);
     setLoading(true);
     try {
-      const isAsd =
-        selectedState.stateID === 28 || selectedState.stateID === 36;
+      const districtStateID = toNum(
+        (district as any).stateID ??
+          (district as any).StateID ??
+          selectedState?.stateID,
+        0,
+      );
+      const isAsd = usesAsdMasters(districtStateID);
       const raw = isAsd
         ? await mastersService.getAsd(district.districtID, languageLabel)
         : await mastersService.getBlocks(district.districtID, languageLabel);
 
       const mapped: SearchBlockItem[] = (raw as any[])
         .map((item: any, index: number) => ({
-          blockID: toNum(
-            item.asdID ?? item.AsdID ?? item.blockID ?? item.BlockID,
-            0,
-          ),
-          blockName: toText(
-            item.asdName ?? item.AsdName ?? item.blockName ?? item.BlockName,
-          ),
+          blockID: isAsd
+            ? toNum(item.asdID ?? item.AsdID, 0)
+            : toNum(item.blockID ?? item.BlockID, 0),
+          blockName: isAsd
+            ? toText(item.asdName ?? item.AsdName)
+            : toText(item.blockName ?? item.BlockName),
           districtID: district.districtID,
-          stateID: selectedState.stateID,
+          stateID: districtStateID,
           isAsd,
           favourite: false,
         }))
-        .filter((item) => item.blockID > 0 && !!item.blockName);
+        .filter(
+          (item) =>
+            item.blockID > 0 &&
+            !!item.blockName,
+        )
+      ;
       const unique = mapped.filter(
         (b, i, arr) =>
           arr.findIndex(

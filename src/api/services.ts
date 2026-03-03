@@ -1,4 +1,4 @@
-import { apiClient } from "./client";
+import { apiClient, extractApiErrorMessage } from "./client";
 import { API_ENDPOINTS } from "../constants/api";
 import {
   ApiResponse,
@@ -21,6 +21,69 @@ const pickList = <T>(payload: any, keys: string[]): T[] => {
     if (Array.isArray(value)) return value as T[];
   }
   return [];
+};
+
+const isApiFailure = (payload: any) => {
+  const candidates = [
+    payload?.isSuccessful,
+    payload?.IsSuccessful,
+    payload?.result?.isSuccessful,
+    payload?.result?.IsSuccessful,
+    payload?.data?.isSuccessful,
+    payload?.data?.IsSuccessful,
+  ];
+
+  for (const value of candidates) {
+    if (value === false) return true;
+  }
+
+  return false;
+};
+
+const pickMasterListOrThrow = <T>(
+  payload: any,
+  keys: string[],
+  fallback: string,
+): T[] => {
+  const list = pickList<T>(payload, keys);
+  if (list.length > 0) return list;
+
+  const nested = payload?.result ?? payload?.data;
+  const nestedList = pickList<T>(nested, keys);
+  if (nestedList.length > 0) return nestedList;
+
+  const errorMessage =
+    extractApiErrorMessage(payload) || extractApiErrorMessage(nested);
+  if (errorMessage) {
+    throw new Error(errorMessage);
+  }
+
+  if (isApiFailure(payload) || isApiFailure(nested)) {
+    throw new Error(fallback);
+  }
+
+  return [];
+};
+
+const filterByDistrictIfPresent = <T>(list: T[], districtID: number): T[] => {
+  const getDistrict = (item: any) =>
+    Number(
+      item?.districtID ??
+        item?.DistrictID ??
+        item?.districtId ??
+        item?.DistrictId ??
+        0,
+    );
+
+  const rowsWithDistrict = (list as any[]).filter(
+    (item) => getDistrict(item) > 0,
+  );
+  if (!rowsWithDistrict.length) return list;
+
+  const filtered = rowsWithDistrict.filter(
+    (item) => getDistrict(item) === districtID,
+  );
+  return filtered.length ? (filtered as T[]) : list;
 };
 
 export const userService = {
@@ -207,10 +270,14 @@ export const mastersService = {
       {
         GenderID: 0,
         LanguageType: languageType,
-        RefreshDateTime: new Date().toISOString().slice(0, 10),
+        RefreshDateTime: "2025-12-26",
       },
     );
-    return pickList<any>(data, ["objGenderMasterList", "ObjGenderMasterList"]);
+    return pickMasterListOrThrow<any>(
+      data,
+      ["objGenderMasterList", "ObjGenderMasterList"],
+      "Unable to load genders",
+    );
   },
   getStates: async (languageType: string) => {
     const { data } = await apiClient.post<any>(
@@ -219,13 +286,14 @@ export const mastersService = {
         StateID: 0,
         ScientistID: 0,
         LanguageType: languageType,
-        RefreshDateTime: "2019-01-01",
+        RefreshDateTime: "2025-12-26",
       },
     );
-    return pickList<StateMasterItem>(data, [
-      "objStateMasterList",
-      "ObjStateMasterList",
-    ]);
+    return pickMasterListOrThrow<StateMasterItem>(
+      data,
+      ["objStateMasterList", "ObjStateMasterList"],
+      "Unable to load states",
+    );
   },
   getDistricts: async (stateID: number, languageType: string) => {
     const { data } = await apiClient.post<any>(
@@ -234,13 +302,14 @@ export const mastersService = {
         StateID: stateID,
         ScientistID: 0,
         LanguageType: languageType,
-        RefreshDateTime: "2019-01-01",
+        RefreshDateTime: "2025-12-26",
       },
     );
-    return pickList<DistrictMasterItem>(data, [
-      "objDistrictMasterList",
-      "ObjDistrictMasterList",
-    ]);
+    return pickMasterListOrThrow<DistrictMasterItem>(
+      data,
+      ["objDistrictMasterList", "ObjDistrictMasterList"],
+      "Unable to load districts",
+    );
   },
   getBlocks: async (districtID: number, languageType: string) => {
     const { data } = await apiClient.post<any>(
@@ -252,10 +321,12 @@ export const mastersService = {
         RefreshDateTime: "2018-01-01",
       },
     );
-    return pickList<BlockMasterItem>(data, [
-      "objBlockMasterList",
-      "ObjBlockMasterList",
-    ]);
+    const list = pickMasterListOrThrow<BlockMasterItem>(
+      data,
+      ["objBlockMasterList", "ObjBlockMasterList"],
+      "Unable to load blocks",
+    );
+    return list;
   },
   getAsd: async (districtID: number, languageType: string) => {
     const { data } = await apiClient.post<any>(
@@ -267,9 +338,11 @@ export const mastersService = {
         RefreshDateTime: "2018-01-01",
       },
     );
-    return pickList<AsdMasterItem>(data, [
-      "objAsdMasterList",
-      "ObjAsdMasterList",
-    ]);
+    const list = pickMasterListOrThrow<AsdMasterItem>(
+      data,
+      ["objAsdMasterList", "ObjAsdMasterList"],
+      "Unable to load ASD list",
+    );
+    return filterByDistrictIfPresent<AsdMasterItem>(list, districtID);
   },
 };

@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   FlatList as RNFlatList,
@@ -113,6 +119,12 @@ const cloudKeyByWeatherText = (value: string) => {
   return "";
 };
 
+const pickBlockOrAsdName = (item: any) =>
+  pickText(item?.blockName, item?.BlockName, item?.asdName, item?.AsdName, "");
+
+const pickDistrictName = (item: any) =>
+  pickText(item?.districtName, item?.DistrictName, "");
+
 const parseAdvisoryList = (payload: any): CropAdvisoryItem[] => {
   const base = payload?.result || payload?.data || payload;
   if (Array.isArray(base)) return base as CropAdvisoryItem[];
@@ -157,14 +169,70 @@ const mergeLocations = (primary: any[], secondary: any[]) => {
 const mergeAdvisories = (primary: any[], secondary: any[]) => {
   const merged: any[] = [];
   [...primary, ...secondary].forEach((item, index) => {
-    const advisoryId = toNum(item?.cropAdvisoryID ?? item?.CropAdvisoryID, index + 1);
+    const advisoryId = toNum(
+      item?.cropAdvisoryID ?? item?.CropAdvisoryID,
+      index + 1,
+    );
     const exists = merged.some(
       (row, rowIndex) =>
-        toNum(row?.cropAdvisoryID ?? row?.CropAdvisoryID, rowIndex + 1) === advisoryId,
+        toNum(row?.cropAdvisoryID ?? row?.CropAdvisoryID, rowIndex + 1) ===
+        advisoryId,
     );
     if (!exists) merged.push(item);
   });
   return merged;
+};
+
+const isDistrictOnlyRow = (item: any) =>
+  toNum(item?.blockID, item?.BlockID) === 0 &&
+  toNum(item?.asdID, item?.AsdID) === 0 &&
+  !pickText(item?.blockName, item?.BlockName, "") &&
+  !pickText(item?.asdName, item?.AsdName, "");
+
+const shapeHomeLocations = (rows: any[]) => {
+  const districtRows = rows.filter((item) => isDistrictOnlyRow(item));
+  const blockRows = rows.filter((item) => !isDistrictOnlyRow(item));
+
+  if (!blockRows.length) {
+    return districtRows.map((item) => ({
+      ...item,
+      districtWiseWeatherData: item,
+    }));
+  }
+
+  const mappedBlocks = blockRows.map((item) => {
+    const districtMatch =
+      districtRows.find(
+        (district) =>
+          toNum(district?.districtID, district?.DistrictID) ===
+            toNum(item?.districtID, item?.DistrictID) &&
+          toNum(district?.stateID, district?.StateID) ===
+            toNum(item?.stateID, item?.StateID),
+      ) || null;
+
+    return {
+      ...item,
+      districtWiseWeatherData: districtMatch,
+    };
+  });
+
+  const districtOnlyCards = districtRows
+    .filter((district) => {
+      const hasMappedBlock = blockRows.some(
+        (item) =>
+          toNum(district?.districtID, district?.DistrictID) ===
+            toNum(item?.districtID, item?.DistrictID) &&
+          toNum(district?.stateID, district?.StateID) ===
+            toNum(item?.stateID, item?.StateID),
+      );
+      return !hasMappedBlock;
+    })
+    .map((item) => ({
+      ...item,
+      districtWiseWeatherData: item,
+    }));
+
+  return [...mappedBlocks, ...districtOnlyCards];
 };
 
 const orderLocationsBySelected = (
@@ -189,7 +257,7 @@ const buildHomeCropPayload = async (
     Id: userId,
     LanguageType: languageLabel,
     Type: "Farmer",
-    RefreshDateTime: new Date().toISOString().slice(0, 10),
+    RefreshDateTime: "2025-12-26",
   };
 
   try {
@@ -221,9 +289,18 @@ export const DashboardScreen = () => {
   const selectedLocation = useAppStore((s) => s.selectedLocation);
   const setSelectedLocation = useAppStore((s) => s.setSelectedLocation);
   const currentLocationOverride = useAppStore((s) => s.currentLocationOverride);
-  const temporarySearchLocations = useAppStore((s) => s.temporarySearchLocations);
-  const temporarySearchAdvisories = useAppStore((s) => s.temporarySearchAdvisories);
-  const clearTemporarySearchData = useAppStore((s) => s.clearTemporarySearchData);
+  const temporarySearchLocations = useAppStore(
+    (s) => s.temporarySearchLocations,
+  );
+  const temporarySearchAdvisories = useAppStore(
+    (s) => s.temporarySearchAdvisories,
+  );
+  const clearTemporarySearchData = useAppStore(
+    (s) => s.clearTemporarySearchData,
+  );
+  const setCurrentLocationOverride = useAppStore(
+    (s) => s.setCurrentLocationOverride,
+  );
   const userId = useMemo(() => getUserProfileId(user), [user]);
   const languageLabel = useMemo(() => getLanguageLabel(language), [language]);
   const [loading, setLoading] = useState(true);
@@ -232,6 +309,7 @@ export const DashboardScreen = () => {
   const [advisories, setAdvisories] = useState<CropAdvisoryItem[]>([]);
   const [activeTab, setActiveTab] = useState<"block" | "district">("block");
   const [weatherIndex, setWeatherIndex] = useState(0);
+  const carouselRef = useRef<RNFlatList<any> | null>(null);
 
   const openCropAdvisory = (params: Record<string, unknown>) => {
     const parent = navigation.getParent?.();
@@ -265,17 +343,20 @@ export const DashboardScreen = () => {
       const mergedLocations = mergeLocations(
         temporarySearchLocations,
         locationList,
+      );
+      const shapedLocations = shapeHomeLocations(
+        mergedLocations,
       ) as DashboardLocation[];
       const currentSelected = useAppStore.getState().selectedLocation;
       const nextLocations = orderLocationsBySelected(
-        mergedLocations,
+        shapedLocations,
         currentSelected,
       );
       setLocations(nextLocations);
       setAppLocations(locationList);
       if (locationList.length > 0) {
         const match = currentSelected
-          ? locationList.find((item: any) => {
+          ? nextLocations.find((item: any) => {
               const districtID = toNum(item.districtID, item.DistrictID);
               const blockID = toNum(item.blockID, item.BlockID);
               const asdID = toNum(item.asdID, item.AsdID);
@@ -306,6 +387,9 @@ export const DashboardScreen = () => {
         parseAdvisoryList(crop),
       ) as CropAdvisoryItem[];
       setAdvisories(nextAdvisories);
+      if (currentLocationOverride) {
+        setCurrentLocationOverride(null);
+      }
       if (temporarySearchLocations.length || temporarySearchAdvisories.length) {
         clearTemporarySearchData();
       }
@@ -314,9 +398,11 @@ export const DashboardScreen = () => {
       if (!useAppStore.getState().locations?.length) {
         const fallback = useAppStore.getState().locations || [];
         setLocations(
-          mergeLocations(
-            temporarySearchLocations,
-            fallback as DashboardLocation[],
+          shapeHomeLocations(
+            mergeLocations(
+              temporarySearchLocations,
+              fallback as DashboardLocation[],
+            ),
           ) as DashboardLocation[],
         );
       }
@@ -329,6 +415,7 @@ export const DashboardScreen = () => {
     currentLocationOverride,
     setAppLocations,
     clearTemporarySearchData,
+    setCurrentLocationOverride,
     setSelectedLocation,
     temporarySearchAdvisories,
     temporarySearchLocations,
@@ -363,10 +450,17 @@ export const DashboardScreen = () => {
     const idx = locations.findIndex((item: any) => {
       return (
         toNum(item.districtID, item.DistrictID) ===
-          toNum((currentLocation as any).districtID, (currentLocation as any).DistrictID) &&
+          toNum(
+            (currentLocation as any).districtID,
+            (currentLocation as any).DistrictID,
+          ) &&
         toNum(item.blockID, item.BlockID) ===
-          toNum((currentLocation as any).blockID, (currentLocation as any).BlockID) &&
-        toNum(item.asdID, item.AsdID) === toNum((currentLocation as any).asdID, (currentLocation as any).AsdID)
+          toNum(
+            (currentLocation as any).blockID,
+            (currentLocation as any).BlockID,
+          ) &&
+        toNum(item.asdID, item.AsdID) ===
+          toNum((currentLocation as any).asdID, (currentLocation as any).AsdID)
       );
     });
     return idx >= 0 ? idx : 0;
@@ -376,56 +470,98 @@ export const DashboardScreen = () => {
     setWeatherIndex(currentLocationIndex);
   }, [currentLocationIndex]);
 
+  useEffect(() => {
+    if (!locations.length) return;
+    carouselRef.current?.scrollToIndex({
+      index: currentLocationIndex,
+      animated: false,
+    });
+  }, [currentLocationIndex, locations.length]);
+
+  const currentWeatherLocation = useMemo(() => {
+    if (!currentLocation) return null;
+    if (activeTab === "district") {
+      return (
+        (currentLocation as any)?.districtWiseWeatherData || currentLocation
+      );
+    }
+    return currentLocation;
+  }, [activeTab, currentLocation]);
+
   const weatherMetrics = useMemo(() => {
-    if (!currentLocation) return [];
+    if (!currentWeatherLocation) return [];
     return [
       metric(
         "Rainfall",
-        pickText(currentLocation.rainFall, currentLocation.RainFall, "-"),
+        pickText(
+          (currentWeatherLocation as any).rainFall,
+          (currentWeatherLocation as any).RainFall,
+          "-",
+        ),
         require("../../../assets/images/ic_rainfall.png"),
       ),
       metric(
         "Wind Speed",
-        pickText(currentLocation.windSpeed, currentLocation.WindSpeed, "-"),
+        pickText(
+          (currentWeatherLocation as any).windSpeed,
+          (currentWeatherLocation as any).WindSpeed,
+          "-",
+        ),
         require("../../../assets/images/ic_windspeed.png"),
       ),
       metric(
         "Humidity",
-        pickText(currentLocation.humidity, currentLocation.Humidity, "-"),
+        pickText(
+          (currentWeatherLocation as any).humidity,
+          (currentWeatherLocation as any).Humidity,
+          "-",
+        ),
         require("../../../assets/images/ic_humidity.png"),
       ),
       metric(
         "Direction",
         pickText(
-          currentLocation.windDirection,
-          currentLocation.WindDirection,
+          (currentWeatherLocation as any).windDirection,
+          (currentWeatherLocation as any).WindDirection,
           "-",
         ),
         require("../../../assets/images/ic_winddirection.png"),
       ),
     ];
-  }, [currentLocation]);
+  }, [currentWeatherLocation]);
 
   const advisoryRows = useMemo(() => {
     if (!currentLocation) return advisories;
-    const districtId = toNum((currentLocation as any).districtID, (currentLocation as any).DistrictID);
-    const blockId = toNum((currentLocation as any).blockID, (currentLocation as any).BlockID);
-    const asdId = toNum((currentLocation as any).asdID, (currentLocation as any).AsdID);
+    const districtId = toNum(
+      (currentLocation as any).districtID,
+      (currentLocation as any).DistrictID,
+    );
+    const blockId = toNum(
+      (currentLocation as any).blockID,
+      (currentLocation as any).BlockID,
+    );
+    const asdId = toNum(
+      (currentLocation as any).asdID,
+      (currentLocation as any).AsdID,
+    );
 
     return advisories.filter((row: any) => {
       const rowDistrict = toNum(row.districtID, row.DistrictID);
       const rowBlock = toNum(row.blockID, row.BlockID);
       const rowAsd = toNum(row.asdID, row.AsdID);
 
-      // If API row has no location IDs, keep it visible.
-      if (!rowDistrict && !rowBlock && !rowAsd) return true;
+      // Old Xamarin binds exact crop collections for each tab level.
+      // Generic rows without location IDs should not leak into block/district tabs.
+      if (!rowDistrict && !rowBlock && !rowAsd) return false;
 
       if (activeTab === "district") {
-        return rowDistrict === districtId;
+        return rowDistrict === districtId && rowBlock === 0 && rowAsd === 0;
       }
 
-      if (asdId > 0) return rowDistrict === districtId && rowAsd === asdId;
-      return rowDistrict === districtId && rowBlock === blockId;
+      if (asdId > 0) {
+        return rowDistrict === districtId && rowAsd === asdId && rowBlock === 0;
+      }
+      return rowDistrict === districtId && rowBlock === blockId && rowAsd === 0;
     });
   }, [activeTab, advisories, currentLocation]);
 
@@ -462,20 +598,43 @@ export const DashboardScreen = () => {
           <View>
             <View style={styles.topTabs}>
               <Pressable
-                style={[styles.topTab, activeTab === "block" && styles.topTabActive]}
+                style={[
+                  styles.topTab,
+                  activeTab === "block" && styles.topTabActive,
+                ]}
                 onPress={() => setActiveTab("block")}
               >
-                <Text style={activeTab === "block" ? styles.topTabTextActive : styles.topTabText}>Block/ASD</Text>
+                <Text
+                  style={
+                    activeTab === "block"
+                      ? styles.topTabTextActive
+                      : styles.topTabText
+                  }
+                >
+                  Block
+                </Text>
               </Pressable>
               <Pressable
-                style={[styles.topTab, activeTab === "district" && styles.topTabActive]}
+                style={[
+                  styles.topTab,
+                  activeTab === "district" && styles.topTabActive,
+                ]}
                 onPress={() => setActiveTab("district")}
               >
-                <Text style={activeTab === "district" ? styles.topTabTextActive : styles.topTabText}>District</Text>
+                <Text
+                  style={
+                    activeTab === "district"
+                      ? styles.topTabTextActive
+                      : styles.topTabText
+                  }
+                >
+                  District
+                </Text>
               </Pressable>
             </View>
 
             <RNFlatList
+              ref={carouselRef}
               horizontal
               pagingEnabled
               showsHorizontalScrollIndicator={false}
@@ -484,18 +643,27 @@ export const DashboardScreen = () => {
               keyExtractor={(item: any, index) =>
                 `${toNum(item.stateID, item.StateID)}-${toNum(item.districtID, item.DistrictID)}-${toNum(item.blockID, item.BlockID)}-${toNum(item.asdID, item.AsdID)}-${index}`
               }
-              getItemLayout={(_, index) => ({ length: cardWidth, offset: cardWidth * index, index })}
+              getItemLayout={(_, index) => ({
+                length: cardWidth,
+                offset: cardWidth * index,
+                index,
+              })}
               renderItem={({ item }) => {
+                const weatherItem =
+                  activeTab === "district"
+                    ? (item as any)?.districtWiseWeatherData || item
+                    : item;
                 const cloudCover = toNum(
-                  (item as any).cloudCover,
-                  (item as any).CloudCover,
+                  (weatherItem as any).cloudCover,
+                  (weatherItem as any).CloudCover,
                 );
                 const whiteTheme = cloudCover === 3 || cloudCover === 4;
                 const metricColor = whiteTheme ? "#FFFFFF" : "#223C67";
                 const rainImage =
                   iconImageMap[
                     normalizeImageKey(
-                      (item as any).rainFallImage || (item as any).RainFallImage,
+                      (weatherItem as any).rainFallImage ||
+                        (weatherItem as any).RainFallImage,
                     )
                   ] ||
                   (whiteTheme
@@ -504,7 +672,8 @@ export const DashboardScreen = () => {
                 const humidityImage =
                   iconImageMap[
                     normalizeImageKey(
-                      (item as any).humidityImage || (item as any).HumidityImage,
+                      (weatherItem as any).humidityImage ||
+                        (weatherItem as any).HumidityImage,
                     )
                   ] ||
                   (whiteTheme
@@ -513,7 +682,8 @@ export const DashboardScreen = () => {
                 const windSpeedImage =
                   iconImageMap[
                     normalizeImageKey(
-                      (item as any).windSpeedImage || (item as any).WindSpeedImage,
+                      (weatherItem as any).windSpeedImage ||
+                        (weatherItem as any).WindSpeedImage,
                     )
                   ] ||
                   (whiteTheme
@@ -522,29 +692,33 @@ export const DashboardScreen = () => {
                 const windDirectionImage =
                   iconImageMap[
                     normalizeImageKey(
-                      (item as any).windDirectionImage ||
-                        (item as any).WindDirectionImage,
+                      (weatherItem as any).windDirectionImage ||
+                        (weatherItem as any).WindDirectionImage,
                     )
                   ] ||
                   (whiteTheme
                     ? require("../../../assets/images/wind_direction_wh.png")
                     : require("../../../assets/images/east.png"));
                 const windDirectionAngle = toNum(
-                  (item as any).windDirectionAngle,
-                  (item as any).WindDirectionAngle,
+                  (weatherItem as any).windDirectionAngle,
+                  (weatherItem as any).WindDirectionAngle,
                 );
 
                 const itemMetrics = [
                   metric(
                     "Rainfall",
-                    pickText((item as any).rainFall, (item as any).RainFall, "-"),
+                    pickText(
+                      (weatherItem as any).rainFall,
+                      (weatherItem as any).RainFall,
+                      "-",
+                    ),
                     rainImage,
                   ),
                   metric(
                     "Wind Speed",
                     pickText(
-                      (item as any).windSpeed,
-                      (item as any).WindSpeed,
+                      (weatherItem as any).windSpeed,
+                      (weatherItem as any).WindSpeed,
                       "-",
                     ),
                     windSpeedImage,
@@ -552,8 +726,8 @@ export const DashboardScreen = () => {
                   metric(
                     "Humidity",
                     pickText(
-                      (item as any).humidity,
-                      (item as any).Humidity,
+                      (weatherItem as any).humidity,
+                      (weatherItem as any).Humidity,
                       "-",
                     ),
                     humidityImage,
@@ -561,52 +735,97 @@ export const DashboardScreen = () => {
                   metric(
                     "Direction",
                     pickText(
-                      (item as any).windDirection,
-                      (item as any).WindDirection,
+                      (weatherItem as any).windDirection,
+                      (weatherItem as any).WindDirection,
                       "-",
                     ),
                     windDirectionImage,
                   ),
                 ];
                 const cloudUri = pickUri(
-                  (item as any)?.cloudImage,
-                  (item as any)?.CloudImage,
+                  (weatherItem as any)?.cloudImage,
+                  (weatherItem as any)?.CloudImage,
                 );
                 const cloudKey =
                   normalizeImageKey(
-                    (item as any)?.cloudImage || (item as any)?.CloudImage,
+                    (weatherItem as any)?.cloudImage ||
+                      (weatherItem as any)?.CloudImage,
                   ) ||
                   cloudKeyByCover(cloudCover) ||
                   cloudKeyByWeatherText(
                     pickText(
-                      (item as any)?.weatherType,
-                      (item as any)?.WeatherType,
-                      (item as any)?.cloud,
-                      (item as any)?.Cloud,
+                      (weatherItem as any)?.weatherType,
+                      (weatherItem as any)?.WeatherType,
+                      (weatherItem as any)?.cloud,
+                      (weatherItem as any)?.Cloud,
                       "",
                     ),
                   );
-                const cardBackground =
-                  cloudUri
-                    ? { uri: cloudUri }
-                    : weatherBgImageMap[cloudKey] ||
-                      require("../../../assets/images/Clearsky_new.png");
+                const cardBackground = cloudUri
+                  ? { uri: cloudUri }
+                  : weatherBgImageMap[cloudKey] ||
+                    require("../../../assets/images/Clearsky_new.png");
+                const titleText =
+                  activeTab === "district"
+                    ? pickDistrictName(
+                        (item as any)?.districtWiseWeatherData || weatherItem,
+                      ) || "Location"
+                    : pickBlockOrAsdName(weatherItem) ||
+                      pickDistrictName(
+                        (item as any)?.districtWiseWeatherData || weatherItem,
+                      ) ||
+                      "Location";
 
                 return (
-                  <Pressable style={[styles.weatherCardPress, { width: cardWidth }]} onPress={() => navigation.navigate("Forecast")}>
+                  <View style={[styles.weatherCardPress, { width: cardWidth }]}>
                     <ImageBackground
                       source={cardBackground}
                       style={styles.weatherCard}
                       imageStyle={styles.weatherCardBg}
                     >
-                      <Text style={[styles.placeName, { color: metricColor }]}>
-                        {pickText((item as any)?.placeName, (item as any)?.PlaceName, (item as any)?.districtName, (item as any)?.DistrictName, "Location")}
-                      </Text>
-                      <Text style={[styles.dateText, { color: metricColor }]}>{pickText((item as any)?.date, (item as any)?.Date, "-")}</Text>
-                      <Text style={[styles.minMaxText, { color: metricColor }]}>
-                        Min {pickText((item as any)?.minTemp, (item as any)?.MinTemp, "-")} C | Max {pickText((item as any)?.maxTemp, (item as any)?.MaxTemp, "-")} C
-                      </Text>
-                      <Text style={[styles.weatherType, { color: metricColor }]}>{pickText((item as any)?.weatherType, (item as any)?.WeatherType, "-")}</Text>
+                      <Pressable
+                        style={styles.weatherCardTop}
+                        onPress={() => navigation.navigate("Forecast")}
+                      >
+                        <Text
+                          style={[styles.placeName, { color: metricColor }]}
+                        >
+                          {titleText}
+                        </Text>
+                        <Text style={[styles.dateText, { color: metricColor }]}>
+                          {pickText(
+                            (weatherItem as any)?.date,
+                            (weatherItem as any)?.Date,
+                            "-",
+                          )}
+                        </Text>
+                        <Text
+                          style={[styles.minMaxText, { color: metricColor }]}
+                        >
+                          Min{" "}
+                          {pickText(
+                            (weatherItem as any)?.minTemp,
+                            (weatherItem as any)?.MinTemp,
+                            "-",
+                          )}{" "}
+                          C | Max{" "}
+                          {pickText(
+                            (weatherItem as any)?.maxTemp,
+                            (weatherItem as any)?.MaxTemp,
+                            "-",
+                          )}{" "}
+                          C
+                        </Text>
+                        <Text
+                          style={[styles.weatherType, { color: metricColor }]}
+                        >
+                          {pickText(
+                            (weatherItem as any)?.weatherType,
+                            (weatherItem as any)?.WeatherType,
+                            "-",
+                          )}
+                        </Text>
+                      </Pressable>
 
                       <View style={styles.metricsGrid}>
                         {itemMetrics.map((m, metricIndex) => (
@@ -616,20 +835,38 @@ export const DashboardScreen = () => {
                               style={[
                                 styles.metricIcon,
                                 metricIndex === 3
-                                  ? { transform: [{ rotate: `${windDirectionAngle}deg` }] }
+                                  ? {
+                                      transform: [
+                                        { rotate: `${windDirectionAngle}deg` },
+                                      ],
+                                    }
                                   : null,
                               ]}
                               resizeMode="contain"
                             />
                             <View>
-                              <Text style={[styles.metricLabel, { color: metricColor }]}>{m.label}</Text>
-                              <Text style={[styles.metricValue, { color: metricColor }]}>{m.value}</Text>
+                              <Text
+                                style={[
+                                  styles.metricLabel,
+                                  { color: metricColor },
+                                ]}
+                              >
+                                {m.label}
+                              </Text>
+                              <Text
+                                style={[
+                                  styles.metricValue,
+                                  { color: metricColor },
+                                ]}
+                              >
+                                {m.value}
+                              </Text>
                             </View>
                           </View>
                         ))}
                       </View>
                     </ImageBackground>
-                  </Pressable>
+                  </View>
                 );
               }}
               onMomentumScrollEnd={(e) => {
@@ -649,20 +886,38 @@ export const DashboardScreen = () => {
             {locations.length > 1 ? (
               <View style={styles.dotsRow}>
                 {locations.map((_, idx) => (
-                  <View key={`dot-${idx}`} style={[styles.dot, idx === weatherIndex && styles.dotActive]} />
+                  <View
+                    key={`dot-${idx}`}
+                    style={[
+                      styles.dot,
+                      idx === weatherIndex && styles.dotActive,
+                    ]}
+                  />
                 ))}
               </View>
             ) : null}
 
-            {pickText((currentLocation as any)?.warningMessage, (currentLocation as any)?.WarningMessage) ? (
+            {pickText(
+              (currentWeatherLocation as any)?.warningMessage,
+              (currentWeatherLocation as any)?.WarningMessage,
+            ) ? (
               <View
                 style={[
                   styles.warningWrap,
-                  { backgroundColor: pickText((currentLocation as any)?.colorCode, (currentLocation as any)?.ColorCode) || "#F7CE52" },
+                  {
+                    backgroundColor:
+                      pickText(
+                        (currentWeatherLocation as any)?.colorCode,
+                        (currentWeatherLocation as any)?.ColorCode,
+                      ) || "#F7CE52",
+                  },
                 ]}
               >
                 <Text style={styles.warningText}>
-                  {pickText((currentLocation as any)?.warningMessage, (currentLocation as any)?.WarningMessage)}
+                  {pickText(
+                    (currentWeatherLocation as any)?.warningMessage,
+                    (currentWeatherLocation as any)?.WarningMessage,
+                  )}
                 </Text>
               </View>
             ) : null}
@@ -703,7 +958,13 @@ export const DashboardScreen = () => {
                   advisoryId: toNum(row.cropAdvisoryID, row.CropAdvisoryID),
                   cropId: toNum(row.cropID, row.CropID),
                   cropCategoryId: toNum(row.cropCategoryID, row.CropCategoryID),
-                  cropName: pickText(row.cropName, row.CropName, row.title, row.Title, "Crop Advisory"),
+                  cropName: pickText(
+                    row.cropName,
+                    row.CropName,
+                    row.title,
+                    row.Title,
+                    "Crop Advisory",
+                  ),
                 })
               }
             >
@@ -789,6 +1050,9 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 16,
     minHeight: 240,
+  },
+  weatherCardTop: {
+    alignSelf: "stretch",
   },
   weatherCardBg: {
     borderRadius: 8,

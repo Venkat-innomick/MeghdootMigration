@@ -149,7 +149,7 @@ export const CropAdvisoryScreen = () => {
             LanguageType: languageLabel,
             Type: 'Farmer',
             CropID: requestedCropId,
-            RefreshDateTime: new Date().toISOString().slice(0, 10),
+            RefreshDateTime: "2025-12-26",
           })
         : await cropService.getAdvisoryTop({
             Id: userProfileId,
@@ -158,7 +158,7 @@ export const CropAdvisoryScreen = () => {
             LanguageType: languageLabel,
             languageType: languageLabel,
             Type: 'Farmer',
-            RefreshDateTime: new Date().toISOString().slice(0, 10),
+            RefreshDateTime: "2025-12-26",
           });
       const base = response?.result || response?.data || response;
       const list = pickList(base, [
@@ -213,7 +213,7 @@ export const CropAdvisoryScreen = () => {
     const commonPayload = {
       CropAdvisoryID: cropId,
       LanguageType: languageLabel,
-      RefreshDateTime: '2019-07-02',
+      RefreshDateTime: '2025-12-26',
     };
 
     const [imgRes, audRes] = await Promise.all([

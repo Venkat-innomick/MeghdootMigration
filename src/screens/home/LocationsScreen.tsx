@@ -91,6 +91,10 @@ const cloudKeyByWeatherText = (value: string) => {
   return '';
 };
 
+const usesAsdMasters = (stateID: number) => stateID === 28 || stateID === 36;
+const getSubLocationLabel = (stateID: number) =>
+  usesAsdMasters(stateID) ? 'ASD' : 'block';
+
 export const LocationsScreen = () => {
   useAndroidNavigationBar(colors.darkGreen, 'light');
   const navigation = useNavigation<any>();
@@ -245,24 +249,61 @@ export const LocationsScreen = () => {
   };
 
   const onDistrictSelect = async (district: DistrictMasterItem) => {
-    if (!selectedState) return;
     setSelectedDistrict(district);
     setSelectedBlock(null);
+    setBlocks([]);
+  };
+
+  const loadBlocksForDistrict = async () => {
+    if (!selectedDistrict || !selectedState) return;
     setAddLoading(true);
     try {
-      const isAsd = selectedState.stateID === 28 || selectedState.stateID === 36;
+      const isAsd = usesAsdMasters(selectedState.stateID);
       const res = isAsd
-        ? await mastersService.getAsd(district.districtID, languageLabel)
-        : await mastersService.getBlocks(district.districtID, languageLabel);
+        ? await mastersService.getAsd(selectedDistrict.districtID, languageLabel)
+        : await mastersService.getBlocks(selectedDistrict.districtID, languageLabel);
 
-      const mapped = (res as any[])
-        .map((b, index) => ({
-          id: toNum(b.asdID ?? b.AsdID ?? b.blockID ?? b.BlockID, 0),
-          label: toText(b.asdName ?? b.AsdName ?? b.blockName ?? b.BlockName),
+      const rawList = Array.isArray(res)
+        ? res
+        : (
+            (res as any)?.ObjAsdMasterList ||
+            (res as any)?.ObjBlockMasterList ||
+            (res as any)?.result?.ObjAsdMasterList ||
+            (res as any)?.result?.ObjBlockMasterList ||
+            (res as any)?.data?.ObjAsdMasterList ||
+            (res as any)?.data?.ObjBlockMasterList ||
+            []
+          );
+
+      console.log('Locations block raw response', {
+        isAsd,
+        districtID: selectedDistrict.districtID,
+        count: rawList.length,
+        first: rawList[0],
+      });
+
+      const mapped = (rawList as any[])
+        .map((b) => ({
+          id: isAsd
+            ? toNum(b.asdID ?? b.AsdID, 0)
+            : toNum(b.blockID ?? b.BlockID, 0),
+          label: isAsd
+            ? toText(b.asdName ?? b.AsdName)
+            : toText(b.blockName ?? b.BlockName),
         }))
         .filter((b) => b.id > 0 && !!b.label);
-      const unique = mapped.filter((b, i, arr) => arr.findIndex((x) => x.id === b.id) === i);
+      const unique = mapped.filter(
+        (b, i, arr) => arr.findIndex((x) => x.id === b.id) === i,
+      );
+      console.log('Locations block mapped response', {
+        count: unique.length,
+        first: unique[0],
+      });
       setBlocks(unique);
+      setBlockPickerOpen(true);
+    } catch (e: any) {
+      setBlocks([]);
+      Alert.alert('Error', e.message || 'Unable to load blocks');
     } finally {
       setAddLoading(false);
     }
@@ -273,6 +314,9 @@ export const LocationsScreen = () => {
     setSelectedState(null);
     setSelectedDistrict(null);
     setSelectedBlock(null);
+    setStatePickerOpen(false);
+    setDistrictPickerOpen(false);
+    setBlockPickerOpen(false);
     setDistricts([]);
     setBlocks([]);
     setAddLoading(true);
@@ -301,7 +345,7 @@ export const LocationsScreen = () => {
     if (!selectedBlock) {
       Alert.alert(
         'Validation',
-        selectedState.stateID === 28 || selectedState.stateID === 36 ? 'Please select ASD' : 'Please select block'
+        usesAsdMasters(selectedState.stateID) ? 'Please select ASD' : 'Please select block'
       );
       return;
     }
@@ -314,7 +358,7 @@ export const LocationsScreen = () => {
       Createdby: userId,
       Updatedby: userId,
     };
-    if (selectedState.stateID === 28 || selectedState.stateID === 36) payload.AsdID = selectedBlock.id;
+    if (usesAsdMasters(selectedState.stateID)) payload.AsdID = selectedBlock.id;
     else payload.BlockID = selectedBlock.id;
 
     setAddLoading(true);
@@ -329,12 +373,12 @@ export const LocationsScreen = () => {
       const optimistic: LocationRow = {
         stateID: selectedState.stateID,
         districtID: selectedDistrict.districtID,
-        blockID: selectedState.stateID === 28 || selectedState.stateID === 36 ? 0 : selectedBlock.id,
-        asdID: selectedState.stateID === 28 || selectedState.stateID === 36 ? selectedBlock.id : 0,
+        blockID: usesAsdMasters(selectedState.stateID) ? 0 : selectedBlock.id,
+        asdID: usesAsdMasters(selectedState.stateID) ? selectedBlock.id : 0,
         tempStateID: selectedState.stateID,
         tempDistrictID: selectedDistrict.districtID,
-        tempBlockID: selectedState.stateID === 28 || selectedState.stateID === 36 ? 0 : selectedBlock.id,
-        tempAsdID: selectedState.stateID === 28 || selectedState.stateID === 36 ? selectedBlock.id : 0,
+        tempBlockID: usesAsdMasters(selectedState.stateID) ? 0 : selectedBlock.id,
+        tempAsdID: usesAsdMasters(selectedState.stateID) ? selectedBlock.id : 0,
         stateName: selectedState.stateName,
         cityName: selectedBlock.label,
         colorCode: '#FFFFFF',
@@ -380,8 +424,17 @@ export const LocationsScreen = () => {
           return already ? prev : [...prev, optimistic];
         });
       }
-      Alert.alert('Success', 'Location added successfully');
-      navigation.navigate('Home');
+      setSelectedLocation({
+        districtID: optimistic.districtID,
+        blockID: optimistic.blockID,
+        asdID: optimistic.asdID,
+      });
+      Alert.alert('Success', 'Location added successfully', [
+        {
+          text: 'OK',
+          onPress: () => navigation.navigate('Home'),
+        },
+      ]);
     } catch (e: any) {
       Alert.alert('Failed', e.message || 'Unable to add location');
     } finally {
@@ -409,7 +462,7 @@ export const LocationsScreen = () => {
       UserProfileID: userId,
       DistrictID: resolvedDistrictID,
     };
-    if (resolvedStateID === 28 || resolvedStateID === 36) {
+    if (usesAsdMasters(resolvedStateID)) {
       payload.AsdID = resolvedAsdID;
     } else {
       payload.BlockID = resolvedBlockID;
@@ -551,9 +604,17 @@ export const LocationsScreen = () => {
               <Image source={require('../../../assets/images/dropdown.png')} style={styles.dropdownIcon} resizeMode="contain" />
             </Pressable>
 
-            <Pressable style={[styles.selector, { marginTop: 10 }]} onPress={() => selectedDistrict && setBlockPickerOpen(true)}>
+            <Pressable
+              style={[styles.selector, { marginTop: 10 }]}
+              onPress={() => selectedDistrict && loadBlocksForDistrict()}
+            >
               <Text style={[styles.selectorText, !selectedBlock && styles.selectorPlaceholder]}>
-                {selectedBlock?.label || ((selectedState?.stateID === 28 || selectedState?.stateID === 36) ? 'Select ASD' : 'Select block')}
+                {selectedBlock?.label ||
+                  (selectedState
+                    ? addLoading && selectedDistrict
+                      ? `Loading ${getSubLocationLabel(selectedState.stateID)}...`
+                      : `Select ${getSubLocationLabel(selectedState.stateID)}`
+                    : 'Select block')}
               </Text>
               <Image source={require('../../../assets/images/dropdown.png')} style={styles.dropdownIcon} resizeMode="contain" />
             </Pressable>
@@ -622,22 +683,43 @@ export const LocationsScreen = () => {
         <Pressable style={styles.pickerOverlay} onPress={() => setBlockPickerOpen(false)}>
           <View style={styles.pickerCard}>
             <ScrollView>
-              {blocks.map((item) => (
-                <Pressable
-                  key={`b-${item.id}-${item.label}`}
-                  style={styles.pickerItem}
-                  onPress={() => {
-                    setBlockPickerOpen(false);
-                    setSelectedBlock(item);
-                  }}
-                >
-                  <Text style={styles.pickerText}>{item.label}</Text>
-                </Pressable>
-              ))}
+              {blocks.length ? (
+                blocks.map((item) => (
+                  <Pressable
+                    key={`b-${item.id}-${item.label}`}
+                    style={[
+                      styles.pickerItem,
+                      selectedBlock?.id === item.id && styles.selectedPickerItem,
+                    ]}
+                    onPress={() => {
+                      setSelectedBlock(item);
+                      setBlockPickerOpen(false);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.pickerText,
+                        selectedBlock?.id === item.id && styles.selectedPickerText,
+                      ]}
+                    >
+                      {item.label}
+                    </Text>
+                  </Pressable>
+                ))
+              ) : (
+                <View style={styles.emptyPickerWrap}>
+                  <Text style={styles.pickerText}>
+                    {addLoading
+                      ? `Loading ${getSubLocationLabel(selectedState?.stateID || 0)}...`
+                      : `No ${getSubLocationLabel(selectedState?.stateID || 0)} data`}
+                  </Text>
+                </View>
+              )}
             </ScrollView>
           </View>
         </Pressable>
       </Modal>
+
     </Screen>
   );
 };
@@ -751,11 +833,32 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 6,
   },
+  inlinePickerCard: {
+    marginTop: 8,
+    maxHeight: 220,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+    overflow: 'hidden',
+  },
+  inlinePickerScroll: {
+    maxHeight: 220,
+  },
   pickerItem: {
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderTopWidth: 1,
     borderTopColor: '#f0f0f0',
   },
+  selectedPickerItem: {
+    backgroundColor: '#EAF6EE',
+  },
+  emptyPickerWrap: {
+    paddingHorizontal: 14,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
   pickerText: { color: colors.text, fontFamily: 'RobotoRegular', fontSize: 14 },
+  selectedPickerText: { color: colors.darkGreen, fontFamily: 'RobotoMedium' },
 });

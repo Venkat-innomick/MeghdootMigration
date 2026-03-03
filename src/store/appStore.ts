@@ -92,7 +92,6 @@ export const useAppStore = create<AppState>()(
         user: state.user,
         locations: state.locations,
         selectedLocation: state.selectedLocation,
-        currentLocationOverride: state.currentLocationOverride,
       }),
       migrate: (persistedState: any, version) => {
         // Force onboarding to show once after migration from older app state.

@@ -88,7 +88,7 @@ export const AllCropsScreen = () => {
       const response = await cropService.getCategories({
         CropCategoryID: 0,
         ID: userId,
-        RefreshDateTime: "2019-07-05",
+        RefreshDateTime: "2025-12-26",
         LanguageType: languageLabel,
       });
 
