@@ -25,6 +25,7 @@ import {
   parseLocationWeatherList,
   toText as normalizeText,
 } from '../../utils/locationApi';
+import { API_REFRESH_DATES } from '../../utils/apiDates';
 import { useAndroidNavigationBar } from '../../hooks/useAndroidNavigationBar';
 
 const pickText = (...values: any[]) => {
@@ -300,7 +301,7 @@ export const ForecastScreen = () => {
         DistrictID: districtID,
         LanguageType: languageLabel,
         languageType: languageLabel,
-        RefreshDateTime: '2025-12-26',
+        RefreshDateTime: API_REFRESH_DATES.current(),
       };
 
       if (stateID === 28 || stateID === 36) payload.AsdID = asdID || blockID;

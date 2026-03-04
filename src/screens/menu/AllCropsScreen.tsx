@@ -15,6 +15,7 @@ import { cropService } from "../../api/services";
 import { useAppStore } from "../../store/appStore";
 import { useAndroidNavigationBar } from "../../hooks/useAndroidNavigationBar";
 import { getLanguageLabel, getUserProfileId } from "../../utils/locationApi";
+import { API_REFRESH_DATES } from "../../utils/apiDates";
 
 const pickText = (...values: any[]) => {
   for (const value of values) {
@@ -88,7 +89,7 @@ export const AllCropsScreen = () => {
       const response = await cropService.getCategories({
         CropCategoryID: 0,
         ID: userId,
-        RefreshDateTime: "2025-12-26",
+        RefreshDateTime: API_REFRESH_DATES.current(),
         LanguageType: languageLabel,
       });
 

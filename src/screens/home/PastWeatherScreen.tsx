@@ -25,6 +25,7 @@ import {
   parseLocationWeatherList,
   toText as normalizeText,
 } from '../../utils/locationApi';
+import { API_REFRESH_DATES } from '../../utils/apiDates';
 import { useAndroidNavigationBar } from '../../hooks/useAndroidNavigationBar';
 
 const pickText = (...values: any[]) => {
@@ -77,29 +78,28 @@ const localImageMap: Record<string, ImageSourcePropType> = {
 };
 
 const weatherBgImageMap: Record<string, ImageSourcePropType> = {
-  clearsky_new: require('../../../assets/images/Clearsky_new.png'),
-  mainly_clear: require('../../../assets/images/Mainly_Clear.png'),
-  partly_cloudy: require('../../../assets/images/Partly_Cloudy.png'),
+  Clearsky_new: require('../../../assets/images/Clearsky_new.png'),
+  Mainly_Clear: require('../../../assets/images/Mainly_Clear.png'),
+  Partly_Cloudy: require('../../../assets/images/Partly_Cloudy.png'),
   generally_cloudy: require('../../../assets/images/generally_cloudy.png'),
-  cloudy: require('../../../assets/images/Cloudy.png'),
+  Cloudy: require('../../../assets/images/Cloudy.png'),
 };
 
-const cloudKeyByCover = (cloudCover: number) => {
+const cloudImageNameByCover = (cloudCover: number) => {
   if (cloudCover < 0) return '';
-  if (cloudCover === 0) return 'clearsky_new';
-  if (cloudCover === 1 || cloudCover === 2) return 'mainly_clear';
-  if (cloudCover === 3 || cloudCover === 4) return 'partly_cloudy';
+  if (cloudCover === 0) return 'Clearsky_new';
+  if (cloudCover === 1 || cloudCover === 2) return 'Mainly_Clear';
+  if (cloudCover === 3 || cloudCover === 4) return 'Partly_Cloudy';
   if (cloudCover === 5 || cloudCover === 6 || cloudCover === 7) return 'generally_cloudy';
-  return 'cloudy';
+  return 'Cloudy';
 };
 
-const cloudKeyByWeatherText = (value: string) => {
-  const text = value.toLowerCase();
-  if (text.includes('clear')) return 'clearsky_new';
-  if (text.includes('partly')) return 'partly_cloudy';
-  if (text.includes('mainly')) return 'mainly_clear';
-  if (text.includes('cloud')) return 'generally_cloudy';
-  return '';
+const pickXamarinCloudImageName = (item: any) => {
+  const direct = pickText(item?.cloudImage, item?.CloudImage, '');
+  if (direct && weatherBgImageMap[direct]) return direct;
+  return cloudImageNameByCover(
+    pickNum(item?.cloudCover, item?.CloudCover, -1),
+  );
 };
 
 const normalizeImageKey = (value: unknown) => {
@@ -111,10 +111,10 @@ const normalizeImageKey = (value: unknown) => {
 
 const resolveWeatherDate = (item: any) =>
   pickText(
-    item?.Date,
-    item?.date,
     item?.KisanDate_Lang,
     item?.ForeCastDate_Lang,
+    item?.Date,
+    item?.date,
     item?.KisanDate,
     item?.ForeCastDate,
     item?.ForeCastDate_format,
@@ -156,6 +156,21 @@ const normalizeWeatherItem = (item: any) => {
   };
 };
 
+const getMetricIconsForItem = (item: any) => {
+  const getIcon = (nameValue: any, fallback: ImageSourcePropType) => {
+    const key = normalizeImageKey(nameValue);
+    return localImageMap[key] || fallback;
+  };
+
+  return {
+    temp: getIcon(item.tempImage || item.TempImage, require('../../../assets/images/ic_tempWeather.png')),
+    rainfall: getIcon(item.rainFallImage || item.rainfallImage || item.RainFallImage, require('../../../assets/images/ic_rainfall.png')),
+    humidity: getIcon(item.humidityImage || item.HumidityImage, require('../../../assets/images/ic_humidity.png')),
+    windSpeed: getIcon(item.windSpeedImage || item.WindSpeedImage, require('../../../assets/images/ic_windspeed.png')),
+    windDirection: getIcon(item.windDirectionImage || item.WindDirectionImage, require('../../../assets/images/ic_winddirection.png')),
+  };
+};
+
 const pickList = (payload: any, keys: string[]): any[] => {
   if (!payload) return [];
   if (Array.isArray(payload)) return payload;
@@ -177,7 +192,7 @@ const getPastWeatherRows = (rawPayload: any) => {
     return [...observed].sort((a, b) => {
       const aTime = parseDateMs(a?.KisanDate ?? a?.Date ?? a?.date);
       const bTime = parseDateMs(b?.KisanDate ?? b?.Date ?? b?.date);
-      return bTime - aTime;
+      return aTime - bTime;
     });
   }
 
@@ -201,11 +216,11 @@ const getLocationIds = (location: any) => ({
 });
 
 const dedupePastWeatherLocations = (items: any[]) => {
-  // Past Weather tab in old Xamarin dedupes by state + district.
+  // Old Xamarin Past Weather dedupes by temp state + district + block + asd.
   const seen = new Set<string>();
   return items.filter((item) => {
     const ids = getLocationIds(item);
-    const key = `${ids.stateID}-${ids.districtID}`;
+    const key = `${ids.stateID}-${ids.districtID}-${ids.blockID}-${ids.asdID}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -243,35 +258,18 @@ export const PastWeatherScreen = () => {
     const district = pickText(selectedLocation.districtName, selectedLocation.DistrictName, selectedLocation.tempDistrictName, selectedLocation.TempDistrictName, '');
     const block = pickText(selectedLocation.blockName, selectedLocation.BlockName, selectedLocation.tempBlockName, selectedLocation.TempBlockName, '');
     const asd = pickText(selectedLocation.asdName, selectedLocation.AsdName, selectedLocation.tempAsdName, selectedLocation.TempAsdName, '');
-    const location = block !== '-' ? block : asd;
+    const location = stateID === 28 || stateID === 36 ? asd : block;
     if (location && location !== '-') return `${location} (${stateID === 28 || stateID === 36 ? 'ASD' : 'Block'})`;
     return `${district} (District)`;
   }, [selectedLocation]);
 
-  const metricIcons = useMemo(() => {
-    const getIcon = (nameValue: any, fallback: ImageSourcePropType) => {
-      const key = normalizeImageKey(nameValue);
-      return localImageMap[key] || fallback;
-    };
-    return {
-      temp: getIcon(selectedDay.tempImage || selectedDay.TempImage, require('../../../assets/images/ic_tempWeather.png')),
-      rainfall: getIcon(selectedDay.rainFallImage || selectedDay.rainfallImage || selectedDay.RainFallImage, require('../../../assets/images/ic_rainfall.png')),
-      humidity: getIcon(selectedDay.humidityImage || selectedDay.HumidityImage, require('../../../assets/images/ic_humidity.png')),
-      windSpeed: getIcon(selectedDay.windSpeedImage || selectedDay.WindSpeedImage, require('../../../assets/images/ic_windspeed.png')),
-      windDirection: getIcon(selectedDay.windDirectionImage || selectedDay.WindDirectionImage, require('../../../assets/images/ic_winddirection.png')),
-    };
-  }, [selectedDay]);
+  const metricIcons = useMemo(() => getMetricIconsForItem(selectedDay), [selectedDay]);
 
   const heroBackgroundSource = useMemo(() => {
     const cloudUri = pickUri(selectedDay.cloudImage, selectedDay.CloudImage);
     if (cloudUri) return { uri: cloudUri };
-    const key =
-      normalizeImageKey(selectedDay.cloudImage || selectedDay.CloudImage) ||
-      cloudKeyByCover(pickNum(selectedDay.cloudCover, selectedDay.CloudCover, -1)) ||
-      cloudKeyByWeatherText(
-        pickText(selectedDay.weatherType, selectedDay.WeatherType, selectedDay.cloud, selectedDay.Cloud, ''),
-      );
-    return weatherBgImageMap[key] || require('../../../assets/images/Clearsky_new.png');
+    const imageName = pickXamarinCloudImageName(selectedDay);
+    return weatherBgImageMap[imageName] || require('../../../assets/images/Clearsky_new.png');
   }, [selectedDay]);
 
   const loadLocations = async () => {
@@ -325,7 +323,7 @@ export const PastWeatherScreen = () => {
         DistrictID: districtID,
         LanguageType: languageLabel,
         languageType: languageLabel,
-        RefreshDateTime: '2025-12-26',
+        RefreshDateTime: API_REFRESH_DATES.current(),
       };
 
       if (stateID === 28 || stateID === 36) payload.AsdID = asdID || blockID;
@@ -384,7 +382,8 @@ export const PastWeatherScreen = () => {
             renderItem={({ item, index }) => {
               const row: any = item;
               const selected = index === selectedDayIndex;
-              const dayDate = resolveWeatherDate(row);
+              const rowIcons = getMetricIconsForItem(row);
+              const dayDate = pickText(row.Date, row.date, '-');
               return (
                 <Pressable
                   style={[styles.dayPill, selected && styles.dayPillSelected]}
@@ -393,9 +392,9 @@ export const PastWeatherScreen = () => {
                   <Text style={[styles.dayDateText, selected && styles.dayTextSelected]} numberOfLines={2}>
                     {dayDate}
                   </Text>
-                  <Text style={[styles.dayText, selected && styles.dayTextSelected]}>{pickText(row.minTemp, row.MinTemp, '-')}</Text>
-                  <Text style={[styles.dayText, selected && styles.dayTextSelected]}>{pickText(row.maxTemp, row.MaxTemp, '-')}</Text>
-                  <Image source={metricIcons.temp} style={styles.tempIcon} resizeMode="contain" />
+                  <Text style={[styles.dayText, selected && styles.dayTextSelected]}>{pickText(row.MinTemp, row.minTemp, '-')}</Text>
+                  <Text style={[styles.dayText, selected && styles.dayTextSelected]}>{pickText(row.MaxTemp, row.maxTemp, '-')}</Text>
+                  <Image source={rowIcons.temp} style={styles.tempIcon} resizeMode="contain" />
                 </Pressable>
               );
             }}
@@ -413,9 +412,9 @@ export const PastWeatherScreen = () => {
               style={styles.hero}
               imageStyle={styles.heroImage}
             >
-              <Text style={[styles.heroDate, { color: heroTextColor }]}>{pickText(selectedDay.date, selectedDay.Date, '-')}</Text>
+              <Text style={[styles.heroDate, { color: heroTextColor }]}>{pickText(selectedDay.Date, selectedDay.date, '-')}</Text>
               <View style={[styles.heroDivider, { backgroundColor: heroTextColor }]} />
-              <Text style={[styles.heroType, { color: heroTextColor }]}>{pickText(selectedDay.weatherType, selectedDay.WeatherType, '-')}</Text>
+              <Text style={[styles.heroType, { color: heroTextColor }]}>{pickText(selectedDay.WeatherType, selectedDay.weatherType, '-')}</Text>
 
               <View style={styles.metricRow}>
                 <View style={styles.metricHalf}>
@@ -423,7 +422,7 @@ export const PastWeatherScreen = () => {
                   <View>
                     <Text style={[styles.metricLabel, { color: heroTextColor }]}>Temperature</Text>
                     <Text style={[styles.metricValue, { color: heroTextColor }]}>
-                      Min {pickText(selectedDay.minTempDegree, selectedDay.MinTempDegree, selectedDay.MinTemp, '-')} | Max {pickText(selectedDay.maxTempDegree, selectedDay.MaxTempDegree, selectedDay.MaxTemp, '-')}
+                      Min {pickText(selectedDay.MinTempDegree, selectedDay.minTempDegree, selectedDay.MinTemp, '-')} | Max {pickText(selectedDay.MaxTempDegree, selectedDay.maxTempDegree, selectedDay.MaxTemp, '-')}
                     </Text>
                   </View>
                 </View>
@@ -434,14 +433,14 @@ export const PastWeatherScreen = () => {
                   <Image source={metricIcons.rainfall} style={styles.metricIcon} resizeMode="contain" />
                   <View>
                     <Text style={[styles.metricLabel, { color: heroTextColor }]}>Rainfall</Text>
-                    <Text style={[styles.metricValue, { color: heroTextColor }]}>{pickText(selectedDay.rainFall, selectedDay.RainFall, selectedDay.rainfall, selectedDay.Rainfall, '-')}</Text>
+                    <Text style={[styles.metricValue, { color: heroTextColor }]}>{pickText(selectedDay.Rainfall, selectedDay.rainfall, selectedDay.RainFall, selectedDay.rainFall, '-')}</Text>
                   </View>
                 </View>
                 <View style={styles.metricHalf}>
                   <Image source={metricIcons.windSpeed} style={styles.metricIcon} resizeMode="contain" />
                   <View>
                     <Text style={[styles.metricLabel, { color: heroTextColor }]}>Wind Speed</Text>
-                    <Text style={[styles.metricValue, { color: heroTextColor }]}>{pickText(selectedDay.windSpeed, selectedDay.WindSpeed, '-')}</Text>
+                    <Text style={[styles.metricValue, { color: heroTextColor }]}>{pickText(selectedDay.WindSpeed, selectedDay.windSpeed, '-')}</Text>
                   </View>
                 </View>
               </View>
@@ -451,18 +450,18 @@ export const PastWeatherScreen = () => {
                   <Image source={metricIcons.humidity} style={styles.metricIcon} resizeMode="contain" />
                   <View>
                     <Text style={[styles.metricLabel, { color: heroTextColor }]}>Humidity</Text>
-                    <Text style={[styles.metricValue, { color: heroTextColor }]}>{pickText(selectedDay.humidity, selectedDay.Humidity, '-')}</Text>
+                    <Text style={[styles.metricValue, { color: heroTextColor }]}>{pickText(selectedDay.Humidity, selectedDay.humidity, '-')}</Text>
                   </View>
                 </View>
                 <View style={styles.metricHalf}>
                   <Image
                     source={metricIcons.windDirection}
-                    style={[styles.metricIcon, { transform: [{ rotate: `${pickNum(selectedDay.windDirectionAngle, selectedDay.WindDirectionAngle)}deg` }] }]}
+                    style={[styles.metricIcon, { transform: [{ rotate: `${pickNum(selectedDay.WindDirectionAngle, selectedDay.windDirectionAngle)}deg` }] }]}
                     resizeMode="contain"
                   />
                   <View>
                     <Text style={[styles.metricLabel, { color: heroTextColor }]}>Wind Direction</Text>
-                    <Text style={[styles.metricValue, { color: heroTextColor }]}>{pickText(selectedDay.windDirection, selectedDay.WindDirection, '-')}</Text>
+                    <Text style={[styles.metricValue, { color: heroTextColor }]}>{pickText(selectedDay.WindDirection, selectedDay.windDirection, '-')}</Text>
                   </View>
                 </View>
               </View>

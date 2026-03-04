@@ -33,6 +33,7 @@ import {
   getUserProfileId,
   parseLocationWeatherList,
 } from "../../utils/locationApi";
+import { API_REFRESH_DATES } from "../../utils/apiDates";
 import { useAndroidNavigationBar } from "../../hooks/useAndroidNavigationBar";
 
 const pickText = (...values: any[]) => {
@@ -81,11 +82,11 @@ const normalizeImageKey = (value: unknown) => {
 };
 
 const weatherBgImageMap: Record<string, ImageSourcePropType> = {
-  clearsky_new: require("../../../assets/images/Clearsky_new.png"),
-  mainly_clear: require("../../../assets/images/Mainly_Clear.png"),
-  partly_cloudy: require("../../../assets/images/Partly_Cloudy.png"),
+  Clearsky_new: require("../../../assets/images/Clearsky_new.png"),
+  Mainly_Clear: require("../../../assets/images/Mainly_Clear.png"),
+  Partly_Cloudy: require("../../../assets/images/Partly_Cloudy.png"),
   generally_cloudy: require("../../../assets/images/generally_cloudy.png"),
-  cloudy: require("../../../assets/images/Cloudy.png"),
+  Cloudy: require("../../../assets/images/Cloudy.png"),
 };
 
 const iconImageMap: Record<string, ImageSourcePropType> = {
@@ -100,23 +101,22 @@ const iconImageMap: Record<string, ImageSourcePropType> = {
   east: require("../../../assets/images/east.png"),
 };
 
-const cloudKeyByCover = (cloudCover: number) => {
+const cloudImageNameByCover = (cloudCover: number) => {
   if (cloudCover < 0) return "";
-  if (cloudCover === 0) return "clearsky_new";
-  if (cloudCover === 1 || cloudCover === 2) return "mainly_clear";
-  if (cloudCover === 3 || cloudCover === 4) return "partly_cloudy";
+  if (cloudCover === 0) return "Clearsky_new";
+  if (cloudCover === 1 || cloudCover === 2) return "Mainly_Clear";
+  if (cloudCover === 3 || cloudCover === 4) return "Partly_Cloudy";
   if (cloudCover === 5 || cloudCover === 6 || cloudCover === 7)
     return "generally_cloudy";
-  return "cloudy";
+  return "Cloudy";
 };
 
-const cloudKeyByWeatherText = (value: string) => {
-  const text = value.toLowerCase();
-  if (text.includes("clear")) return "clearsky_new";
-  if (text.includes("partly")) return "partly_cloudy";
-  if (text.includes("mainly")) return "mainly_clear";
-  if (text.includes("cloud")) return "generally_cloudy";
-  return "";
+const pickXamarinCloudImageName = (item: any) => {
+  const direct = pickText(item?.cloudImage, item?.CloudImage, "");
+  if (direct && weatherBgImageMap[direct]) return direct;
+  return cloudImageNameByCover(
+    toNum(item?.cloudCover, item?.CloudCover, -1),
+  );
 };
 
 const pickBlockOrAsdName = (item: any) =>
@@ -257,7 +257,7 @@ const buildHomeCropPayload = async (
     Id: userId,
     LanguageType: languageLabel,
     Type: "Farmer",
-    RefreshDateTime: "2025-12-26",
+    RefreshDateTime: API_REFRESH_DATES.current(),
   };
 
   try {
@@ -297,9 +297,6 @@ export const DashboardScreen = () => {
   );
   const clearTemporarySearchData = useAppStore(
     (s) => s.clearTemporarySearchData,
-  );
-  const setCurrentLocationOverride = useAppStore(
-    (s) => s.setCurrentLocationOverride,
   );
   const userId = useMemo(() => getUserProfileId(user), [user]);
   const languageLabel = useMemo(() => getLanguageLabel(language), [language]);
@@ -387,9 +384,6 @@ export const DashboardScreen = () => {
         parseAdvisoryList(crop),
       ) as CropAdvisoryItem[];
       setAdvisories(nextAdvisories);
-      if (currentLocationOverride) {
-        setCurrentLocationOverride(null);
-      }
       if (temporarySearchLocations.length || temporarySearchAdvisories.length) {
         clearTemporarySearchData();
       }
@@ -415,7 +409,6 @@ export const DashboardScreen = () => {
     currentLocationOverride,
     setAppLocations,
     clearTemporarySearchData,
-    setCurrentLocationOverride,
     setSelectedLocation,
     temporarySearchAdvisories,
     temporarySearchLocations,
@@ -746,24 +739,10 @@ export const DashboardScreen = () => {
                   (weatherItem as any)?.cloudImage,
                   (weatherItem as any)?.CloudImage,
                 );
-                const cloudKey =
-                  normalizeImageKey(
-                    (weatherItem as any)?.cloudImage ||
-                      (weatherItem as any)?.CloudImage,
-                  ) ||
-                  cloudKeyByCover(cloudCover) ||
-                  cloudKeyByWeatherText(
-                    pickText(
-                      (weatherItem as any)?.weatherType,
-                      (weatherItem as any)?.WeatherType,
-                      (weatherItem as any)?.cloud,
-                      (weatherItem as any)?.Cloud,
-                      "",
-                    ),
-                  );
+                const cloudImageName = pickXamarinCloudImageName(weatherItem);
                 const cardBackground = cloudUri
                   ? { uri: cloudUri }
-                  : weatherBgImageMap[cloudKey] ||
+                  : weatherBgImageMap[cloudImageName] ||
                     require("../../../assets/images/Clearsky_new.png");
                 const titleText =
                   activeTab === "district"
@@ -943,6 +922,8 @@ export const DashboardScreen = () => {
             "-",
           );
           const imageUri = pickUri(
+            row.cropImageURL,
+            row.CropImageURL,
             row.localFilePath,
             row.LocalFilePath,
             row.imagePath,

@@ -1,4 +1,5 @@
 import { LANGUAGES } from "../constants/languages";
+import { API_REFRESH_DATES } from "./apiDates";
 
 export const toNum = (value: unknown, fallback = 0): number => {
   if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -57,7 +58,7 @@ export const buildByLocationPayload = (
   const payload: Record<string, unknown> = {
     Id: userId,
     LanguageType: languageLabel,
-    RefreshDateTime: "2025-12-26",
+    RefreshDateTime: API_REFRESH_DATES.current(),
   };
 
   if (coords) {

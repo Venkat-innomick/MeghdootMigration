@@ -20,6 +20,7 @@ import { Screen } from "../../components/Screen";
 import { spacing } from "../../theme/spacing";
 import { colors } from "../../theme/colors";
 import { mastersService, userService } from "../../api/services";
+import { API_REFRESH_DATES } from "../../utils/apiDates";
 import {
   AsdMasterItem,
   BlockMasterItem,
@@ -177,8 +178,8 @@ export const RegistrationScreen = ({ navigation }: Props) => {
       setLoading(true);
       try {
         const [genders, states] = await Promise.all([
-          mastersService.getGenders(languageLabel),
-          mastersService.getStates(languageLabel),
+          mastersService.getGenders(languageLabel, API_REFRESH_DATES.current()),
+          mastersService.getStates(languageLabel, API_REFRESH_DATES.current()),
         ]);
 
         const mappedGenders = (genders || [])
@@ -226,6 +227,7 @@ export const RegistrationScreen = ({ navigation }: Props) => {
       const districts = await mastersService.getDistricts(
         state.stateID,
         languageLabel,
+        API_REFRESH_DATES.current(),
       );
       const mappedDistricts = (districts || [])
         .map((d: any, index: number) => ({
@@ -265,6 +267,7 @@ export const RegistrationScreen = ({ navigation }: Props) => {
         const asd = await mastersService.getAsd(
           district.districtID,
           languageLabel,
+          API_REFRESH_DATES.current(),
         );
         const mapped = (asd as AsdMasterItem[])
           .map((a: any) => ({
@@ -277,6 +280,7 @@ export const RegistrationScreen = ({ navigation }: Props) => {
         const blocks = await mastersService.getBlocks(
           district.districtID,
           languageLabel,
+          API_REFRESH_DATES.blockMasters,
         );
         const mapped = (blocks as BlockMasterItem[])
           .map((b: any) => ({

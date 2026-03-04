@@ -16,6 +16,7 @@ import { cropService } from "../../api/services";
 import { useAppStore } from "../../store/appStore";
 import { useAndroidNavigationBar } from "../../hooks/useAndroidNavigationBar";
 import { getLanguageLabel, getUserProfileId } from "../../utils/locationApi";
+import { API_REFRESH_DATES } from "../../utils/apiDates";
 
 const pickText = (...values: any[]) => {
   for (const value of values) {
@@ -103,7 +104,7 @@ export const FavouritesScreen = () => {
       const response = await cropService.getFavourites({
         Id: userId,
         LanguageType: languageLabel,
-        RefreshDateTime: "2025-12-26",
+        RefreshDateTime: API_REFRESH_DATES.favourites,
       });
       const base = response?.result || response?.data || response;
       const list = pickList(base, [
@@ -144,10 +145,8 @@ export const FavouritesScreen = () => {
         onPress: async () => {
           try {
             const payload = {
-              CAFLID: caflId,
               CropAdvisoryID: pickNum(item.cropAdvisoryID, item.CropAdvisoryID),
               UserProfileID: user?.typeOfRole || user?.userProfileId || 0,
-              Updatedby: user?.typeOfRole || user?.userProfileId || 0,
             };
             await cropService.removeFavourite(payload);
             setItems((prev) =>

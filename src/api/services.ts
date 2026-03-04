@@ -1,5 +1,6 @@
 import { apiClient, extractApiErrorMessage } from "./client";
 import { API_ENDPOINTS } from "../constants/api";
+import { API_REFRESH_DATES } from "../utils/apiDates";
 import {
   ApiResponse,
   AsdMasterItem,
@@ -264,13 +265,16 @@ export const notificationService = {
 };
 
 export const mastersService = {
-  getGenders: async (languageType: string) => {
+  getGenders: async (
+    languageType: string,
+    refreshDateTime: string = API_REFRESH_DATES.current(),
+  ) => {
     const { data } = await apiClient.post<any>(
       API_ENDPOINTS.masters.getGenderMasterList,
       {
         GenderID: 0,
         LanguageType: languageType,
-        RefreshDateTime: "2025-12-26",
+        RefreshDateTime: refreshDateTime,
       },
     );
     return pickMasterListOrThrow<any>(
@@ -279,14 +283,17 @@ export const mastersService = {
       "Unable to load genders",
     );
   },
-  getStates: async (languageType: string) => {
+  getStates: async (
+    languageType: string,
+    refreshDateTime: string = API_REFRESH_DATES.current(),
+  ) => {
     const { data } = await apiClient.post<any>(
       API_ENDPOINTS.masters.getStateMasterList,
       {
         StateID: 0,
         ScientistID: 0,
         LanguageType: languageType,
-        RefreshDateTime: "2025-12-26",
+        RefreshDateTime: refreshDateTime,
       },
     );
     return pickMasterListOrThrow<StateMasterItem>(
@@ -295,14 +302,18 @@ export const mastersService = {
       "Unable to load states",
     );
   },
-  getDistricts: async (stateID: number, languageType: string) => {
+  getDistricts: async (
+    stateID: number,
+    languageType: string,
+    refreshDateTime: string = API_REFRESH_DATES.current(),
+  ) => {
     const { data } = await apiClient.post<any>(
       API_ENDPOINTS.masters.getDistrictMasterList,
       {
         StateID: stateID,
         ScientistID: 0,
         LanguageType: languageType,
-        RefreshDateTime: "2025-12-26",
+        RefreshDateTime: refreshDateTime,
       },
     );
     return pickMasterListOrThrow<DistrictMasterItem>(
@@ -311,14 +322,18 @@ export const mastersService = {
       "Unable to load districts",
     );
   },
-  getBlocks: async (districtID: number, languageType: string) => {
+  getBlocks: async (
+    districtID: number,
+    languageType: string,
+    refreshDateTime: string = API_REFRESH_DATES.blockMasters,
+  ) => {
     const { data } = await apiClient.post<any>(
       API_ENDPOINTS.masters.getBlockMasterList,
       {
         DistrictID: districtID,
         ScientistID: 0,
         LanguageType: languageType,
-        RefreshDateTime: "2018-01-01",
+        RefreshDateTime: refreshDateTime,
       },
     );
     const list = pickMasterListOrThrow<BlockMasterItem>(
@@ -328,14 +343,18 @@ export const mastersService = {
     );
     return list;
   },
-  getAsd: async (districtID: number, languageType: string) => {
+  getAsd: async (
+    districtID: number,
+    languageType: string,
+    refreshDateTime: string = API_REFRESH_DATES.blockMasters,
+  ) => {
     const { data } = await apiClient.post<any>(
       API_ENDPOINTS.masters.getAsdMasterList,
       {
         DistrictID: districtID,
         ScientistID: 0,
         LanguageType: languageType,
-        RefreshDateTime: "2018-01-01",
+        RefreshDateTime: refreshDateTime,
       },
     );
     const list = pickMasterListOrThrow<AsdMasterItem>(

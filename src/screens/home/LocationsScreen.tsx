@@ -18,6 +18,7 @@ import { Screen } from '../../components/Screen';
 import { colors } from '../../theme/colors';
 import { mastersService, userService, weatherService } from '../../api/services';
 import { useAppStore } from '../../store/appStore';
+import { API_REFRESH_DATES } from '../../utils/apiDates';
 import { DistrictMasterItem, StateMasterItem } from '../../types/domain';
 import {
   buildByLocationPayload,
@@ -46,6 +47,9 @@ type LocationRow = {
   cloudCover: number;
   weatherType: string;
   isCurrentLocation: boolean;
+  districtName: string;
+  blockName: string;
+  asdName: string;
 };
 
 type Option = { id: number; label: string };
@@ -67,28 +71,50 @@ const normalizeImageKey = (value: unknown) => {
 };
 
 const locationBgImageMap: Record<string, ImageSourcePropType> = {
-  clearsky_new: require('../../../assets/images/Clearsky_new.png'),
-  mainly_clear: require('../../../assets/images/Mainly_Clear.png'),
-  partly_cloudy: require('../../../assets/images/Partly_Cloudy.png'),
+  Clearsky_new: require('../../../assets/images/Clearsky_new.png'),
+  Mainly_Clear: require('../../../assets/images/Mainly_Clear.png'),
+  Partly_Cloudy: require('../../../assets/images/Partly_Cloudy.png'),
   generally_cloudy: require('../../../assets/images/generally_cloudy.png'),
-  cloudy: require('../../../assets/images/Cloudy.png'),
+  Cloudy: require('../../../assets/images/Cloudy.png'),
 };
 
-const cloudKeyByCover = (cloudCover: number) => {
-  if (cloudCover === 0) return 'clearsky_new';
-  if (cloudCover === 1 || cloudCover === 2) return 'mainly_clear';
-  if (cloudCover === 3 || cloudCover === 4) return 'partly_cloudy';
+const cloudImageNameByCover = (cloudCover: number) => {
+  if (cloudCover < 0) return '';
+  if (cloudCover === 0) return 'Clearsky_new';
+  if (cloudCover === 1 || cloudCover === 2) return 'Mainly_Clear';
+  if (cloudCover === 3 || cloudCover === 4) return 'Partly_Cloudy';
   if (cloudCover === 5 || cloudCover === 6 || cloudCover === 7) return 'generally_cloudy';
-  return 'cloudy';
+  return 'Cloudy';
 };
 
-const cloudKeyByWeatherText = (value: string) => {
-  const text = value.toLowerCase();
-  if (text.includes('clear')) return 'clearsky_new';
-  if (text.includes('partly')) return 'partly_cloudy';
-  if (text.includes('mainly')) return 'mainly_clear';
-  if (text.includes('cloud')) return 'generally_cloudy';
-  return '';
+const pickXamarinCloudImageName = (item: any) => {
+  const direct = toText(item.cloudImage ?? item.CloudImage);
+  if (direct && locationBgImageMap[direct]) return direct;
+  return cloudImageNameByCover(toNum(item.cloudCover ?? item.CloudCover, -1));
+};
+
+const isDistrictOnlyRow = (item: LocationRow) =>
+  item.blockID === 0 &&
+  item.asdID === 0 &&
+  !toText(item.blockName) &&
+  !toText(item.asdName);
+
+const shapeLocationRows = (rows: LocationRow[]) => {
+  const districtRows = rows.filter(isDistrictOnlyRow);
+  const blockRows = rows.filter((item) => !isDistrictOnlyRow(item));
+
+  if (!blockRows.length) return districtRows;
+
+  const standaloneDistricts = districtRows.filter(
+    (district) =>
+      !blockRows.some(
+        (item) =>
+          item.stateID === district.stateID &&
+          item.districtID === district.districtID,
+      ),
+  );
+
+  return [...blockRows, ...standaloneDistricts];
 };
 
 const usesAsdMasters = (stateID: number) => stateID === 28 || stateID === 36;
@@ -135,13 +161,11 @@ export const LocationsScreen = () => {
       const tempAsdID = toNum(item.tempAsdID ?? item.TempAsdID ?? item.tempasdID);
       const cloudCover = toNum(item.cloudCover ?? item.CloudCover, -1);
       const weatherType = toText(item.weatherType ?? item.WeatherType ?? item.cloud ?? item.Cloud);
-      const cityName =
-        toText(item.cityName ?? item.CityName) ||
-        toText(item.placeName ?? item.PlaceName) ||
-        toText(item.blockName ?? item.BlockName) ||
-        toText(item.asdName ?? item.AsdName) ||
-        toText(item.districtName ?? item.DistrictName) ||
-        'Location';
+      const districtName = toText(item.districtName ?? item.DistrictName);
+      const blockName = toText(item.blockName ?? item.BlockName);
+      const asdName = toText(item.asdName ?? item.AsdName);
+      const cityName = blockName || asdName || districtName || 'Location';
+      const cloudImage = pickXamarinCloudImageName(item);
 
       return {
         stateID,
@@ -155,16 +179,17 @@ export const LocationsScreen = () => {
         stateName: toText(item.stateName ?? item.StateName) || '--',
         cityName,
         colorCode: toText(item.colorCode ?? item.ColorCode) || '#FFFFFF',
-        cloudImage: toText(
-          item.cloudImage ?? item.CloudImage ?? item.imagePath ?? item.ImagePath,
-        ),
+        cloudImage,
         cloudCover,
         weatherType,
         isCurrentLocation: Boolean(item.isCurrentLocation ?? item.IsCurrentLocation),
+        districtName,
+        blockName,
+        asdName,
       };
     });
 
-    return mapped.filter((x) => x.districtID > 0);
+    return shapeLocationRows(mapped.filter((x) => x.districtID > 0));
   }, []);
 
   const normalizedLocations = useMemo(() => {
@@ -215,7 +240,10 @@ export const LocationsScreen = () => {
   }, [appLocations, mapRawLocations]);
 
   const loadStates = async () => {
-    const res = await mastersService.getStates(languageLabel);
+    const res = await mastersService.getStates(
+      languageLabel,
+      API_REFRESH_DATES.searchMasters,
+    );
     const mapped = (res as any[])
       .map((s, index) => ({
         stateID: toNum(s.stateID ?? s.StateID, 0),
@@ -233,7 +261,11 @@ export const LocationsScreen = () => {
     setBlocks([]);
     setAddLoading(true);
     try {
-      const res = await mastersService.getDistricts(state.stateID, languageLabel);
+      const res = await mastersService.getDistricts(
+        state.stateID,
+        languageLabel,
+        API_REFRESH_DATES.searchMasters,
+      );
       const mapped = (res as any[])
         .map((d, index) => ({
           districtID: toNum(d.districtID ?? d.DistrictID, 0),
@@ -386,6 +418,9 @@ export const LocationsScreen = () => {
         cloudCover: -1,
         weatherType: '',
         isCurrentLocation: false,
+        districtName: selectedDistrict.districtName,
+        blockName: usesAsdMasters(selectedState.stateID) ? '' : selectedBlock.label,
+        asdName: usesAsdMasters(selectedState.stateID) ? selectedBlock.label : '',
       };
 
       setLocations((prev) => [
@@ -508,14 +543,10 @@ export const LocationsScreen = () => {
     <View style={styles.cardWrap}>
       {(() => {
         const uri = pickUri(item.cloudImage);
-        const localKey =
-          normalizeImageKey(item.cloudImage) ||
-          cloudKeyByCover(item.cloudCover) ||
-          cloudKeyByWeatherText(item.weatherType);
         const source =
           uri
             ? { uri }
-            : locationBgImageMap[localKey] ||
+            : locationBgImageMap[item.cloudImage] ||
               require('../../../assets/images/Clearsky_new.png');
         return (
       <ImageBackground

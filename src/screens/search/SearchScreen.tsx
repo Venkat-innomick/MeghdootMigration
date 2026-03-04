@@ -36,6 +36,7 @@ import {
   toText,
 } from "../../utils/locationApi";
 import { useAndroidNavigationBar } from "../../hooks/useAndroidNavigationBar";
+import { API_REFRESH_DATES } from "../../utils/apiDates";
 
 type SearchBlockItem = {
   blockID: number;
@@ -170,7 +171,7 @@ export const SearchScreen = () => {
       StateID: item.stateID,
       DistrictID: item.districtID,
       LanguageType: languageLabel,
-      RefreshDateTime: "2025-12-26",
+      RefreshDateTime: API_REFRESH_DATES.current(),
     };
     const cropPayload: Record<string, unknown> = {
       StateID: item.stateID,
@@ -203,7 +204,10 @@ export const SearchScreen = () => {
   const loadStates = async () => {
     setLoading(true);
     try {
-      const list = await mastersService.getStates(languageLabel);
+      const list = await mastersService.getStates(
+        languageLabel,
+        API_REFRESH_DATES.searchMasters,
+      );
       const normalized = (list as any[])
         .map((s, index) => ({
           stateID: toNum(s.stateID ?? s.StateID, 0),
@@ -234,6 +238,7 @@ export const SearchScreen = () => {
       const list = await mastersService.getDistricts(
         state.stateID,
         languageLabel,
+        API_REFRESH_DATES.searchMasters,
       );
       const normalized = (list as any[])
         .map((d, index) => ({

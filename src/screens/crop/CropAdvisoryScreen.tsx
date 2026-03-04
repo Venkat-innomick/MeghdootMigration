@@ -16,6 +16,7 @@ import { colors } from '../../theme/colors';
 import { cropService } from '../../api/services';
 import { useAppStore } from '../../store/appStore';
 import { getLanguageLabel } from '../../utils/locationApi';
+import { API_REFRESH_DATES } from '../../utils/apiDates';
 
 const pickText = (...values: any[]) => {
   for (const value of values) {
@@ -149,16 +150,13 @@ export const CropAdvisoryScreen = () => {
             LanguageType: languageLabel,
             Type: 'Farmer',
             CropID: requestedCropId,
-            RefreshDateTime: "2025-12-26",
+            RefreshDateTime: API_REFRESH_DATES.current(),
           })
         : await cropService.getAdvisoryTop({
             Id: userProfileId,
-            UserProfileID: userProfileId,
-            userProfileID: userProfileId,
             LanguageType: languageLabel,
-            languageType: languageLabel,
             Type: 'Farmer',
-            RefreshDateTime: "2025-12-26",
+            RefreshDateTime: API_REFRESH_DATES.current(),
           });
       const base = response?.result || response?.data || response;
       const list = pickList(base, [
@@ -213,7 +211,7 @@ export const CropAdvisoryScreen = () => {
     const commonPayload = {
       CropAdvisoryID: cropId,
       LanguageType: languageLabel,
-      RefreshDateTime: '2025-12-26',
+      RefreshDateTime: API_REFRESH_DATES.attachments,
     };
 
     const [imgRes, audRes] = await Promise.all([
