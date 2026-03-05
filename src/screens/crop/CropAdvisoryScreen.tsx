@@ -1,13 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Linking,
+  Platform,
   Pressable,
   ScrollView,
   Share,
   StyleSheet,
   Text,
+  ToastAndroid,
   View,
 } from 'react-native';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
@@ -91,6 +94,7 @@ export const CropAdvisoryScreen = () => {
   const [images, setImages] = useState<any[]>([]);
   const [audios, setAudios] = useState<any[]>([]);
   const [isEnglish, setIsEnglish] = useState(true);
+  const [favouriteBusy, setFavouriteBusy] = useState(false);
 
   const [weatherOpen, setWeatherOpen] = useState(true);
   const [agroOpen, setAgroOpen] = useState(false);
@@ -138,6 +142,14 @@ export const CropAdvisoryScreen = () => {
   const recommendationText = isEnglish
     ? pickText(current.recommendations, current.Recommendations, '--')
     : pickText(current.recommendationsRegional, current.RecommendationsRegional, current.recommendations, current.Recommendations, '--');
+
+  const hasWeatherSection = !!pickText(current.weatherCondition, current.WeatherCondition);
+  const hasRecommendationSection = !!pickText(current.recommendations, current.Recommendations);
+  // Old Xamarin screen keeps agro section hidden in Crop Advisory view.
+  const hasAgroSection = false;
+  const recommendationTitle = pickText(current.title, current.Title)
+    ? `Advisory - ${pickText(current.title, current.Title)}`
+    : 'Advisory';
 
   const loadAdvisories = async () => {
     if (!userProfileId) return;
@@ -242,41 +254,62 @@ export const CropAdvisoryScreen = () => {
   }, [advisoryId, languageLabel]);
 
   const toggleFavourite = async () => {
-    if (!advisoryId || !userProfileId || isFavourite) return;
-
-    const payload = {
-      CAFLID: 0,
-      CropAdvisoryID: advisoryId,
-      UserProfileID: userProfileId,
-      Createdby: userProfileId,
-      Updatedby: userProfileId,
-    };
-
-    try {
-      const response = await cropService.toggleFavourite(payload);
-      if (response.isSuccessful === false) return;
-
-      setItems((prev) =>
-        prev.map((item, i) => {
-          if (i !== index) return item;
-          return {
-            ...item,
-            favouriteID: 1,
-            FavouriteID: 1,
+    if (!advisoryId || !userProfileId || isFavourite || favouriteBusy) return;
+    Alert.alert('', 'Add to favourites?', [
+      { text: 'No', style: 'cancel' },
+      {
+        text: 'Yes',
+        onPress: async () => {
+          const payload = {
+            CAFLID: 0,
+            CropAdvisoryID: advisoryId,
+            UserProfileID: userProfileId,
+            Createdby: userProfileId,
+            Updatedby: userProfileId,
           };
-        })
-      );
-    } catch {
-      // no-op: keep UX identical to old app (silent on some failures)
-    }
+
+          try {
+            setFavouriteBusy(true);
+            const response = await cropService.toggleFavourite(payload);
+            if (response.isSuccessful === false) return;
+
+            setItems((prev) =>
+              prev.map((item, i) => {
+                if (i !== index) return item;
+                return {
+                  ...item,
+                  favouriteID: 1,
+                  FavouriteID: 1,
+                };
+              })
+            );
+            if (Platform.OS === 'android') {
+              ToastAndroid.show('Added to favourites', ToastAndroid.SHORT);
+            }
+          } catch {
+            // no-op: keep UX identical to old app (silent on some failures)
+          } finally {
+            setFavouriteBusy(false);
+          }
+        },
+      },
+    ]);
   };
 
   const shareCurrent = async () => {
-    const title = pickText(current.title, current.Title, 'Advisory');
-    const location = pickText(current.location, current.Location, '');
+    const stateID = pickNum(current.stateID, current.StateID);
+    const districtID = pickNum(current.districtID, current.DistrictID);
+    const blockID = pickNum(current.blockID, current.BlockID);
+    const asdID = pickNum(current.asdID, current.AsdID);
+    if (!stateID || !districtID) return;
+    const isAsdState = stateID === 28 || stateID === 36;
+    const levelPart = isAsdState ? `ASDID=${asdID}` : `BlockID=${blockID}`;
+    const shareUrl = `https://www.tropmet.res.in/StateID=${stateID}/DistrictID=${districtID}/${levelPart}`;
+
     await Share.share({
-      message: `${title}${location ? ` - ${location}` : ''}`,
-      title: 'Meghdoot',
+      title: 'MEGHDOOT',
+      message: `Checkout Meghdoot Crop Advisory\n${shareUrl}`,
+      url: shareUrl,
     });
   };
 
@@ -312,12 +345,24 @@ export const CropAdvisoryScreen = () => {
 
   const prevEnabled = index > 0;
   const nextEnabled = index < items.length - 1;
+  const hasAttachments = images.length > 0 || audios.length > 0;
+  const categoryIcon = pickUri(current.cCropImg, current.CCropImg);
 
   if (loading) {
     return (
       <Screen>
         <View style={styles.loaderWrap}>
           <ActivityIndicator color={colors.primary} />
+        </View>
+      </Screen>
+    );
+  }
+
+  if (!items.length) {
+    return (
+      <Screen>
+        <View style={styles.loaderWrap}>
+          <Text style={styles.emptyText}>No data currently available.</Text>
         </View>
       </Screen>
     );
@@ -361,11 +406,13 @@ export const CropAdvisoryScreen = () => {
                 style={styles.actionIcon}
                 resizeMode="contain"
               />
-              <Text style={styles.actionText}>{isFavourite ? 'Added Fav' : 'Add Fav'}</Text>
+              <Text style={styles.actionText}>{favouriteBusy ? 'Saving...' : isFavourite ? 'Added Fav' : 'Add Fav'}</Text>
             </Pressable>
 
             <Pressable style={styles.actionItem} onPress={shareCurrent}>
-              <Image source={require('../../../assets/images/share_wh.png')} style={styles.actionIcon} resizeMode="contain" />
+              <View style={styles.shareIconWrap}>
+                <Image source={require('../../../assets/images/share_wh.png')} style={styles.shareIconGlyph} resizeMode="contain" />
+              </View>
               <Text style={styles.actionText}>Share</Text>
             </Pressable>
           </View>
@@ -380,7 +427,11 @@ export const CropAdvisoryScreen = () => {
               <Text style={styles.metaText}>{pickText(current.location, current.Location, '-')}</Text>
             </View>
             <View style={styles.metaItem}>
-              <Image source={require('../../../assets/images/ic_crop.png')} style={styles.metaIcon} resizeMode="contain" />
+              <Image
+                source={categoryIcon ? { uri: categoryIcon } : require('../../../assets/images/ic_crop.png')}
+                style={styles.metaIcon}
+                resizeMode="contain"
+              />
               <Text style={styles.metaText}>{pickText(current.category, current.Category, current.cropCategoryName, current.CropCategoryName, '-')}</Text>
             </View>
             <Text style={styles.metaDate}>{pickText(current.createdDate, current.CreatedDate, '-')}</Text>
@@ -404,78 +455,94 @@ export const CropAdvisoryScreen = () => {
           </View>
         </View>
 
-        <AdvisorySection title="Weather Condition" open={weatherOpen} onToggle={() => setWeatherOpen((v) => !v)} content={weatherText} />
-        <AdvisorySection title="Agro Advisory" open={agroOpen} onToggle={() => setAgroOpen((v) => !v)} content={agroText} />
+        {hasWeatherSection ? (
+          <AdvisorySection title="Weather Condition" open={weatherOpen} onToggle={() => setWeatherOpen((v) => !v)} content={weatherText} />
+        ) : null}
+        {hasAgroSection ? (
+          <AdvisorySection title="Agro Advisory" open={agroOpen} onToggle={() => setAgroOpen((v) => !v)} content={agroText} />
+        ) : null}
         <AdvisorySection title="SMS Text" open={smsOpen} onToggle={() => setSmsOpen((v) => !v)} content={briefText} />
-        <AdvisorySection title="Recommendations" open={recommendationOpen} onToggle={() => setRecommendationOpen((v) => !v)} content={recommendationText} />
+        {hasRecommendationSection ? (
+          <AdvisorySection title={recommendationTitle} open={recommendationOpen} onToggle={() => setRecommendationOpen((v) => !v)} content={recommendationText} />
+        ) : null}
 
-        <View style={styles.sectionWrap}>
-          <Pressable style={styles.sectionHeader} onPress={() => setAttachmentsOpen((v) => !v)}>
-            <Text style={styles.sectionTitle}>Attachments</Text>
-            <Image
-              source={require('../../../assets/images/ic_uparrow.png')}
-              style={[styles.sectionArrow, { transform: [{ rotate: attachmentsOpen ? '180deg' : '0deg' }] }]}
-              resizeMode="contain"
-            />
-          </Pressable>
-          {attachmentsOpen ? (
-            <>
-              {images.length ? (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.attachRow}>
-                  {images.map((item, i) => (
-                    <Pressable
-                      key={`img-${i}`}
-                      onPress={() => openImagePreview(pickUri(item.imagePath, item.ImagePath, item.localFilePath, item.LocalFilePath))}
-                    >
-                      <Image
-                        source={
-                          pickUri(item.imagePath, item.ImagePath, item.localFilePath, item.LocalFilePath)
-                            ? { uri: pickUri(item.imagePath, item.ImagePath, item.localFilePath, item.LocalFilePath) }
-                            : require('../../../assets/images/defult_crop_plane.png')
-                        }
-                        style={styles.attachImage}
-                        resizeMode="cover"
-                      />
-                    </Pressable>
-                  ))}
-                </ScrollView>
-              ) : null}
+        {hasAttachments ? (
+          <View style={styles.sectionWrap}>
+            <Pressable style={styles.sectionHeader} onPress={() => setAttachmentsOpen((v) => !v)}>
+              <Text style={styles.sectionTitle}>Attachments</Text>
+              <Image
+                source={require('../../../assets/images/ic_uparrow.png')}
+                style={[styles.sectionArrow, { transform: [{ rotate: attachmentsOpen ? '180deg' : '0deg' }] }]}
+                resizeMode="contain"
+              />
+            </Pressable>
+            {attachmentsOpen ? (
+              <>
+                {images.length ? (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.attachRow}>
+                    {images.map((item, i) => (
+                      <Pressable
+                        key={`img-${i}`}
+                        onPress={() => openImagePreview(pickUri(item.imagePath, item.ImagePath, item.localFilePath, item.LocalFilePath))}
+                      >
+                        <Image
+                          source={
+                            pickUri(item.imagePath, item.ImagePath, item.localFilePath, item.LocalFilePath)
+                              ? { uri: pickUri(item.imagePath, item.ImagePath, item.localFilePath, item.LocalFilePath) }
+                              : require('../../../assets/images/defult_crop_plane.png')
+                          }
+                          style={styles.attachImage}
+                          resizeMode="cover"
+                        />
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                ) : null}
 
-              {audios.length ? (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.attachRow}>
-                  {audios.map((item, i) => (
-                    <Pressable
-                      key={`aud-${i}`}
-                      style={styles.audioTile}
-                      onPress={() => openAudioPopup(pickText(item.imagePath, item.ImagePath, item.audioPath, item.AudioPath))}
-                    >
-                      <Image source={require('../../../assets/images/speaker.png')} style={styles.audioIcon} resizeMode="contain" />
-                    </Pressable>
-                  ))}
-                </ScrollView>
-              ) : null}
+                {audios.length ? (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.attachRow}>
+                    {audios.map((item, i) => (
+                      <Pressable
+                        key={`aud-${i}`}
+                        style={styles.audioTile}
+                        onPress={() => openAudioPopup(pickText(item.imagePath, item.ImagePath, item.audioPath, item.AudioPath))}
+                      >
+                        <Image source={require('../../../assets/images/speaker.png')} style={styles.audioIcon} resizeMode="contain" />
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                ) : null}
+              </>
+            ) : null}
+          </View>
+        ) : null}
 
-              {!images.length && !audios.length ? <Text style={styles.sectionBody}>--</Text> : null}
-            </>
-          ) : null}
-        </View>
-
-        <View style={styles.navArrowsRow}>
-          <Pressable disabled={!prevEnabled} onPress={() => setIndex((v) => Math.max(0, v - 1))}>
-            <Image
-              source={require('../../../assets/images/next_arrow.png')}
-              style={[styles.navArrow, { transform: [{ rotate: '180deg' }], opacity: prevEnabled ? 1 : 0.35 }]}
-              resizeMode="contain"
-            />
-          </Pressable>
-          <Pressable disabled={!nextEnabled} onPress={() => setIndex((v) => Math.min(items.length - 1, v + 1))}>
-            <Image
-              source={require('../../../assets/images/next_arrow.png')}
-              style={[styles.navArrow, { opacity: nextEnabled ? 1 : 0.35 }]}
-              resizeMode="contain"
-            />
-          </Pressable>
-        </View>
+        {items.length > 1 ? (
+          <View style={styles.navArrowsRow}>
+            {prevEnabled ? (
+              <Pressable onPress={() => setIndex((v) => Math.max(0, v - 1))}>
+                <Image
+                  source={require('../../../assets/images/next_arrow.png')}
+                  style={[styles.navArrow, { transform: [{ rotate: '180deg' }] }]}
+                  resizeMode="contain"
+                />
+              </Pressable>
+            ) : (
+              <View />
+            )}
+            {nextEnabled ? (
+              <Pressable onPress={() => setIndex((v) => Math.min(items.length - 1, v + 1))}>
+                <Image
+                  source={require('../../../assets/images/next_arrow.png')}
+                  style={styles.navArrow}
+                  resizeMode="contain"
+                />
+              </Pressable>
+            ) : (
+              <View />
+            )}
+          </View>
+        ) : null}
       </ScrollView>
     </Screen>
   );
@@ -489,6 +556,11 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  emptyText: {
+    color: '#999',
+    fontFamily: 'RobotoRegular',
+    fontSize: 16,
   },
   heroWrap: {
     position: 'relative',
@@ -512,6 +584,24 @@ const styles = StyleSheet.create({
   actionIcon: {
     width: 50,
     height: 50,
+  },
+  shareIconWrap: {
+    width: 45,
+    height: 45,
+    borderRadius: 25,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  shareIconGlyph: {
+    width: 35,
+    height: 35,
+    tintColor: colors.darkGreen,
   },
   actionText: {
     marginTop: 2,

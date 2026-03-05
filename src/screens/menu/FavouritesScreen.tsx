@@ -4,11 +4,14 @@ import {
   Alert,
   FlatList,
   Image,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
+  ToastAndroid,
   View,
 } from "react-native";
+import { Swipeable } from "react-native-gesture-handler";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { Screen } from "../../components/Screen";
 import { colors } from "../../theme/colors";
@@ -130,13 +133,8 @@ export const FavouritesScreen = () => {
   );
 
   const removeFavourite = async (item: any) => {
-    const caflId = pickNum(
-      item.caFLID,
-      item.CAFLID,
-      item.favouriteID,
-      item.FavouriteID,
-    );
-    if (!caflId) return;
+    const cropAdvisoryId = pickNum(item.cropAdvisoryID, item.CropAdvisoryID);
+    if (!cropAdvisoryId || !userId) return;
 
     Alert.alert("Remove", "Remove this item from favourites?", [
       { text: "Cancel", style: "cancel" },
@@ -145,19 +143,37 @@ export const FavouritesScreen = () => {
         onPress: async () => {
           try {
             const payload = {
-              CropAdvisoryID: pickNum(item.cropAdvisoryID, item.CropAdvisoryID),
-              UserProfileID: user?.typeOfRole || user?.userProfileId || 0,
+              CropAdvisoryID: cropAdvisoryId,
+              UserProfileID: userId,
             };
-            await cropService.removeFavourite(payload);
+            const response: any = await cropService.removeFavourite(payload);
+            const ok = Boolean(
+              response?.IsSuccessful ??
+                response?.isSuccessful ??
+                response?.result?.IsSuccessful ??
+                response?.result?.isSuccessful ??
+                true,
+            );
+            if (!ok) {
+              Alert.alert(
+                "Delete failed",
+                response?.ErrorMessage ||
+                  response?.errorMessage ||
+                  "Unable to remove favourite",
+              );
+              return;
+            }
             setItems((prev) =>
               prev.filter(
                 (x) =>
-                  pickNum(x.caFLID, x.CAFLID, x.favouriteID, x.FavouriteID) !==
-                  caflId,
+                  pickNum(x.cropAdvisoryID, x.CropAdvisoryID) !== cropAdvisoryId,
               ),
             );
-          } catch {
-            // silent to match old app behavior
+            if (Platform.OS === "android") {
+              ToastAndroid.show("Deleted successfully", ToastAndroid.SHORT);
+            }
+          } catch (error: any) {
+            Alert.alert("Delete failed", error?.message || "Unable to remove favourite");
           }
         },
       },
@@ -197,80 +213,91 @@ export const FavouritesScreen = () => {
             item.imagePath,
             item.ImagePath,
           );
+          const categoryIcon = pickUri(item.cCropImg, item.CCropImg);
 
           return (
             <View style={styles.cardWrap}>
-              <Pressable
-                style={styles.removeBtn}
-                onPress={() => removeFavourite(item)}
+              <Swipeable
+                overshootRight={false}
+                renderRightActions={() => (
+                  <Pressable
+                    style={styles.swipeDelete}
+                    onPress={() => removeFavourite(item)}
+                  >
+                    <Image
+                      source={require("../../../assets/images/ic_delete.png")}
+                      style={styles.swipeDeleteIcon}
+                      resizeMode="contain"
+                    />
+                    <Text style={styles.swipeDeleteText}>Remove</Text>
+                  </Pressable>
+                )}
               >
-                <Image
-                  source={require("../../../assets/images/ic_delete.png")}
-                  style={styles.removeIcon}
-                  resizeMode="contain"
-                />
-              </Pressable>
-
-              <Pressable
-                style={styles.card}
-                onPress={() =>
-                  navigation.push("CropAdvisory", {
-                    advisoryId: pickNum(
-                      item.cropAdvisoryID,
-                      item.CropAdvisoryID,
-                      0,
-                    ),
-                    cropId: pickNum(item.cropID, item.CropID, 0),
-                    cropCategoryId: pickNum(
-                      item.cropCategoryID,
-                      item.CropCategoryID,
-                      0,
-                    ),
-                    cropName: pickText(item.cropName, item.CropName, ""),
-                  })
-                }
-              >
-                <Image
-                  source={
-                    image
-                      ? { uri: image }
-                      : require("../../../assets/images/defult_crop_plane.png")
+                <Pressable
+                  style={styles.card}
+                  onPress={() =>
+                    navigation.push("CropAdvisory", {
+                      advisoryId: pickNum(
+                        item.cropAdvisoryID,
+                        item.CropAdvisoryID,
+                        0,
+                      ),
+                      cropId: pickNum(item.cropID, item.CropID, 0),
+                      cropCategoryId: pickNum(
+                        item.cropCategoryID,
+                        item.CropCategoryID,
+                        0,
+                      ),
+                      cropName: pickText(item.cropName, item.CropName, ""),
+                    })
                   }
-                  style={styles.thumb}
-                  resizeMode="cover"
-                />
+                >
+                  <Image
+                    source={
+                      image
+                        ? { uri: image }
+                        : require("../../../assets/images/defult_crop_plane.png")
+                    }
+                    style={styles.thumb}
+                    resizeMode="cover"
+                  />
 
-                <View style={styles.cardRight}>
-                  <View style={styles.titleRow}>
-                    <Text style={styles.title}>
-                      {title}
-                    </Text>
-                    <Text style={styles.date}>{date}</Text>
-                  </View>
+                  <View style={styles.cardRight}>
+                    <View style={styles.titleRow}>
+                      <Text style={styles.title}>
+                        {title}
+                      </Text>
+                      <Text style={styles.date}>{date}</Text>
+                    </View>
 
-                  <View style={styles.infoRow}>
-                    <Image
-                      source={require("../../../assets/images/ic_map.png")}
-                      style={styles.infoIcon}
-                      resizeMode="contain"
-                    />
-                    <Text style={styles.infoText}>
-                      {location}
-                    </Text>
-                  </View>
+                    <View style={styles.infoRow}>
+                      <Image
+                        source={require("../../../assets/images/ic_map.png")}
+                        style={styles.infoIcon}
+                        resizeMode="contain"
+                      />
+                      <Text style={styles.infoText}>
+                        {location}
+                      </Text>
+                    </View>
 
-                  <View style={styles.infoRow}>
-                    <Image
-                      source={require("../../../assets/images/ic_crop.png")}
-                      style={styles.infoIcon}
-                      resizeMode="contain"
-                    />
-                    <Text style={styles.infoText}>
-                      {category}
-                    </Text>
+                    <View style={styles.infoRow}>
+                      <Image
+                        source={
+                          categoryIcon
+                            ? { uri: categoryIcon }
+                            : require("../../../assets/images/ic_crop.png")
+                        }
+                        style={styles.infoIcon}
+                        resizeMode="contain"
+                      />
+                      <Text style={styles.infoText}>
+                        {category}
+                      </Text>
+                    </View>
                   </View>
-                </View>
-              </Pressable>
+                </Pressable>
+              </Swipeable>
             </View>
           );
         }}
@@ -294,21 +321,23 @@ const styles = StyleSheet.create({
   cardWrap: {
     marginBottom: 10,
   },
-  removeBtn: {
-    position: "absolute",
-    right: 8,
-    top: 8,
-    zIndex: 2,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: "#fff",
+  swipeDelete: {
+    width: 110,
+    marginVertical: 1,
+    borderRadius: 6,
+    backgroundColor: "#E56B6B",
     alignItems: "center",
     justifyContent: "center",
+    gap: 2,
   },
-  removeIcon: {
-    width: 18,
-    height: 18,
+  swipeDeleteIcon: {
+    width: 28,
+    height: 28,
+  },
+  swipeDeleteText: {
+    color: "#fff",
+    fontFamily: "RobotoRegular",
+    fontSize: 12,
   },
   card: {
     borderWidth: 1,
@@ -317,7 +346,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     paddingVertical: 8,
     paddingHorizontal: 10,
-    paddingRight: 44,
     flexDirection: "row",
   },
   thumb: {

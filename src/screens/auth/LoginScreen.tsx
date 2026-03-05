@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { CommonActions } from "@react-navigation/native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   Alert,
   Image,
@@ -22,6 +23,7 @@ import { userService } from "../../api/services";
 import { LANGUAGES } from "../../constants/languages";
 import i18n from "../../locales/i18n";
 import { useAndroidNavigationBar } from "../../hooks/useAndroidNavigationBar";
+import { STORAGE_KEYS } from "../../constants/storageKeys";
 
 type Props = NativeStackScreenProps<AuthStackParamList, "Login">;
 
@@ -71,14 +73,21 @@ export const LoginScreen = ({ navigation }: Props) => {
           data?.userProfileId ??
           0,
       );
+      const mobileNumber = data.LogInId || data.mobileNumber || mobile;
+      const apiImagePath = data.ImagePath || data.imagePath || "";
+      const cacheKey = `${STORAGE_KEYS.profileImageCache}:${mobileNumber}`;
+      const cachedImagePath = apiImagePath
+        ? ""
+        : (await AsyncStorage.getItem(cacheKey)) || "";
+      const imagePath = apiImagePath || cachedImagePath || undefined;
 
       if (isSuccessful && data && roleId === 1) {
         setUser({
           userProfileId: typeOfRole,
           firstName: data.FirstName || data.firstName || "",
           lastName: data.LastName || data.lastName || "",
-          mobileNumber: data.LogInId || data.mobileNumber || mobile,
-          imagePath: data.ImagePath || data.imagePath,
+          mobileNumber,
+          imagePath,
           isLogout: false,
           typeOfRole,
           // Persist location/profile fields used by other screens.

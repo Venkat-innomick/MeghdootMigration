@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Alert, Image, ImageSourcePropType, Pressable, StyleSheet, Text, View } from 'react-native';
 import { CommonActions, NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -71,11 +71,11 @@ const looksLikeBase64 = (value: string) => {
 };
 
 const resolveProfileImage = (rawPath: string | undefined): ImageSourcePropType => {
-  if (!rawPath || !rawPath.trim()) return require('../../assets/images/default-profile.png');
+  if (!rawPath || !rawPath.trim()) return require('../../assets/images/ic_defaultProfile.png');
 
   const value = rawPath.trim();
   if (value.toLowerCase() === 'null' || value.toLowerCase() === 'undefined') {
-    return require('../../assets/images/default-profile.png');
+    return require('../../assets/images/ic_defaultProfile.png');
   }
   if (value.startsWith('data:image/')) return { uri: value };
   if (looksLikeBase64(value)) return { uri: `data:image/jpeg;base64,${value}` };
@@ -193,7 +193,14 @@ const OnboardingNavigator = () => {
 const MenuContent = (props: any) => {
   const logout = useAppStore((s) => s.logout);
   const user: any = useAppStore((s) => s.user);
-  const profileImage = resolveProfileImage(user?.imagePath || user?.ImagePath);
+  const profileImageRaw = user?.imagePath || user?.ImagePath;
+  const [imageLoadFailed, setImageLoadFailed] = useState(false);
+  const profileImage = imageLoadFailed
+    ? require('../../assets/images/ic_defaultProfile.png')
+    : resolveProfileImage(profileImageRaw);
+  useEffect(() => {
+    setImageLoadFailed(false);
+  }, [profileImageRaw]);
   const fullName =
     pickText(user?.firstName, user?.FirstName) || pickText(user?.lastName, user?.LastName)
       ? `${pickText(user?.firstName, user?.FirstName)} ${pickText(user?.lastName, user?.LastName)}`.trim()
@@ -239,7 +246,12 @@ const MenuContent = (props: any) => {
           style={styles.profileHeaderBg}
           resizeMode="cover"
         />
-        <Image source={profileImage} style={styles.profileAvatar} resizeMode="cover" />
+        <Image
+          source={profileImage}
+          style={styles.profileAvatar}
+          resizeMode="cover"
+          onError={() => setImageLoadFailed(true)}
+        />
         <Text style={styles.profileName}>{fullName}</Text>
       </Pressable>
       <DrawerItem label="Home" labelStyle={{ color: '#fff' }} icon={() => <Image source={require('../../assets/images/ic_home.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />} onPress={goHome} />

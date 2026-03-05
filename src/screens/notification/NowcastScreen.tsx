@@ -39,6 +39,8 @@ export const NowcastScreen = () => {
           (Array.isArray(root) && root) ||
           root?.objNotificationsDetailsList ||
           root?.ObjNotificationsDetailsList ||
+          root?.objDistrictwiseNowcastList ||
+          root?.ObjDistrictwiseNowcastList ||
           [];
         setItems(Array.isArray(list) ? list : []);
       } finally {
@@ -65,7 +67,15 @@ export const NowcastScreen = () => {
     return (
       <FlatList
         data={items}
-        keyExtractor={(_, index) => String(index)}
+        keyExtractor={(item, index) =>
+          String(
+            item?.notificationId ??
+              item?.NotificationId ??
+              item?.id ??
+              item?.Id ??
+              index,
+          )
+        }
         contentContainerStyle={styles.listContent}
         renderItem={({ item }) => {
           const title = pickText(
@@ -112,9 +122,7 @@ export const NowcastScreen = () => {
               <Text style={styles.issueDate}>{issueDate}</Text>
               <Text style={styles.message}>{message}</Text>
               {toi ? <Text style={styles.metaText}>{toi}</Text> : null}
-              {validity ? (
-                <Text style={styles.metaText}>Validity: {validity}</Text>
-              ) : null}
+              {validity ? <Text style={styles.metaText}>{validity}</Text> : null}
             </View>
           );
         }}

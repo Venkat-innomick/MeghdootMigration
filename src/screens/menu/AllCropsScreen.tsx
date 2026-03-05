@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -70,6 +70,7 @@ export const AllCropsScreen = () => {
 
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<any[]>([]);
+  const hasLoadedRef = useRef(false);
 
   const openCropAdvisory = (params: Record<string, unknown>) => {
     const parent = navigation.getParent?.();
@@ -102,28 +103,17 @@ export const AllCropsScreen = () => {
       ]);
 
       const unique = list.filter((item: any, index: number, arr: any[]) => {
-        const id = pickNum(
-          item.cropID,
-          item.CropID,
-          item.cropCategoryID,
-          item.CropCategoryID,
-          index,
-        );
+        const id = pickNum(item.cropID, item.CropID, 0);
         return (
           arr.findIndex(
             (x) =>
-              pickNum(
-                x.cropID,
-                x.CropID,
-                x.cropCategoryID,
-                x.CropCategoryID,
-                index,
-              ) === id,
+              pickNum(x.cropID, x.CropID, 0) === id,
           ) === index
         );
       });
 
       setItems(unique);
+      hasLoadedRef.current = true;
     } catch {
       setItems([]);
     } finally {
@@ -131,15 +121,14 @@ export const AllCropsScreen = () => {
     }
   }, [languageLabel, userId]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
-
   useFocusEffect(
     React.useCallback(() => {
-      load();
+      // Match Xamarin behavior: load on first open (or if list is empty).
+      if (!hasLoadedRef.current || items.length === 0) {
+        load();
+      }
       return undefined;
-    }, [load])
+    }, [items.length, load])
   );
 
   const content = useMemo(() => {
@@ -178,11 +167,6 @@ export const AllCropsScreen = () => {
             item.CropCategoryID,
             0,
           );
-          const advisoryId = pickNum(
-            item.cropAdvisoryID,
-            item.CropAdvisoryID,
-            0,
-          );
           const name = pickText(
             item.cropName,
             item.CropName,
@@ -204,7 +188,6 @@ export const AllCropsScreen = () => {
                 openCropAdvisory({
                   cropId,
                   cropCategoryId,
-                  advisoryId: advisoryId || undefined,
                   cropName: name || "--",
                 })
               }
@@ -218,7 +201,7 @@ export const AllCropsScreen = () => {
                 style={styles.cropImage}
                 resizeMode="cover"
               />
-              <Text style={styles.cropName} numberOfLines={2}>
+              <Text style={styles.cropName}>
                 {name}
               </Text>
             </Pressable>
@@ -264,7 +247,6 @@ const styles = StyleSheet.create({
     fontFamily: "RobotoRegular",
     fontSize: 16,
     textAlign: "center",
-    minHeight: 38,
     paddingHorizontal: 6,
   },
   empty: {

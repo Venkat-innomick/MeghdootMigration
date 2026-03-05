@@ -21,7 +21,7 @@ const pickText = (...values: any[]) => {
   return "";
 };
 
-const SHORT_LIMIT = 140;
+const SEE_MORE_THRESHOLD = 100;
 
 export const NotificationsScreen = () => {
   useAndroidNavigationBar(colors.background, "dark");
@@ -42,6 +42,8 @@ export const NotificationsScreen = () => {
         (Array.isArray(root) && root) ||
         root?.objNotificationsDetailsList ||
         root?.ObjNotificationsDetailsList ||
+        root?.objDistrictwiseNowcastList ||
+        root?.ObjDistrictwiseNowcastList ||
         [];
       setItems(Array.isArray(list) ? list : []);
     } finally {
@@ -114,17 +116,19 @@ export const NotificationsScreen = () => {
               "-",
             );
             const isExpanded = !!expanded[index];
-            const shouldTrim = message.length > SHORT_LIMIT;
-            const shownMessage =
-              shouldTrim && !isExpanded
-                ? `${message.slice(0, SHORT_LIMIT)}...`
-                : message;
+            const shouldTrim = message.length > SEE_MORE_THRESHOLD;
 
             return (
               <View style={styles.card}>
                 <Text style={styles.title}>{title}</Text>
                 {issue ? <Text style={styles.issueText}>{issue}</Text> : null}
-                <Text style={styles.message}>{shownMessage}</Text>
+                <Text
+                  style={styles.message}
+                  numberOfLines={isExpanded ? 10 : 2}
+                  ellipsizeMode="tail"
+                >
+                  {message}
+                </Text>
 
                 {shouldTrim ? (
                   <Pressable
@@ -134,7 +138,7 @@ export const NotificationsScreen = () => {
                     }
                   >
                     <Text style={styles.seeMoreText}>
-                      {isExpanded ? "See Less" : "See More"}
+                      {isExpanded ? "Read Less" : "Read More"}
                     </Text>
                   </Pressable>
                 ) : null}

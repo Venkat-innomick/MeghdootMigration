@@ -1,4 +1,5 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ActionSheetIOS,
   ActivityIndicator,
@@ -23,6 +24,7 @@ import { API_BASE_URL } from '../../constants/api';
 import { userService } from '../../api/services';
 import { LANGUAGES } from '../../constants/languages';
 import i18n from '../../locales/i18n';
+import { STORAGE_KEYS } from '../../constants/storageKeys';
 
 const pickText = (...values: any[]) => {
   for (const value of values) {
@@ -70,6 +72,7 @@ export const ProfileScreen = () => {
   const hasLoadedProfileRef = useRef(false);
   const [loading, setLoading] = useState(false);
   const [updatingImage, setUpdatingImage] = useState(false);
+  const [imageLoadFailed, setImageLoadFailed] = useState(false);
 
   const languageLabel = useMemo(
     () => LANGUAGES.find((l) => l.code === languageCode)?.label || 'English',
@@ -98,6 +101,11 @@ export const ProfileScreen = () => {
           const users = (root.ObjUserList || root.objUserList || root.result || root.data || []) as any[];
           const data = Array.isArray(users) ? users[0] : users;
           if (!data) return;
+          const apiImagePath = data.ImagePath || data.imagePath || '';
+          const cachedImagePath = apiImagePath
+            ? ''
+            : (await AsyncStorage.getItem(`${STORAGE_KEYS.profileImageCache}:${mobile}`)) || '';
+          const effectiveImagePath = apiImagePath || cachedImagePath || user?.imagePath;
 
           const typeOfRole = Number(
             data?.TypeOfRole ?? data?.typeOfRole ?? data?.UserProfileID ?? data?.userProfileId ?? user?.userProfileId ?? 0
@@ -108,7 +116,7 @@ export const ProfileScreen = () => {
             firstName: data.FirstName || data.firstName || user?.firstName || '',
             lastName: data.LastName || data.lastName || user?.lastName || '',
             mobileNumber: data.LogInId || data.mobileNumber || user?.mobileNumber || '',
-            imagePath: data.ImagePath || data.imagePath || user?.imagePath,
+            imagePath: effectiveImagePath,
             isLogout: false,
             typeOfRole: typeOfRole || user?.typeOfRole,
             ...(data.StateID ? { stateID: data.StateID } : {}),
@@ -133,7 +141,14 @@ export const ProfileScreen = () => {
     }, [languageLabel, setUser, user?.LogInId, user?.MobileNumber, user?.mobileNumber])
   );
 
-  const profileImage = resolveProfileImage(user?.imagePath || user?.ImagePath);
+  const profileImageRaw = user?.imagePath || user?.ImagePath;
+  const profileImage = imageLoadFailed
+    ? require('../../../assets/images/ic_defaultProfile.png')
+    : resolveProfileImage(profileImageRaw);
+
+  useEffect(() => {
+    setImageLoadFailed(false);
+  }, [profileImageRaw]);
 
   const stateName = pickText(user?.stateName, user?.StateName);
   const districtName = pickText(user?.districtName, user?.DistrictName);
@@ -144,10 +159,7 @@ export const ProfileScreen = () => {
   const first = (typeof user?.firstName === 'string' && user.firstName.trim())
     ? user.firstName.trim()
     : (typeof user?.FirstName === 'string' ? user.FirstName.trim() : '');
-  const last = (typeof user?.lastName === 'string' && user.lastName.trim())
-    ? user.lastName.trim()
-    : (typeof user?.LastName === 'string' ? user.LastName.trim() : '');
-  const profileName = `${first} ${last}`.trim() || '__';
+  const profileName = first || '__';
 
   const persistProfileImage = useCallback(
     async (base64Image: string) => {
@@ -166,11 +178,8 @@ export const ProfileScreen = () => {
           });
           const ok = Boolean(response?.isSuccessful ?? response?.IsSuccessful ?? true);
           if (!ok) {
-            Alert.alert(
-              i18n.t('profile.title'),
-              response?.errorMessage || response?.ErrorMessage || i18n.t('profile.unableUpdateImage')
-            );
-            return;
+            // Keep local persistence behavior same as old Xamarin flow.
+            console.log('[ProfileImage] API save returned unsuccessful, keeping local image');
           }
         } catch {
           // Old Xamarin app also persisted locally even when upload path was not active.
@@ -180,6 +189,15 @@ export const ProfileScreen = () => {
           ...(user || {}),
           imagePath: base64Image,
         });
+        const mobile = String(
+          user?.mobileNumber || user?.LogInId || user?.MobileNumber || ''
+        ).trim();
+        if (mobile) {
+          await AsyncStorage.setItem(
+            `${STORAGE_KEYS.profileImageCache}:${mobile}`,
+            base64Image
+          );
+        }
         if (Platform.OS === 'android') {
           ToastAndroid.show(i18n.t('profile.imageUpdated'), ToastAndroid.SHORT);
         } else {
@@ -271,7 +289,11 @@ export const ProfileScreen = () => {
     <Screen>
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.avatarWrap}>
-          <Image source={profileImage} style={styles.avatar} />
+          <Image
+            source={profileImage}
+            style={styles.avatar}
+            onError={() => setImageLoadFailed(true)}
+          />
           <Pressable style={styles.avatarEditBtn} onPress={onEditProfileImage}>
             <Image
               source={require('../../../assets/images/ic_cameraGallery.png')}
@@ -318,6 +340,9 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   avatarWrap: {
+    width: 90,
+    height: 90,
+    alignSelf: 'center',
     alignItems: 'center',
     marginBottom: 12,
     position: 'relative',
