@@ -56,6 +56,21 @@ const pickUri = (...values: any[]) => {
   return "";
 };
 
+const formatAdvisoryDate = (raw: string) => {
+  if (!raw) return "";
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const toLegacy = (d: Date) =>
+    `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()}`;
+
+  if (raw === toLegacy(today)) return "Today";
+  if (raw === toLegacy(yesterday)) return "Yesterday";
+  return raw;
+};
+
 const metric = (label: string, value: string, icon: any) => ({
   label,
   value,
@@ -465,6 +480,30 @@ export const DashboardScreen = () => {
     return idx >= 0 ? idx : 0;
   }, [carouselLocations, currentLocation]);
 
+  const canUseBlockTab = useMemo(() => {
+    if (!locations.length) return false;
+    const target: any = currentLocation || locations[0];
+    if (!target) return false;
+    const targetState = toNum(target.stateID, target.StateID);
+    const targetDistrict = toNum(target.districtID, target.DistrictID);
+    return locations.some((row: any) => {
+      return (
+        toNum(row.stateID, row.StateID) === targetState &&
+        toNum(row.districtID, row.DistrictID) === targetDistrict &&
+        isBlockLevelRow(row)
+      );
+    });
+  }, [currentLocation, locations]);
+
+  const blockTabLabel = useMemo(() => {
+    const stateID = toNum(
+      (currentLocation as any)?.stateID,
+      (currentLocation as any)?.StateID,
+      0,
+    );
+    return stateID === 28 || stateID === 36 ? "ASD" : "Block";
+  }, [currentLocation]);
+
   useEffect(() => {
     if (!carouselLocations.length) return;
     carouselRef.current?.scrollToIndex({
@@ -472,6 +511,12 @@ export const DashboardScreen = () => {
       animated: false,
     });
   }, [currentLocationIndex, carouselLocations.length]);
+
+  useEffect(() => {
+    if (activeTab === "block" && !canUseBlockTab) {
+      setActiveTab("district");
+    }
+  }, [activeTab, canUseBlockTab]);
 
   const indicatorIndex = useMemo(() => {
     if (!carouselLocations.length) return 0;
@@ -584,6 +629,20 @@ export const DashboardScreen = () => {
     });
   }, [activeTab, advisories, currentLocation]);
 
+  const hasDistrictAdvisories = useMemo(() => {
+    if (!currentLocation) return false;
+    const districtId = toNum(
+      (currentLocation as any).districtID,
+      (currentLocation as any).DistrictID,
+    );
+    return advisories.some((row: any) => {
+      const rowDistrict = toNum(row.districtID, row.DistrictID);
+      const rowBlock = toNum(row.blockID, row.BlockID);
+      const rowAsd = toNum(row.asdID, row.AsdID);
+      return rowDistrict === districtId && rowBlock === 0 && rowAsd === 0;
+    });
+  }, [advisories, currentLocation]);
+
   const cardWidth = Math.max(width, 280);
 
   if (loading) {
@@ -620,8 +679,12 @@ export const DashboardScreen = () => {
                 style={[
                   styles.topTab,
                   activeTab === "block" && styles.topTabActive,
+                  !canUseBlockTab && styles.topTabDisabled,
                 ]}
-                onPress={() => setActiveTab("block")}
+                onPress={() => {
+                  if (canUseBlockTab) setActiveTab("block");
+                }}
+                disabled={!canUseBlockTab}
               >
                 <Text
                   style={
@@ -630,7 +693,7 @@ export const DashboardScreen = () => {
                       : styles.topTabText
                   }
                 >
-                  Block/ASD
+                  {blockTabLabel}
                 </Text>
               </Pressable>
               <Pressable
@@ -933,7 +996,7 @@ export const DashboardScreen = () => {
               </View>
             )}
 
-            {carouselLocations.length > 1 ? (
+            {carouselLocations.length > 1 && currentWeatherLocation ? (
               <View style={styles.dotsRow}>
                 {carouselLocations.map((_, idx) => (
                   <View
@@ -1041,7 +1104,9 @@ export const DashboardScreen = () => {
                   <Text style={styles.advisoryTitle} numberOfLines={2}>
                     {title}
                   </Text>
-                  <Text style={styles.advisoryDate}>{created}</Text>
+                  <Text style={styles.advisoryDate}>
+                    {formatAdvisoryDate(created)}
+                  </Text>
                 </View>
 
                 <View style={styles.categoryRow}>
@@ -1061,7 +1126,11 @@ export const DashboardScreen = () => {
           );
         }}
         ListEmptyComponent={
-          <Text style={styles.noData}>No advisory data.</Text>
+          <Text style={styles.noData}>
+            {activeTab === "block" && hasDistrictAdvisories
+              ? "District-level advisories available. Select District tab."
+              : "No advisory data."}
+          </Text>
         }
       />
     </Screen>
@@ -1086,6 +1155,9 @@ const styles = StyleSheet.create({
   },
   topTabActive: {
     backgroundColor: colors.primary,
+  },
+  topTabDisabled: {
+    opacity: 0.5,
   },
   topTabText: {
     color: colors.primary,

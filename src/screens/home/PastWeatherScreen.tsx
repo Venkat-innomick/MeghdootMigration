@@ -192,7 +192,7 @@ const getPastWeatherRows = (rawPayload: any) => {
     return [...observed].sort((a, b) => {
       const aTime = parseDateMs(a?.KisanDate ?? a?.Date ?? a?.date);
       const bTime = parseDateMs(b?.KisanDate ?? b?.Date ?? b?.date);
-      return aTime - bTime;
+      return bTime - aTime;
     });
   }
 
@@ -216,11 +216,11 @@ const getLocationIds = (location: any) => ({
 });
 
 const dedupePastWeatherLocations = (items: any[]) => {
-  // Old Xamarin Past Weather dedupes by temp state + district + block + asd.
+  // Old Xamarin Past Weather dedupes only by state + district.
   const seen = new Set<string>();
   return items.filter((item) => {
     const ids = getLocationIds(item);
-    const key = `${ids.stateID}-${ids.districtID}-${ids.blockID}-${ids.asdID}`;
+    const key = `${ids.stateID}-${ids.districtID}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;

@@ -13,7 +13,9 @@ import {
   Text,
   View,
 } from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Screen } from '../../components/Screen';
 import { colors } from '../../theme/colors';
 import { mastersService, userService, weatherService } from '../../api/services';
@@ -123,6 +125,7 @@ const getSubLocationLabel = (stateID: number) =>
 
 export const LocationsScreen = () => {
   useAndroidNavigationBar(colors.darkGreen, 'light');
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const user: any = useAppStore((s) => s.user);
   const language = useAppStore((s) => s.language);
@@ -226,8 +229,7 @@ export const LocationsScreen = () => {
       setLocations(filtered);
       return filtered;
     } catch {
-      setLocations([]);
-      return [] as LocationRow[];
+      return locations;
     } finally {
       setLoading(false);
     }
@@ -307,13 +309,6 @@ export const LocationsScreen = () => {
             []
           );
 
-      console.log('Locations block raw response', {
-        isAsd,
-        districtID: selectedDistrict.districtID,
-        count: rawList.length,
-        first: rawList[0],
-      });
-
       const mapped = (rawList as any[])
         .map((b) => ({
           id: isAsd
@@ -327,10 +322,6 @@ export const LocationsScreen = () => {
       const unique = mapped.filter(
         (b, i, arr) => arr.findIndex((x) => x.id === b.id) === i,
       );
-      console.log('Locations block mapped response', {
-        count: unique.length,
-        first: unique[0],
-      });
       setBlocks(unique);
       setBlockPickerOpen(true);
     } catch (e: any) {
@@ -479,7 +470,7 @@ export const LocationsScreen = () => {
 
   const deleteLocation = async (item: LocationRow) => {
     if (!userId) return;
-    if (normalizedLocations.length <= 1) {
+    if (addedLocations.length <= 1) {
       Alert.alert('Info', `Cannot delete only location (${item.stateName}, ${item.cityName}).`);
       return;
     }
@@ -539,16 +530,15 @@ export const LocationsScreen = () => {
     }, [userId, languageLabel])
   );
 
-  const renderCard = (item: LocationRow, showDelete = true) => (
-    <View style={styles.cardWrap}>
-      {(() => {
-        const uri = pickUri(item.cloudImage);
-        const source =
-          uri
-            ? { uri }
-            : locationBgImageMap[item.cloudImage] ||
-              require('../../../assets/images/Clearsky_new.png');
-        return (
+  const renderCardBody = (item: LocationRow) => {
+    const uri = pickUri(item.cloudImage);
+    const source =
+      uri
+        ? { uri }
+        : locationBgImageMap[item.cloudImage] ||
+          require('../../../assets/images/Clearsky_new.png');
+
+    return (
       <ImageBackground
         source={source}
         style={styles.card}
@@ -561,15 +551,26 @@ export const LocationsScreen = () => {
           {item.stateName || '--'}
         </Text>
       </ImageBackground>
-        );
-      })()}
+    );
+  };
 
+  const renderCard = (item: LocationRow, showDelete = true) => (
+    <View style={styles.cardWrap}>
       {showDelete ? (
-        <Pressable style={styles.deleteButton} onPress={() => deleteLocation(item)}>
-          <Image source={require('../../../assets/images/ic_delete.png')} style={styles.deleteIcon} resizeMode="contain" />
-          <Text style={styles.deleteText}>Delete</Text>
-        </Pressable>
-      ) : null}
+        <Swipeable
+          overshootRight={false}
+          renderRightActions={() => (
+            <Pressable style={styles.swipeDelete} onPress={() => deleteLocation(item)}>
+              <Image source={require('../../../assets/images/ic_delete.png')} style={styles.swipeDeleteIcon} resizeMode="contain" />
+              <Text style={styles.swipeDeleteText}>Delete</Text>
+            </Pressable>
+          )}
+        >
+          {renderCardBody(item)}
+        </Swipeable>
+      ) : (
+        renderCardBody(item)
+      )}
     </View>
   );
 
@@ -582,6 +583,9 @@ export const LocationsScreen = () => {
     navigation.navigate('Home');
   };
 
+  const floatingBottom = insets.bottom + 72;
+  const listBottomPadding = floatingBottom + 86;
+
   return (
     <Screen>
       <View style={styles.root}>
@@ -593,14 +597,14 @@ export const LocationsScreen = () => {
           <FlatList
             data={addedLocations}
             keyExtractor={(item, index) => `${item.stateID}-${item.districtID}-${item.blockID}-${item.asdID}-${index}`}
-            contentContainerStyle={styles.container}
+            contentContainerStyle={[styles.container, { paddingBottom: listBottomPadding }]}
             ListHeaderComponent={
               <>
                 {currentLocation ? (
                   <>
                     <Text style={styles.currentLbl}>Current Locations</Text>
                     <Pressable onPress={() => openInHome(currentLocation)}>{renderCard(currentLocation, false)}</Pressable>
-                    <View style={styles.separator} />
+                    {addedLocations.length ? <View style={styles.separator} /> : null}
                   </>
                 ) : null}
                 {addedLocations.length ? <Text style={styles.addedLbl}>Added locations</Text> : null}
@@ -611,7 +615,7 @@ export const LocationsScreen = () => {
           />
         )}
 
-        <Pressable style={styles.addButton} onPress={openAdd}>
+        <Pressable style={[styles.addButton, { bottom: floatingBottom }]} onPress={openAdd}>
           <Text style={styles.addButtonText}>Add location</Text>
         </Pressable>
       </View>
@@ -785,19 +789,17 @@ const styles = StyleSheet.create({
   cardBg: { borderRadius: 10, resizeMode: 'cover' },
   cityText: { color: '#fff', fontFamily: 'RobotoMedium', fontSize: 16 },
   stateText: { color: '#fff', fontFamily: 'RobotoRegular', fontSize: 14, marginTop: 2 },
-  deleteButton: {
-    position: 'absolute',
-    right: 10,
-    top: 8,
+  swipeDelete: {
+    width: 108,
+    marginVertical: 10,
+    borderRadius: 10,
     backgroundColor: '#DE4141',
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
   },
-  deleteIcon: { width: 18, height: 18 },
-  deleteText: { color: '#fff', fontFamily: 'RobotoRegular', fontSize: 12, marginLeft: 4 },
+  swipeDeleteIcon: { width: 24, height: 24 },
+  swipeDeleteText: { color: '#fff', fontFamily: 'RobotoRegular', fontSize: 12 },
   addButton: {
     position: 'absolute',
     left: 5,

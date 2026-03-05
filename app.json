@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "AGROMET",
-    "slug": "agromet-rn-eas",
+    "name": "MEGHDOOT",
+    "slug": "meghdoot-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/AppIcon.png",
@@ -22,7 +22,7 @@
     "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.agromet.app"
+      "bundleIdentifier": "com.imd.meghdoot"
     },
     "android": {
       "package": "com.aas.meghdoot",
@@ -44,8 +44,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow AGROMET to access your photos.",
-          "cameraPermission": "Allow AGROMET to access your camera."
+          "photosPermission": "Allow MEGHDOOT to access your photos.",
+          "cameraPermission": "Allow MEGHDOOT to access your camera."
         }
       ],
       [

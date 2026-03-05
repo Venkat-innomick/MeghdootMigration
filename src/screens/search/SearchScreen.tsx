@@ -54,6 +54,7 @@ export const SearchScreen = () => {
   const navigation = useNavigation<any>();
   const user: any = useAppStore((s) => s.user);
   const language = useAppStore((s) => s.language);
+  const appLocations = useAppStore((s) => s.locations);
   const setAppLocations = useAppStore((s) => s.setLocations);
   const setSelectedLocation = useAppStore((s) => s.setSelectedLocation);
   const setCurrentLocationOverride = useAppStore(
@@ -285,7 +286,10 @@ export const SearchScreen = () => {
           blockName: isAsd
             ? toText(item.asdName ?? item.AsdName)
             : toText(item.blockName ?? item.BlockName),
-          districtID: district.districtID,
+          districtID: toNum(
+            item.districtID ?? item.DistrictID,
+            district.districtID,
+          ),
           stateID: districtStateID,
           isAsd,
           favourite: false,
@@ -293,7 +297,8 @@ export const SearchScreen = () => {
         .filter(
           (item) =>
             item.blockID > 0 &&
-            !!item.blockName,
+            !!item.blockName &&
+            item.districtID === district.districtID,
         )
       ;
       const unique = mapped.filter(
@@ -358,6 +363,10 @@ export const SearchScreen = () => {
       return;
     }
     try {
+      if ((appLocations?.length || 0) <= 1) {
+        Alert.alert("Info", "Cannot delete the only saved location.");
+        return;
+      }
       const payload: Record<string, unknown> = {
         UserProfileID: userId,
         DistrictID: item.districtID,
@@ -392,6 +401,13 @@ export const SearchScreen = () => {
   const onRowPress = async (item: SearchBlockItem) => {
     setLoading(true);
     try {
+      if (item.favourite) {
+        await syncUserLocations();
+        setTemporarySearchData({ locations: [], advisories: [] });
+        await moveToHomeForItem(item);
+        return;
+      }
+
       const result = await loadSelectedLocationData(item);
       if (!result.locations.length && !result.advisories.length) {
         Alert.alert("Info", "No data found for selected location.");
@@ -529,7 +545,9 @@ export const SearchScreen = () => {
             }
             ListEmptyComponent={
               <Text style={styles.empty}>
-                Select state and district to load blocks.
+                {selectedDistrict
+                  ? "No data currently available."
+                  : "Select state and district to load blocks."}
               </Text>
             }
             renderItem={({ item }) => (

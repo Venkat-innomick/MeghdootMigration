@@ -112,10 +112,10 @@ const normalizeImageKey = (value: unknown) => {
 
 const resolveWeatherDate = (item: any) =>
   pickText(
-    item?.Date,
-    item?.date,
     item?.KisanDate_Lang,
     item?.ForeCastDate_Lang,
+    item?.Date,
+    item?.date,
     item?.KisanDate,
     item?.ForeCastDate,
     item?.ForeCastDate_format,
