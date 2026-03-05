@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -12,6 +12,7 @@ import { notificationService } from "../../api/services";
 import { useAppStore } from "../../store/appStore";
 import { colors } from "../../theme/colors";
 import { useAndroidNavigationBar } from "../../hooks/useAndroidNavigationBar";
+import { getUserProfileId } from "../../utils/locationApi";
 
 const pickText = (...values: any[]) => {
   for (const value of values) {
@@ -25,37 +26,42 @@ const SHORT_LIMIT = 140;
 export const NotificationsScreen = () => {
   useAndroidNavigationBar(colors.background, "dark");
   const user = useAppStore((s) => s.user);
+  const userId = useMemo(() => getUserProfileId(user), [user]);
 
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<any[]>([]);
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
 
-  const load = async () => {
-    if (!user) return;
+  const load = useCallback(async () => {
+    if (!userId) return;
     setLoading(true);
     try {
-      const response = await notificationService.getUserNotifications(
-        user.userProfileId,
-      );
-      setItems(Array.isArray(response) ? response : []);
+      const response: any = await notificationService.getUserNotifications(userId);
+      const root = response?.result || response?.data || response;
+      const list =
+        (Array.isArray(root) && root) ||
+        root?.objNotificationsDetailsList ||
+        root?.ObjNotificationsDetailsList ||
+        [];
+      setItems(Array.isArray(list) ? list : []);
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId]);
 
   useEffect(() => {
     load().catch(() => setItems([]));
-  }, [user]);
+  }, [load]);
 
-  const clearAll = async () => {
-    if (!user) return;
+  const clearAll = useCallback(async () => {
+    if (!userId) return;
     try {
-      await notificationService.clearNotifications(user.userProfileId);
+      await notificationService.clearNotifications(userId);
       setItems([]);
     } catch {
       // no-op
     }
-  };
+  }, [userId]);
 
   const content = useMemo(() => {
     if (loading) {

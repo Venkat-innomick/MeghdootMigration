@@ -1,14 +1,16 @@
 import React from 'react';
-import { Alert, Image, Pressable, Text, View } from 'react-native';
+import { Alert, Image, ImageSourcePropType, Pressable, StyleSheet, Text, View } from 'react-native';
 import { CommonActions, NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createDrawerNavigator, DrawerContentScrollView, DrawerItem } from '@react-navigation/drawer';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as NavigationBar from 'expo-navigation-bar';
+import Constants from 'expo-constants';
 import { RootStackParamList, AuthStackParamList, OnboardingStackParamList } from './types';
 import { useAppStore } from '../store/appStore';
 import { colors } from '../theme/colors';
+import { API_BASE_URL } from '../constants/api';
 
 import { LanguageSelectionScreen } from '../screens/onboarding/LanguageSelectionScreen';
 import { OnboardingOneScreen } from '../screens/onboarding/OnboardingOneScreen';
@@ -54,6 +56,38 @@ const setAndroidNavBar = (backgroundColor: string, buttonStyle: 'light' | 'dark'
   }
 };
 
+const pickText = (...values: any[]) => {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) return value;
+    if (typeof value === 'number') return String(value);
+  }
+  return '';
+};
+
+const looksLikeBase64 = (value: string) => {
+  if (!value || value.length < 40) return false;
+  const trimmed = value.trim();
+  return /^[A-Za-z0-9+/=\r\n]+$/.test(trimmed);
+};
+
+const resolveProfileImage = (rawPath: string | undefined): ImageSourcePropType => {
+  if (!rawPath || !rawPath.trim()) return require('../../assets/images/default-profile.png');
+
+  const value = rawPath.trim();
+  if (value.toLowerCase() === 'null' || value.toLowerCase() === 'undefined') {
+    return require('../../assets/images/default-profile.png');
+  }
+  if (value.startsWith('data:image/')) return { uri: value };
+  if (looksLikeBase64(value)) return { uri: `data:image/jpeg;base64,${value}` };
+  if (value.startsWith('http://') || value.startsWith('https://') || value.startsWith('file://')) {
+    return { uri: value };
+  }
+
+  const base = ((Constants.expoConfig?.extra?.apiBaseUrl as string | undefined) || API_BASE_URL).replace(/\/+$/, '');
+  const path = value.startsWith('/') ? value : `/${value}`;
+  return { uri: `${base}${path}` };
+};
+
 const MainHeader = ({ navigation, title }: any) => ({
   title,
   headerStyle: { backgroundColor: colors.primary },
@@ -77,7 +111,19 @@ const HomeTabs = () => {
   return (
     <Tabs.Navigator
       screenOptions={({ route, navigation }) => ({
-        ...MainHeader({ navigation, title: 'MEGHDOOT' }),
+        ...MainHeader({
+          navigation,
+          title:
+            route.name === 'Home'
+              ? 'Home'
+              : route.name === 'PastWeather'
+              ? 'Past Weather'
+              : route.name === 'Forecast'
+              ? 'Forecast'
+              : route.name === 'Locations'
+              ? 'Locations'
+              : 'MEGHDOOT',
+        }),
         tabBarStyle: {
           backgroundColor: colors.darkGreen,
           paddingTop: 8,
@@ -146,7 +192,12 @@ const OnboardingNavigator = () => {
 
 const MenuContent = (props: any) => {
   const logout = useAppStore((s) => s.logout);
-  const user = useAppStore((s) => s.user);
+  const user: any = useAppStore((s) => s.user);
+  const profileImage = resolveProfileImage(user?.imagePath || user?.ImagePath);
+  const fullName =
+    pickText(user?.firstName, user?.FirstName) || pickText(user?.lastName, user?.LastName)
+      ? `${pickText(user?.firstName, user?.FirstName)} ${pickText(user?.lastName, user?.LastName)}`.trim()
+      : 'User';
   const goMenu = (screen: string) => {
     setAndroidNavBar(colors.background, 'dark');
     props.navigation.navigate(screen);
@@ -180,11 +231,16 @@ const MenuContent = (props: any) => {
   return (
     <DrawerContentScrollView {...props} style={{ backgroundColor: colors.gladeGreen }}>
       <Pressable
-        style={{ backgroundColor: colors.gladeGreen, padding: 16, alignItems: 'center' }}
+        style={styles.profileHeader}
         onPress={() => props.navigation.getParent()?.navigate('Profile')}
       >
-        <Image source={require('../../assets/images/ic_profileMenuBG.png')} style={{ width: '100%', height: 120, borderRadius: 8, marginBottom: 8 }} resizeMode="cover" />
-        <Text style={{ color: '#fff', fontFamily: 'RobotoMedium', fontSize: 16 }}>{`${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'User'}</Text>
+        <Image
+          source={require('../../assets/images/ic_profileMenuBG.png')}
+          style={styles.profileHeaderBg}
+          resizeMode="cover"
+        />
+        <Image source={profileImage} style={styles.profileAvatar} resizeMode="cover" />
+        <Text style={styles.profileName}>{fullName}</Text>
       </Pressable>
       <DrawerItem label="Home" labelStyle={{ color: '#fff' }} icon={() => <Image source={require('../../assets/images/ic_home.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />} onPress={goHome} />
       <DrawerItem label="All Crops" labelStyle={{ color: '#fff' }} icon={() => <Image source={require('../../assets/images/ic_allCrop.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />} onPress={() => goMenu('AllCrops')} />
@@ -198,6 +254,35 @@ const MenuContent = (props: any) => {
     </DrawerContentScrollView>
   );
 };
+
+const styles = StyleSheet.create({
+  profileHeader: {
+    backgroundColor: colors.gladeGreen,
+    padding: 16,
+    alignItems: 'center',
+  },
+  profileHeaderBg: {
+    width: '100%',
+    height: 120,
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  profileAvatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 2,
+    borderColor: '#fff',
+    marginTop: -92,
+    marginBottom: 8,
+    backgroundColor: '#fff',
+  },
+  profileName: {
+    color: '#fff',
+    fontFamily: 'RobotoMedium',
+    fontSize: 16,
+  },
+});
 
 const MainDrawer = () => {
   return (
@@ -213,7 +298,7 @@ const MainDrawer = () => {
     >
       <Drawer.Screen name="MainTabs" component={HomeTabs} options={{ headerShown: false }} />
       <Drawer.Screen name="AllCrops" component={AllCropsScreen} options={{ title: 'All Crops' }} />
-      <Drawer.Screen name="Favourites" component={FavouritesScreen} options={{ title: 'Favourite List' }} />
+      <Drawer.Screen name="Favourites" component={FavouritesScreen} options={{ title: 'My Favourites' }} />
       <Drawer.Screen name="Nowcast" component={NowcastScreen} options={{ title: 'Nowcast' }} />
       <Drawer.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
       <Drawer.Screen name="LanguageSettings" component={LanguageSettingsScreen} options={{ title: 'Change Language' }} />

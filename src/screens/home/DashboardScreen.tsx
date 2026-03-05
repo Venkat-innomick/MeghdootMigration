@@ -183,11 +183,11 @@ const mergeAdvisories = (primary: any[], secondary: any[]) => {
   return merged;
 };
 
-const isDistrictOnlyRow = (item: any) =>
-  toNum(item?.blockID, item?.BlockID) === 0 &&
-  toNum(item?.asdID, item?.AsdID) === 0 &&
-  !pickText(item?.blockName, item?.BlockName, "") &&
-  !pickText(item?.asdName, item?.AsdName, "");
+const isBlockLevelRow = (item: any) =>
+  toNum(item?.blockID, item?.BlockID) > 0 ||
+  toNum(item?.asdID, item?.AsdID) > 0;
+
+const isDistrictOnlyRow = (item: any) => !isBlockLevelRow(item);
 
 const shapeHomeLocations = (rows: any[]) => {
   const districtRows = rows.filter((item) => isDistrictOnlyRow(item));
@@ -305,7 +305,6 @@ export const DashboardScreen = () => {
   const [locations, setLocations] = useState<DashboardLocation[]>([]);
   const [advisories, setAdvisories] = useState<CropAdvisoryItem[]>([]);
   const [activeTab, setActiveTab] = useState<"block" | "district">("block");
-  const [weatherIndex, setWeatherIndex] = useState(0);
   const carouselRef = useRef<RNFlatList<any> | null>(null);
 
   const openCropAdvisory = (params: Record<string, unknown>) => {
@@ -421,10 +420,17 @@ export const DashboardScreen = () => {
     }, [loadData]),
   );
 
+  const carouselLocations = useMemo(() => {
+    if (activeTab === "block") {
+      return locations.filter((item) => isBlockLevelRow(item as any));
+    }
+    return locations;
+  }, [activeTab, locations]);
+
   const currentLocation = useMemo(() => {
-    if (!locations.length) return null;
-    if (!selectedLocation) return locations[0] as any;
-    const match = locations.find((item: any) => {
+    if (!carouselLocations.length) return null;
+    if (!selectedLocation) return carouselLocations[0] as any;
+    const match = carouselLocations.find((item: any) => {
       const districtID = toNum(item.districtID, item.DistrictID);
       const blockID = toNum(item.blockID, item.BlockID);
       const asdID = toNum(item.asdID, item.AsdID);
@@ -434,13 +440,13 @@ export const DashboardScreen = () => {
         asdID === selectedLocation.asdID
       );
     });
-    return (match || locations[0]) as any;
-  }, [locations, selectedLocation]);
+    return (match || carouselLocations[0]) as any;
+  }, [carouselLocations, selectedLocation]);
 
   const currentLocationIndex = useMemo(() => {
-    if (!locations.length) return 0;
+    if (!carouselLocations.length) return 0;
     if (!currentLocation) return 0;
-    const idx = locations.findIndex((item: any) => {
+    const idx = carouselLocations.findIndex((item: any) => {
       return (
         toNum(item.districtID, item.DistrictID) ===
           toNum(
@@ -457,22 +463,37 @@ export const DashboardScreen = () => {
       );
     });
     return idx >= 0 ? idx : 0;
-  }, [currentLocation, locations]);
+  }, [carouselLocations, currentLocation]);
 
   useEffect(() => {
-    setWeatherIndex(currentLocationIndex);
-  }, [currentLocationIndex]);
-
-  useEffect(() => {
-    if (!locations.length) return;
+    if (!carouselLocations.length) return;
     carouselRef.current?.scrollToIndex({
       index: currentLocationIndex,
       animated: false,
     });
-  }, [currentLocationIndex, locations.length]);
+  }, [currentLocationIndex, carouselLocations.length]);
+
+  const indicatorIndex = useMemo(() => {
+    if (!carouselLocations.length) return 0;
+    return Math.max(
+      0,
+      Math.min(currentLocationIndex, carouselLocations.length - 1),
+    );
+  }, [currentLocationIndex, carouselLocations.length]);
 
   const currentWeatherLocation = useMemo(() => {
     if (!currentLocation) return null;
+    const currentBlockId = toNum(
+      (currentLocation as any)?.blockID,
+      (currentLocation as any)?.BlockID,
+    );
+    const currentAsdId = toNum(
+      (currentLocation as any)?.asdID,
+      (currentLocation as any)?.AsdID,
+    );
+    if (activeTab === "block" && currentBlockId <= 0 && currentAsdId <= 0) {
+      return null;
+    }
     if (activeTab === "district") {
       return (
         (currentLocation as any)?.districtWiseWeatherData || currentLocation
@@ -524,7 +545,7 @@ export const DashboardScreen = () => {
   }, [currentWeatherLocation]);
 
   const advisoryRows = useMemo(() => {
-    if (!currentLocation) return advisories;
+    if (!currentLocation) return [];
     const districtId = toNum(
       (currentLocation as any).districtID,
       (currentLocation as any).DistrictID,
@@ -551,6 +572,11 @@ export const DashboardScreen = () => {
         return rowDistrict === districtId && rowBlock === 0 && rowAsd === 0;
       }
 
+      // Block tab should show data only when selected location is truly block/asd level.
+      if (blockId <= 0 && asdId <= 0) {
+        return false;
+      }
+
       if (asdId > 0) {
         return rowDistrict === districtId && rowAsd === asdId && rowBlock === 0;
       }
@@ -558,7 +584,7 @@ export const DashboardScreen = () => {
     });
   }, [activeTab, advisories, currentLocation]);
 
-  const cardWidth = Math.max(width - 32, 280);
+  const cardWidth = Math.max(width, 280);
 
   if (loading) {
     return (
@@ -604,7 +630,7 @@ export const DashboardScreen = () => {
                       : styles.topTabText
                   }
                 >
-                  Block
+                  Block/ASD
                 </Text>
               </Pressable>
               <Pressable
@@ -626,26 +652,44 @@ export const DashboardScreen = () => {
               </Pressable>
             </View>
 
-            <RNFlatList
-              ref={carouselRef}
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              data={locations}
-              initialScrollIndex={0}
-              keyExtractor={(item: any, index) =>
-                `${toNum(item.stateID, item.StateID)}-${toNum(item.districtID, item.DistrictID)}-${toNum(item.blockID, item.BlockID)}-${toNum(item.asdID, item.AsdID)}-${index}`
-              }
-              getItemLayout={(_, index) => ({
-                length: cardWidth,
-                offset: cardWidth * index,
-                index,
-              })}
-              renderItem={({ item }) => {
+            {carouselLocations.length ? (
+              <RNFlatList
+                ref={carouselRef}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                data={carouselLocations}
+                initialScrollIndex={0}
+                keyExtractor={(item: any, index) =>
+                  `${toNum(item.stateID, item.StateID)}-${toNum(item.districtID, item.DistrictID)}-${toNum(item.blockID, item.BlockID)}-${toNum(item.asdID, item.AsdID)}-${index}`
+                }
+                getItemLayout={(_, index) => ({
+                  length: cardWidth,
+                  offset: cardWidth * index,
+                  index,
+                })}
+                renderItem={({ item }) => {
+                const itemBlockId = toNum((item as any)?.blockID, (item as any)?.BlockID);
+                const itemAsdId = toNum((item as any)?.asdID, (item as any)?.AsdID);
+                const hasBlockLevelForCard = itemBlockId > 0 || itemAsdId > 0;
                 const weatherItem =
                   activeTab === "district"
                     ? (item as any)?.districtWiseWeatherData || item
-                    : item;
+                    : hasBlockLevelForCard
+                      ? item
+                      : null;
+
+                if (!weatherItem) {
+                  return (
+                    <View style={[styles.weatherCardPress, { width: cardWidth }]}>
+                      <View style={styles.noWeatherCard}>
+                        <Text style={styles.noWeatherText}>
+                          No block-level weather data.
+                        </Text>
+                      </View>
+                    </View>
+                  );
+                }
                 const cloudCover = toNum(
                   (weatherItem as any).cloudCover,
                   (weatherItem as any).CloudCover,
@@ -746,130 +790,157 @@ export const DashboardScreen = () => {
                     require("../../../assets/images/Clearsky_new.png");
                 const titleText =
                   activeTab === "district"
-                    ? pickDistrictName(
-                        (item as any)?.districtWiseWeatherData || weatherItem,
-                      ) || "Location"
-                    : pickBlockOrAsdName(weatherItem) ||
-                      pickDistrictName(
-                        (item as any)?.districtWiseWeatherData || weatherItem,
-                      ) ||
-                      "Location";
+                    ? pickText(
+                        (item as any)?.districtWiseWeatherData?.placeName,
+                        (item as any)?.districtWiseWeatherData?.PlaceName,
+                        pickDistrictName(
+                          (item as any)?.districtWiseWeatherData || weatherItem,
+                        ),
+                        "Location",
+                      )
+                    : pickText(
+                        (weatherItem as any)?.placeName,
+                        (weatherItem as any)?.PlaceName,
+                        pickBlockOrAsdName(weatherItem),
+                        pickDistrictName(
+                          (item as any)?.districtWiseWeatherData || weatherItem,
+                        ),
+                        "Location",
+                      );
 
                 return (
                   <View style={[styles.weatherCardPress, { width: cardWidth }]}>
-                    <ImageBackground
-                      source={cardBackground}
-                      style={styles.weatherCard}
-                      imageStyle={styles.weatherCardBg}
-                    >
-                      <Pressable
-                        style={styles.weatherCardTop}
-                        onPress={() => navigation.navigate("Forecast")}
+                    {weatherItem ? (
+                      <ImageBackground
+                        source={cardBackground}
+                        style={styles.weatherCard}
+                        imageStyle={styles.weatherCardBg}
                       >
-                        <Text
-                          style={[styles.placeName, { color: metricColor }]}
+                        <Pressable
+                          style={styles.weatherCardTop}
+                          onPress={() => navigation.navigate("Forecast")}
                         >
-                          {titleText}
-                        </Text>
-                        <Text style={[styles.dateText, { color: metricColor }]}>
-                          {pickText(
-                            (weatherItem as any)?.date,
-                            (weatherItem as any)?.Date,
-                            "-",
-                          )}
-                        </Text>
-                        <Text
-                          style={[styles.minMaxText, { color: metricColor }]}
-                        >
-                          Min{" "}
-                          {pickText(
-                            (weatherItem as any)?.minTemp,
-                            (weatherItem as any)?.MinTemp,
-                            "-",
-                          )}{" "}
-                          C | Max{" "}
-                          {pickText(
-                            (weatherItem as any)?.maxTemp,
-                            (weatherItem as any)?.MaxTemp,
-                            "-",
-                          )}{" "}
-                          C
-                        </Text>
-                        <Text
-                          style={[styles.weatherType, { color: metricColor }]}
-                        >
-                          {pickText(
-                            (weatherItem as any)?.weatherType,
-                            (weatherItem as any)?.WeatherType,
-                            "-",
-                          )}
-                        </Text>
-                      </Pressable>
+                          <Text
+                            style={[styles.placeName, { color: metricColor }]}
+                          >
+                            {titleText}
+                          </Text>
+                          <Text style={[styles.dateText, { color: metricColor }]}>
+                            {pickText(
+                              (weatherItem as any)?.date,
+                              (weatherItem as any)?.Date,
+                              "-",
+                            )}
+                          </Text>
+                          <Text
+                            style={[styles.minMaxText, { color: metricColor }]}
+                          >
+                            Min{" "}
+                            {pickText(
+                              (weatherItem as any)?.minTemp,
+                              (weatherItem as any)?.MinTemp,
+                              "-",
+                            )}{" "}
+                            C | Max{" "}
+                            {pickText(
+                              (weatherItem as any)?.maxTemp,
+                              (weatherItem as any)?.MaxTemp,
+                              "-",
+                            )}{" "}
+                            C
+                          </Text>
+                          <Text
+                            style={[styles.weatherType, { color: metricColor }]}
+                          >
+                            {pickText(
+                              (weatherItem as any)?.weatherType,
+                              (weatherItem as any)?.WeatherType,
+                              "-",
+                            )}
+                          </Text>
+                        </Pressable>
 
-                      <View style={styles.metricsGrid}>
-                        {itemMetrics.map((m, metricIndex) => (
-                          <View key={m.label} style={styles.metricRow}>
-                            <Image
-                              source={m.icon}
-                              style={[
-                                styles.metricIcon,
-                                metricIndex === 3
-                                  ? {
-                                      transform: [
-                                        { rotate: `${windDirectionAngle}deg` },
-                                      ],
-                                    }
-                                  : null,
-                              ]}
-                              resizeMode="contain"
-                            />
-                            <View>
-                              <Text
+                        <View style={styles.metricsGrid}>
+                          {itemMetrics.map((m, metricIndex) => (
+                            <View key={m.label} style={styles.metricRow}>
+                              <Image
+                                source={m.icon}
                                 style={[
-                                  styles.metricLabel,
-                                  { color: metricColor },
+                                  styles.metricIcon,
+                                  metricIndex === 3
+                                    ? {
+                                        transform: [
+                                          { rotate: `${windDirectionAngle}deg` },
+                                        ],
+                                      }
+                                    : null,
                                 ]}
-                              >
-                                {m.label}
-                              </Text>
-                              <Text
-                                style={[
-                                  styles.metricValue,
-                                  { color: metricColor },
-                                ]}
-                              >
-                                {m.value}
-                              </Text>
+                                resizeMode="contain"
+                              />
+                              <View>
+                                <Text
+                                  style={[
+                                    styles.metricLabel,
+                                    { color: metricColor },
+                                  ]}
+                                >
+                                  {m.label}
+                                </Text>
+                                <Text
+                                  style={[
+                                    styles.metricValue,
+                                    { color: metricColor },
+                                  ]}
+                                >
+                                  {m.value}
+                                </Text>
+                              </View>
                             </View>
-                          </View>
-                        ))}
+                          ))}
+                        </View>
+                      </ImageBackground>
+                    ) : (
+                      <View style={styles.noWeatherCard}>
+                        <Text style={styles.noWeatherText}>
+                          No block-level weather data.
+                        </Text>
                       </View>
-                    </ImageBackground>
+                    )}
                   </View>
                 );
-              }}
-              onMomentumScrollEnd={(e) => {
-                const x = e.nativeEvent.contentOffset.x;
-                const index = Math.round(x / cardWidth);
-                const item: any = locations[index];
-                if (!item) return;
-                setWeatherIndex(index);
-                setSelectedLocation({
-                  districtID: toNum(item.districtID, item.DistrictID),
-                  blockID: toNum(item.blockID, item.BlockID),
-                  asdID: toNum(item.asdID, item.AsdID),
-                });
-              }}
-            />
+                }}
+                onMomentumScrollEnd={(e) => {
+                  const x = e.nativeEvent.contentOffset.x;
+                  const index = Math.round(x / cardWidth);
+                  const item: any = carouselLocations[index];
+                  if (!item) return;
+                  setSelectedLocation({
+                    districtID: toNum(item.districtID, item.DistrictID),
+                    blockID: toNum(item.blockID, item.BlockID),
+                    asdID: toNum(item.asdID, item.AsdID),
+                  });
+                }}
+              />
+            ) : (
+              <View style={[styles.weatherCardPress, { width: cardWidth }]}>
+                <View style={styles.noWeatherCard}>
+                  <Text style={styles.noWeatherText}>
+                    {activeTab === "block"
+                      ? "No block-level weather data."
+                      : "No district-level weather data."}
+                  </Text>
+                </View>
+              </View>
+            )}
 
-            {locations.length > 1 ? (
+            {carouselLocations.length > 1 ? (
               <View style={styles.dotsRow}>
-                {locations.map((_, idx) => (
+                {carouselLocations.map((_, idx) => (
                   <View
                     key={`dot-${idx}`}
                     style={[
                       styles.dot,
-                      idx === weatherIndex && styles.dotActive,
+                      idx === indicatorIndex && styles.dotActive,
                     ]}
                   />
                 ))}
@@ -901,7 +972,13 @@ export const DashboardScreen = () => {
               </View>
             ) : null}
 
-            <Text style={styles.recentTitle}>Recent crop advisories</Text>
+            <Text style={styles.recentTitle}>
+              {`Recent crop advisories${pickText(
+                (currentWeatherLocation as any)?.recCropName,
+                (currentWeatherLocation as any)?.RecCropName,
+                "",
+              )}`}
+            </Text>
           </View>
         }
         renderItem={({ item }) => {
@@ -1021,10 +1098,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   weatherCardPress: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 0,
     marginBottom: 16,
   },
   weatherCard: {
+    marginHorizontal: 16,
     borderRadius: 8,
     overflow: "hidden",
     paddingHorizontal: 16,
@@ -1037,6 +1115,21 @@ const styles = StyleSheet.create({
   },
   weatherCardBg: {
     borderRadius: 8,
+  },
+  noWeatherCard: {
+    marginHorizontal: 16,
+    borderRadius: 8,
+    minHeight: 240,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  noWeatherText: {
+    color: colors.muted,
+    fontFamily: "RobotoRegular",
+    fontSize: 14,
   },
   placeName: {
     color: "#fff",

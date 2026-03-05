@@ -242,7 +242,7 @@ export const FavouritesScreen = () => {
 
                 <View style={styles.cardRight}>
                   <View style={styles.titleRow}>
-                    <Text style={styles.title} numberOfLines={2}>
+                    <Text style={styles.title}>
                       {title}
                     </Text>
                     <Text style={styles.date}>{date}</Text>
@@ -254,7 +254,7 @@ export const FavouritesScreen = () => {
                       style={styles.infoIcon}
                       resizeMode="contain"
                     />
-                    <Text style={styles.infoText} numberOfLines={2}>
+                    <Text style={styles.infoText}>
                       {location}
                     </Text>
                   </View>
@@ -265,7 +265,7 @@ export const FavouritesScreen = () => {
                       style={styles.infoIcon}
                       resizeMode="contain"
                     />
-                    <Text style={styles.infoText} numberOfLines={2}>
+                    <Text style={styles.infoText}>
                       {category}
                     </Text>
                   </View>
@@ -317,6 +317,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     paddingVertical: 8,
     paddingHorizontal: 10,
+    paddingRight: 44,
     flexDirection: "row",
   },
   thumb: {
@@ -333,7 +334,8 @@ const styles = StyleSheet.create({
   titleRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start",
+    alignItems: "center",
+    flexWrap: "wrap",
   },
   title: {
     flex: 1,
@@ -341,11 +343,14 @@ const styles = StyleSheet.create({
     fontFamily: "RobotoRegular",
     fontSize: 16,
     marginRight: 8,
+    lineHeight: 22,
   },
   date: {
     color: "#8A8A8A",
     fontFamily: "RobotoRegular",
     fontSize: 12,
+    lineHeight: 16,
+    marginTop: 2,
   },
   infoRow: {
     marginTop: 3,
@@ -362,6 +367,7 @@ const styles = StyleSheet.create({
     color: "#4E4E4E",
     fontFamily: "RobotoRegular",
     fontSize: 14,
+    lineHeight: 20,
   },
   empty: {
     flex: 1,

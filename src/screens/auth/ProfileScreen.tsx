@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActionSheetIOS,
   ActivityIndicator,
@@ -10,6 +10,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  ToastAndroid,
   View,
 } from 'react-native';
 import Constants from 'expo-constants';
@@ -21,6 +22,7 @@ import { useAndroidNavigationBar } from '../../hooks/useAndroidNavigationBar';
 import { API_BASE_URL } from '../../constants/api';
 import { userService } from '../../api/services';
 import { LANGUAGES } from '../../constants/languages';
+import i18n from '../../locales/i18n';
 
 const pickText = (...values: any[]) => {
   for (const value of values) {
@@ -37,11 +39,11 @@ const looksLikeBase64 = (value: string) => {
 };
 
 const resolveProfileImage = (rawPath: string | undefined): ImageSourcePropType => {
-  if (!rawPath || !rawPath.trim()) return require('../../../assets/images/default-profile.png');
+  if (!rawPath || !rawPath.trim()) return require('../../../assets/images/ic_defaultProfile.png');
 
   const value = rawPath.trim();
   if (value.toLowerCase() === 'null' || value.toLowerCase() === 'undefined') {
-    return require('../../../assets/images/default-profile.png');
+    return require('../../../assets/images/ic_defaultProfile.png');
   }
   if (value.startsWith('data:image/')) return { uri: value };
   if (looksLikeBase64(value)) return { uri: `data:image/jpeg;base64,${value}` };
@@ -65,6 +67,7 @@ export const ProfileScreen = () => {
   const user: any = useAppStore((s) => s.user);
   const setUser = useAppStore((s) => s.setUser);
   const languageCode = useAppStore((s) => s.language);
+  const hasLoadedProfileRef = useRef(false);
   const [loading, setLoading] = useState(false);
   const [updatingImage, setUpdatingImage] = useState(false);
 
@@ -76,6 +79,10 @@ export const ProfileScreen = () => {
   useFocusEffect(
     useCallback(() => {
       const loadProfile = async () => {
+        const hasCachedProfile =
+          !!(user?.stateName || user?.StateName || user?.districtName || user?.DistrictName);
+        if (hasLoadedProfileRef.current && hasCachedProfile) return;
+
         const mobile = user?.mobileNumber || user?.LogInId || user?.MobileNumber;
         if (!mobile) return;
 
@@ -116,6 +123,7 @@ export const ProfileScreen = () => {
             ...(data.PanchayatName ? { panchayatName: data.PanchayatName } : {}),
             ...(data.LanguageName ? { languageName: data.LanguageName } : {}),
           } as any);
+          hasLoadedProfileRef.current = true;
         } finally {
           setLoading(false);
         }
@@ -145,7 +153,7 @@ export const ProfileScreen = () => {
     async (base64Image: string) => {
       const userProfileId = Number(user?.typeOfRole ?? user?.TypeOfRole ?? user?.userProfileId ?? user?.UserProfileID ?? 0);
       if (!userProfileId) {
-        Alert.alert('Profile', 'Unable to update image. Please login again.');
+        Alert.alert(i18n.t('profile.title'), i18n.t('profile.loginAgain'));
         return;
       }
 
@@ -158,7 +166,10 @@ export const ProfileScreen = () => {
           });
           const ok = Boolean(response?.isSuccessful ?? response?.IsSuccessful ?? true);
           if (!ok) {
-            Alert.alert('Profile', response?.errorMessage || response?.ErrorMessage || 'Unable to update profile image');
+            Alert.alert(
+              i18n.t('profile.title'),
+              response?.errorMessage || response?.ErrorMessage || i18n.t('profile.unableUpdateImage')
+            );
             return;
           }
         } catch {
@@ -169,6 +180,11 @@ export const ProfileScreen = () => {
           ...(user || {}),
           imagePath: base64Image,
         });
+        if (Platform.OS === 'android') {
+          ToastAndroid.show(i18n.t('profile.imageUpdated'), ToastAndroid.SHORT);
+        } else {
+          Alert.alert(i18n.t('profile.title'), i18n.t('profile.imageUpdated'));
+        }
       } finally {
         setUpdatingImage(false);
       }
@@ -182,7 +198,7 @@ export const ProfileScreen = () => {
       try {
         ImagePicker = require('expo-image-picker');
       } catch {
-        Alert.alert('Profile', 'Install expo-image-picker to enable photo update.');
+        Alert.alert(i18n.t('profile.title'), i18n.t('profile.installImagePicker'));
         return;
       }
 
@@ -190,13 +206,13 @@ export const ProfileScreen = () => {
         const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
         const libraryPermission = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (cameraPermission?.status !== 'granted' || libraryPermission?.status !== 'granted') {
-          Alert.alert('Profile', 'Camera/Photos permission denied.');
+          Alert.alert(i18n.t('profile.title'), i18n.t('profile.cameraPhotosDenied'));
           return;
         }
       } else {
         const libraryPermission = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (libraryPermission?.status !== 'granted') {
-          Alert.alert('Profile', 'Photos permission denied.');
+          Alert.alert(i18n.t('profile.title'), i18n.t('profile.photosDenied'));
           return;
         }
       }
@@ -221,7 +237,7 @@ export const ProfileScreen = () => {
       const asset = result?.assets?.[0];
       const base64Image = asset?.base64 as string | undefined;
       if (!base64Image) {
-        Alert.alert('Profile', 'Unable to read selected image.');
+        Alert.alert(i18n.t('profile.title'), i18n.t('profile.unableReadImage'));
         return;
       }
       await persistProfileImage(base64Image);
@@ -233,7 +249,7 @@ export const ProfileScreen = () => {
     if (Platform.OS === 'ios') {
       ActionSheetIOS.showActionSheetWithOptions(
         {
-          options: ['Cancel', 'Take Photo', 'Choose From Library'],
+          options: [i18n.t('common.cancel'), i18n.t('profile.takePhoto'), i18n.t('profile.chooseFromLibrary')],
           cancelButtonIndex: 0,
         },
         (index) => {
@@ -244,10 +260,10 @@ export const ProfileScreen = () => {
       return;
     }
 
-    Alert.alert('Choose One', '', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Take Photo', onPress: () => pickAndSaveImage('camera') },
-      { text: 'Choose From Library', onPress: () => pickAndSaveImage('library') },
+    Alert.alert(i18n.t('profile.chooseOne'), '', [
+      { text: i18n.t('common.cancel'), style: 'cancel' },
+      { text: i18n.t('profile.takePhoto'), onPress: () => pickAndSaveImage('camera') },
+      { text: i18n.t('profile.chooseFromLibrary'), onPress: () => pickAndSaveImage('library') },
     ]);
   }, [pickAndSaveImage]);
 
@@ -257,24 +273,28 @@ export const ProfileScreen = () => {
         <View style={styles.avatarWrap}>
           <Image source={profileImage} style={styles.avatar} />
           <Pressable style={styles.avatarEditBtn} onPress={onEditProfileImage}>
-            <Text style={styles.avatarEditGlyph}>↑</Text>
+            <Image
+              source={require('../../../assets/images/ic_cameraGallery.png')}
+              style={styles.avatarEditIcon}
+              resizeMode="contain"
+            />
           </Pressable>
         </View>
 
         <View style={styles.contentWrap}>
-          <Text style={styles.sectionTitle}>General</Text>
-          <InfoField label="Name" value={profileName} />
-          <InfoField label="Mobile Number" value={pickText(user?.mobileNumber, user?.LogInId, user?.MobileNumber)} />
+          <Text style={styles.sectionTitle}>{i18n.t('profile.general')}</Text>
+          <InfoField label={i18n.t('profile.name')} value={profileName} />
+          <InfoField label={i18n.t('profile.mobileNumber')} value={pickText(user?.mobileNumber, user?.LogInId, user?.MobileNumber)} />
 
-          <Text style={styles.sectionTitle}>Profile Language</Text>
-          <InfoField label="Language" value={language} />
+          <Text style={styles.sectionTitle}>{i18n.t('profile.profileLanguage')}</Text>
+          <InfoField label={i18n.t('profile.language')} value={language} />
 
-          <Text style={styles.sectionTitle}>Location Details</Text>
-          <InfoField label="State" value={stateName} />
-          <InfoField label="District" value={districtName} />
-          <InfoField label={blockLabel} value={blockName} />
-          <InfoField label="Village" value={pickText(user?.villageName, user?.VillageName)} />
-          <InfoField label="Panchayat" value={pickText(user?.panchayatName, user?.PanchayatName)} divider={false} />
+          <Text style={styles.sectionTitle}>{i18n.t('profile.locationDetails')}</Text>
+          <InfoField label={i18n.t('profile.state')} value={stateName} />
+          <InfoField label={i18n.t('profile.district')} value={districtName} />
+          <InfoField label={blockLabel === 'ASD' ? i18n.t('profile.asd') : i18n.t('profile.block')} value={blockName} />
+          <InfoField label={i18n.t('profile.village')} value={pickText(user?.villageName, user?.VillageName)} />
+          <InfoField label={i18n.t('profile.panchayat')} value={pickText(user?.panchayatName, user?.PanchayatName)} divider={false} />
         </View>
       </ScrollView>
       {loading ? (
@@ -323,9 +343,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   avatarEditIcon: {
-    width: 18,
-    height: 18,
-    tintColor: colors.primary,
+    width: 20,
+    height: 20,
   },
   avatarEditGlyph: {
     color: colors.primary,
