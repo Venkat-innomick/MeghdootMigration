@@ -62,6 +62,14 @@ const pickColor = (...values: any[]) => {
   return '#024764';
 };
 
+const getHomeLikeMetricColor = (cloudCover: number) => {
+  const whiteTheme = cloudCover === 3 || cloudCover === 4;
+  return whiteTheme ? '#FFFFFF' : '#223C67';
+};
+
+const isHomeWhiteTheme = (cloudCover: number) =>
+  cloudCover === 3 || cloudCover === 4;
+
 const localImageMap: Record<string, ImageSourcePropType> = {
   ic_tempweather: require('../../../assets/images/ic_tempWeather.png'),
   temp_blue: require('../../../assets/images/temp_blue.png'),
@@ -157,17 +165,45 @@ const normalizeWeatherItem = (item: any) => {
 };
 
 const getMetricIconsForItem = (item: any) => {
+  const whiteTheme = isHomeWhiteTheme(
+    pickNum(item?.cloudCover, item?.CloudCover, -1),
+  );
   const getIcon = (nameValue: any, fallback: ImageSourcePropType) => {
     const key = normalizeImageKey(nameValue);
     return localImageMap[key] || fallback;
   };
 
   return {
-    temp: getIcon(item.tempImage || item.TempImage, require('../../../assets/images/ic_tempWeather.png')),
-    rainfall: getIcon(item.rainFallImage || item.rainfallImage || item.RainFallImage, require('../../../assets/images/ic_rainfall.png')),
-    humidity: getIcon(item.humidityImage || item.HumidityImage, require('../../../assets/images/ic_humidity.png')),
-    windSpeed: getIcon(item.windSpeedImage || item.WindSpeedImage, require('../../../assets/images/ic_windspeed.png')),
-    windDirection: getIcon(item.windDirectionImage || item.WindDirectionImage, require('../../../assets/images/ic_winddirection.png')),
+    temp: getIcon(
+      item.tempImage || item.TempImage,
+      whiteTheme
+        ? require('../../../assets/images/ic_tempWeather.png')
+        : require('../../../assets/images/temp_blue.png'),
+    ),
+    rainfall: getIcon(
+      item.rainFallImage || item.rainfallImage || item.RainFallImage,
+      whiteTheme
+        ? require('../../../assets/images/ic_rainfall.png')
+        : require('../../../assets/images/ic_pastRainfall.png'),
+    ),
+    humidity: getIcon(
+      item.humidityImage || item.HumidityImage,
+      whiteTheme
+        ? require('../../../assets/images/ic_humidity.png')
+        : require('../../../assets/images/ic_pastHumidity.png'),
+    ),
+    windSpeed: getIcon(
+      item.windSpeedImage || item.WindSpeedImage,
+      whiteTheme
+        ? require('../../../assets/images/ic_windspeed.png')
+        : require('../../../assets/images/ic_pastWindSpeed.png'),
+    ),
+    windDirection: getIcon(
+      item.windDirectionImage || item.WindDirectionImage,
+      whiteTheme
+        ? require('../../../assets/images/wind_direction_wh.png')
+        : require('../../../assets/images/east.png'),
+    ),
   };
 };
 
@@ -249,8 +285,17 @@ export const PastWeatherScreen = () => {
   const selectedLocation = locations[selectedLocationIndex] as any;
   const selectedDay = (days[selectedDayIndex] || {}) as any;
   const heroTextColor = useMemo(
-    () => pickColor(selectedDay.textColor, selectedDay.TextColor),
-    [selectedDay],
+    () =>
+      pickColor(
+        getHomeLikeMetricColor(
+          pickNum(selectedDay.cloudCover, selectedDay.CloudCover, -1),
+        ),
+        selectedDay.textColor,
+        selectedDay.TextColor,
+        selectedLocation?.colorCode,
+        selectedLocation?.ColorCode,
+      ),
+    [selectedDay, selectedLocation],
   );
 
   const locationLabel = useMemo(() => {

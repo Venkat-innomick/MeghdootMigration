@@ -999,10 +999,17 @@ export const DashboardScreen = () => {
                   const index = Math.round(x / cardWidth);
                   const item: any = carouselLocations[index];
                   if (!item) return;
+                  const selectedSource: any =
+                    activeTab === "district"
+                      ? item?.districtWiseWeatherData || item
+                      : item;
                   setSelectedLocation({
-                    districtID: toNum(item.districtID, item.DistrictID),
-                    blockID: toNum(item.blockID, item.BlockID),
-                    asdID: toNum(item.asdID, item.AsdID),
+                    districtID: toNum(
+                      selectedSource?.districtID,
+                      selectedSource?.DistrictID,
+                    ),
+                    blockID: toNum(selectedSource?.blockID, selectedSource?.BlockID),
+                    asdID: toNum(selectedSource?.asdID, selectedSource?.AsdID),
                   });
                 }}
               />
