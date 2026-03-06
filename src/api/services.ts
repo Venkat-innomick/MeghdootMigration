@@ -262,6 +262,13 @@ export const notificationService = {
     );
     return data;
   },
+  deleteToken: async (payload: Record<string, unknown>) => {
+    const { data } = await apiClient.post<ApiResponse>(
+      API_ENDPOINTS.notifications.deleteMobileToken,
+      payload,
+    );
+    return data;
+  },
 };
 
 export const mastersService = {

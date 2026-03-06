@@ -40,6 +40,8 @@ import { CropImagePreviewScreen } from '../screens/crop/CropImagePreviewScreen';
 import { SearchScreen } from '../screens/search/SearchScreen';
 import { LanguageSettingsScreen } from '../screens/menu/LanguageSettingsScreen';
 import { SplashScreen } from '../screens/splash/SplashScreen';
+import { unregisterPushTokenForUser } from '../hooks/usePushNotifications';
+import { rootNavigationRef } from './navigationRef';
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
@@ -218,7 +220,15 @@ const MenuContent = (props: any) => {
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'OK',
-        onPress: () => {
+        onPress: async () => {
+          const userProfileId = Number(
+            user?.userProfileId ??
+              user?.UserProfileID ??
+              user?.typeOfRole ??
+              user?.TypeOfRole ??
+              0
+          );
+          await unregisterPushTokenForUser(userProfileId);
           logout();
           setAndroidNavBar(colors.background, 'dark');
           props.navigation.closeDrawer();
@@ -322,7 +332,7 @@ const MainDrawer = () => {
 
 export const AppNavigator = () => {
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={rootNavigationRef}>
       <RootStack.Navigator initialRouteName="Splash">
         <RootStack.Screen name="Splash" component={SplashScreen} options={{ headerShown: false }} />
         <RootStack.Screen name="Onboarding" component={OnboardingNavigator} options={{ headerShown: false }} />
