@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -13,6 +13,7 @@ import { useAppStore } from "../../store/appStore";
 import { colors } from "../../theme/colors";
 import { useAndroidNavigationBar } from "../../hooks/useAndroidNavigationBar";
 import { getUserProfileId } from "../../utils/locationApi";
+import { useFocusEffect } from "@react-navigation/native";
 
 const pickText = (...values: any[]) => {
   for (const value of values) {
@@ -51,15 +52,25 @@ export const NotificationsScreen = () => {
     }
   }, [userId]);
 
-  useEffect(() => {
-    load().catch(() => setItems([]));
-  }, [load]);
+  useFocusEffect(
+    React.useCallback(() => {
+      load().catch(() => setItems([]));
+      return undefined;
+    }, [load]),
+  );
 
   const clearAll = useCallback(async () => {
     if (!userId) return;
     try {
-      await notificationService.clearNotifications(userId);
+      const response: any = await notificationService.clearNotifications(userId);
+      const ok =
+        response?.isSuccessful ??
+        response?.IsSuccessful ??
+        response?.result?.isSuccessful ??
+        response?.result?.IsSuccessful;
+      if (ok !== true) return;
       setItems([]);
+      setExpanded({});
     } catch {
       // no-op
     }

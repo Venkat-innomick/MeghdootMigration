@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -12,6 +12,7 @@ import { useAppStore } from "../../store/appStore";
 import { colors } from "../../theme/colors";
 import { useAndroidNavigationBar } from "../../hooks/useAndroidNavigationBar";
 import { getUserProfileId } from "../../utils/locationApi";
+import { useFocusEffect } from "@react-navigation/native";
 
 const pickText = (...values: any[]) => {
   for (const value of values) {
@@ -28,7 +29,8 @@ export const NowcastScreen = () => {
   const [items, setItems] = useState<any[]>([]);
   const userId = useMemo(() => getUserProfileId(user), [user]);
 
-  useEffect(() => {
+  useFocusEffect(
+    React.useCallback(() => {
     const load = async () => {
       if (!userId) return;
       setLoading(true);
@@ -49,7 +51,9 @@ export const NowcastScreen = () => {
     };
 
     load().catch(() => setItems([]));
-  }, [userId]);
+    return undefined;
+  }, [userId])
+  );
 
   const content = useMemo(() => {
     if (loading) {

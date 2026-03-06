@@ -94,15 +94,6 @@ export const SearchScreen = () => {
     });
   };
 
-  const syncUserLocations = async () => {
-    if (!userId) return [];
-    const payload = buildByLocationPayload(userId, languageLabel);
-    const weather = await weatherService.getByLocation(payload);
-    const list = parseLocationWeatherList(weather) as any[];
-    setAppLocations(list);
-    return list;
-  };
-
   const moveToHomeForItem = async (item: SearchBlockItem) => {
     setSelectedLocation({
       districtID: item.districtID,
@@ -343,15 +334,34 @@ export const SearchScreen = () => {
         );
         return;
       }
-      const refreshed = await refreshFavouriteFlags(blocks);
-      setBlocks(
-        refreshed.map((b) =>
+      setBlocks((prev) =>
+        prev.map((b) =>
           b.blockID === item.blockID && b.districtID === item.districtID
             ? { ...b, favourite: true }
             : b,
         ),
       );
-      await syncUserLocations();
+      const currentLocations = useAppStore.getState().locations || [];
+      const exists = currentLocations.some(
+          (loc) =>
+            toNum((loc as any)?.districtID ?? (loc as any)?.DistrictID) ===
+              item.districtID &&
+            toNum((loc as any)?.blockID ?? (loc as any)?.BlockID) ===
+              (item.isAsd ? 0 : item.blockID) &&
+            toNum((loc as any)?.asdID ?? (loc as any)?.AsdID) ===
+              (item.isAsd ? item.blockID : 0),
+      );
+      if (!exists) {
+        setAppLocations([
+          ...currentLocations,
+          {
+            stateID: item.stateID,
+            districtID: item.districtID,
+            blockID: item.isAsd ? 0 : item.blockID,
+            asdID: item.isAsd ? item.blockID : 0,
+          },
+        ]);
+      }
     } catch (e: any) {
       Alert.alert("Failed", e.message || "Unable to add location");
     }
@@ -384,15 +394,28 @@ export const SearchScreen = () => {
         );
         return;
       }
-      const refreshed = await refreshFavouriteFlags(blocks);
-      setBlocks(
-        refreshed.map((b) =>
+      setBlocks((prev) =>
+        prev.map((b) =>
           b.blockID === item.blockID && b.districtID === item.districtID
             ? { ...b, favourite: false }
             : b,
         ),
       );
-      await syncUserLocations();
+      const currentLocations = useAppStore.getState().locations || [];
+      setAppLocations(
+        currentLocations.filter((loc) => {
+          const districtID = toNum(
+            (loc as any)?.districtID ?? (loc as any)?.DistrictID,
+          );
+          const blockID = toNum((loc as any)?.blockID ?? (loc as any)?.BlockID);
+          const asdID = toNum((loc as any)?.asdID ?? (loc as any)?.AsdID);
+          return !(
+            districtID === item.districtID &&
+            blockID === (item.isAsd ? 0 : item.blockID) &&
+            asdID === (item.isAsd ? item.blockID : 0)
+          );
+        }),
+      );
     } catch (e: any) {
       Alert.alert("Failed", e.message || "Unable to delete location");
     }
@@ -402,7 +425,6 @@ export const SearchScreen = () => {
     setLoading(true);
     try {
       if (item.favourite) {
-        await syncUserLocations();
         setTemporarySearchData({ locations: [], advisories: [] });
         await moveToHomeForItem(item);
         return;

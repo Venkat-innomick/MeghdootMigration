@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { Swipeable } from "react-native-gesture-handler";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import Constants from "expo-constants";
 import { Screen } from "../../components/Screen";
 import { colors } from "../../theme/colors";
 import { cropService } from "../../api/services";
@@ -20,6 +21,7 @@ import { useAppStore } from "../../store/appStore";
 import { useAndroidNavigationBar } from "../../hooks/useAndroidNavigationBar";
 import { getLanguageLabel, getUserProfileId } from "../../utils/locationApi";
 import { API_REFRESH_DATES } from "../../utils/apiDates";
+import { API_BASE_URL } from "../../constants/api";
 
 const pickText = (...values: any[]) => {
   for (const value of values) {
@@ -44,13 +46,21 @@ const pickNum = (...values: any[]) => {
 
 const pickUri = (...values: any[]) => {
   for (const value of values) {
+    if (typeof value !== "string" || !value.trim()) continue;
+    const raw = value.trim();
     if (
-      typeof value === "string" &&
-      (value.startsWith("http://") ||
-        value.startsWith("https://") ||
-        value.startsWith("file://"))
+      raw.startsWith("http://") ||
+      raw.startsWith("https://") ||
+      raw.startsWith("file://")
     ) {
-      return value;
+      return raw;
+    }
+    if (!raw.includes("://")) {
+      const base = (
+        (Constants.expoConfig?.extra?.apiBaseUrl as string | undefined) ||
+        API_BASE_URL
+      ).replace(/\/+$/, "");
+      return `${base}/${raw.replace(/^\/+/, "")}`;
     }
   }
   return "";
@@ -122,10 +132,6 @@ export const FavouritesScreen = () => {
     }
   }, [languageLabel, userId]);
 
-  useEffect(() => {
-    load().catch(() => setItems([]));
-  }, [load]);
-
   useFocusEffect(
     useCallback(() => {
       load().catch(() => setItems([]));
@@ -147,13 +153,12 @@ export const FavouritesScreen = () => {
               UserProfileID: userId,
             };
             const response: any = await cropService.removeFavourite(payload);
-            const ok = Boolean(
+            const okRaw =
               response?.IsSuccessful ??
-                response?.isSuccessful ??
-                response?.result?.IsSuccessful ??
-                response?.result?.isSuccessful ??
-                true,
-            );
+              response?.isSuccessful ??
+              response?.result?.IsSuccessful ??
+              response?.result?.isSuccessful;
+            const ok = typeof okRaw === "boolean" ? okRaw : false;
             if (!ok) {
               Alert.alert(
                 "Delete failed",

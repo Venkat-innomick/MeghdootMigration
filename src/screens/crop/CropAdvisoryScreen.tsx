@@ -14,12 +14,14 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
+import Constants from 'expo-constants';
 import { Screen } from '../../components/Screen';
 import { colors } from '../../theme/colors';
 import { cropService } from '../../api/services';
 import { useAppStore } from '../../store/appStore';
-import { getLanguageLabel } from '../../utils/locationApi';
+import { getLanguageLabel, getUserProfileId } from '../../utils/locationApi';
 import { API_REFRESH_DATES } from '../../utils/apiDates';
+import { API_BASE_URL } from '../../constants/api';
 
 const pickText = (...values: any[]) => {
   for (const value of values) {
@@ -39,8 +41,17 @@ const pickNum = (...values: any[]) => {
 
 const pickUri = (...values: any[]) => {
   for (const value of values) {
-    if (typeof value === 'string' && (value.startsWith('http://') || value.startsWith('https://') || value.startsWith('file://'))) {
-      return value;
+    if (typeof value !== 'string' || !value.trim()) continue;
+    const raw = value.trim();
+    if (raw.startsWith('http://') || raw.startsWith('https://') || raw.startsWith('file://')) {
+      return raw;
+    }
+    if (!raw.includes('://')) {
+      const base = (
+        (Constants.expoConfig?.extra?.apiBaseUrl as string | undefined) ||
+        API_BASE_URL
+      ).replace(/\/+$/, '');
+      return `${base}/${raw.replace(/^\/+/, '')}`;
     }
   }
   return '';
@@ -110,7 +121,7 @@ export const CropAdvisoryScreen = () => {
   );
 
   const userProfileId = useMemo(
-    () => user?.typeOfRole || user?.userProfileId || 0,
+    () => getUserProfileId(user),
     [user]
   );
 
@@ -270,8 +281,13 @@ export const CropAdvisoryScreen = () => {
 
           try {
             setFavouriteBusy(true);
-            const response = await cropService.toggleFavourite(payload);
-            if (response.isSuccessful === false) return;
+            const response: any = await cropService.toggleFavourite(payload);
+            const success =
+              response?.isSuccessful ??
+              response?.IsSuccessful ??
+              response?.result?.isSuccessful ??
+              response?.result?.IsSuccessful;
+            if (success !== true) return;
 
             setItems((prev) =>
               prev.map((item, i) => {
@@ -393,7 +409,22 @@ export const CropAdvisoryScreen = () => {
             {audios.length ? (
               <Pressable
                 style={styles.actionItem}
-                onPress={() => openAudioPopup(pickText(audios[0]?.imagePath, audios[0]?.ImagePath, audios[0]?.audioPath, audios[0]?.AudioPath))}
+                onPress={() =>
+                  openAudioPopup(
+                    pickUri(
+                      audios[0]?.imagePath,
+                      audios[0]?.ImagePath,
+                      audios[0]?.audioPath,
+                      audios[0]?.AudioPath
+                    ) ||
+                      pickText(
+                        audios[0]?.imagePath,
+                        audios[0]?.ImagePath,
+                        audios[0]?.audioPath,
+                        audios[0]?.AudioPath
+                      )
+                  )
+                }
               >
                 <Image source={require('../../../assets/images/ic_audio.png')} style={styles.actionIcon} resizeMode="contain" />
                 <Text style={styles.actionText}>Audio</Text>
@@ -505,7 +536,12 @@ export const CropAdvisoryScreen = () => {
                       <Pressable
                         key={`aud-${i}`}
                         style={styles.audioTile}
-                        onPress={() => openAudioPopup(pickText(item.imagePath, item.ImagePath, item.audioPath, item.AudioPath))}
+                        onPress={() =>
+                          openAudioPopup(
+                            pickUri(item.imagePath, item.ImagePath, item.audioPath, item.AudioPath) ||
+                              pickText(item.imagePath, item.ImagePath, item.audioPath, item.AudioPath)
+                          )
+                        }
                       >
                         <Image source={require('../../../assets/images/speaker.png')} style={styles.audioIcon} resizeMode="contain" />
                       </Pressable>

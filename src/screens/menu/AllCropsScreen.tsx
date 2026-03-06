@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -8,7 +8,11 @@ import {
   Text,
   View,
 } from "react-native";
-import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import {
+  useFocusEffect,
+  useNavigation,
+} from "@react-navigation/native";
+import Constants from "expo-constants";
 import { Screen } from "../../components/Screen";
 import { colors } from "../../theme/colors";
 import { cropService } from "../../api/services";
@@ -16,6 +20,7 @@ import { useAppStore } from "../../store/appStore";
 import { useAndroidNavigationBar } from "../../hooks/useAndroidNavigationBar";
 import { getLanguageLabel, getUserProfileId } from "../../utils/locationApi";
 import { API_REFRESH_DATES } from "../../utils/apiDates";
+import { API_BASE_URL } from "../../constants/api";
 
 const pickText = (...values: any[]) => {
   for (const value of values) {
@@ -39,13 +44,31 @@ const pickNum = (...values: any[]) => {
 
 const pickUri = (...values: any[]) => {
   for (const value of values) {
+    if (typeof value !== "string" || !value.trim()) continue;
+    const raw = value.trim();
     if (
-      typeof value === "string" &&
-      (value.startsWith("http://") ||
-        value.startsWith("https://") ||
-        value.startsWith("file://"))
+      raw.startsWith("http://") ||
+      raw.startsWith("https://") ||
+      raw.startsWith("file://")
     ) {
-      return value;
+      return raw;
+    }
+    // Old Xamarin used server-provided CropImageURL values directly.
+    // Resolve relative URL against API base in RN.
+    if (raw.startsWith("/")) {
+      const base = (
+        (Constants.expoConfig?.extra?.apiBaseUrl as string | undefined) ||
+        API_BASE_URL
+      ).replace(/\/+$/, "");
+      return `${base}${raw}`;
+    }
+    // Some API rows return relative path without leading slash.
+    if (!raw.includes("://")) {
+      const base = (
+        (Constants.expoConfig?.extra?.apiBaseUrl as string | undefined) ||
+        API_BASE_URL
+      ).replace(/\/+$/, "");
+      return `${base}/${raw.replace(/^\/+/, "")}`;
     }
   }
   return "";
@@ -71,6 +94,7 @@ export const AllCropsScreen = () => {
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<any[]>([]);
   const hasLoadedRef = useRef(false);
+  const lastLanguageRef = useRef(languageLabel);
 
   const openCropAdvisory = (params: Record<string, unknown>) => {
     const parent = navigation.getParent?.();
@@ -120,6 +144,13 @@ export const AllCropsScreen = () => {
       setLoading(false);
     }
   }, [languageLabel, userId]);
+
+  useEffect(() => {
+    if (lastLanguageRef.current !== languageLabel) {
+      lastLanguageRef.current = languageLabel;
+      hasLoadedRef.current = false;
+    }
+  }, [languageLabel]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -201,15 +232,13 @@ export const AllCropsScreen = () => {
                 style={styles.cropImage}
                 resizeMode="cover"
               />
-              <Text style={styles.cropName}>
-                {name}
-              </Text>
+              <Text style={styles.cropName}>{name || "--"}</Text>
             </Pressable>
           );
         }}
       />
     );
-  }, [items, loading, navigation]);
+  }, [items, loading]);
 
   return <Screen>{content}</Screen>;
 };
