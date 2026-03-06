@@ -170,7 +170,7 @@ const getForecastRows = (rawPayload: any) =>
   ]);
 
 const getLocationIds = (location: any) => ({
-  // Forecast tab in old Xamarin uses Temp* ids as primary source.
+  // Xamarin ForecastView uses Temp* IDs as primary for location payload.
   stateID: pickNum(location?.tempStateID, location?.TempStateID, location?.stateID, location?.StateID),
   districtID: pickNum(location?.tempDistrictID, location?.TempDistrictID, location?.districtID, location?.DistrictID),
   blockID: pickNum(location?.tempBlockID, location?.TempBlockID, location?.blockID, location?.BlockID),
@@ -192,9 +192,7 @@ export const ForecastScreen = () => {
   useAndroidNavigationBar(colors.darkGreen, 'light');
   const user = useAppStore((s) => s.user);
   const language = useAppStore((s) => s.language);
-  const setAppLocations = useAppStore((s) => s.setLocations);
   const selectedLocationRef = useAppStore((s) => s.selectedLocation);
-  const setSelectedLocation = useAppStore((s) => s.setSelectedLocation);
   const userId = getUserProfileId(user);
   const languageLabel = getLanguageLabel(language);
 
@@ -257,7 +255,6 @@ export const ForecastScreen = () => {
     const rawList = parseLocationWeatherList(response) as DashboardLocation[];
     const list = dedupeForecastLocations(rawList as any[]) as DashboardLocation[];
     setLocations(list);
-    setAppLocations(list);
     if (list.length) {
       const selectedIndex = selectedLocationRef
         ? list.findIndex((loc: any) => {
@@ -274,13 +271,7 @@ export const ForecastScreen = () => {
         : -1;
       const indexToUse = selectedIndex >= 0 ? selectedIndex : 0;
       const target = list[indexToUse] as any;
-      const ids = getLocationIds(target);
       setSelectedLocationIndex(indexToUse);
-      setSelectedLocation({
-        districtID: ids.districtID,
-        blockID: ids.blockID,
-        asdID: ids.asdID,
-      });
       await loadWeatherForLocation(target);
     } else {
       setDays([]);
@@ -321,22 +312,36 @@ export const ForecastScreen = () => {
     React.useCallback(() => {
       const cachedLocations = useAppStore.getState().locations;
       if (cachedLocations?.length) {
-        setLocations(cachedLocations as DashboardLocation[]);
+        const list = dedupeForecastLocations(cachedLocations as any[]) as DashboardLocation[];
+        setLocations(list);
+        if (list.length) {
+          const selectedIndex = selectedLocationRef
+            ? list.findIndex((loc: any) => {
+                const ids = getLocationIds(loc);
+                return (
+                  ids.districtID === selectedLocationRef.districtID &&
+                  ids.blockID === selectedLocationRef.blockID &&
+                  ids.asdID === selectedLocationRef.asdID
+                );
+              })
+            : -1;
+          const indexToUse = selectedIndex >= 0 ? selectedIndex : 0;
+          const target = list[indexToUse] as any;
+          setSelectedLocationIndex(indexToUse);
+          loadWeatherForLocation(target);
+        } else {
+          setDays([]);
+        }
+        return;
       }
       loadLocations();
-    }, [languageLabel, userId]),
+    }, [languageLabel, userId, selectedLocationRef]),
   );
 
   const selectLocation = async (index: number) => {
     const location = locations[index] as any;
-    const ids = getLocationIds(location);
     setSelectedLocationIndex(index);
     setPickerOpen(false);
-    setSelectedLocation({
-      districtID: ids.districtID,
-      blockID: ids.blockID,
-      asdID: ids.asdID,
-    });
     await loadWeatherForLocation(location);
   };
 

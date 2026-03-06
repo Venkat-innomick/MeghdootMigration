@@ -364,7 +364,9 @@ export const DashboardScreen = () => {
         currentSelected,
       );
       setLocations(nextLocations);
-      setAppLocations(locationList);
+      // Keep shared locations aligned with the rendered Home carousel list
+      // so Forecast/PastWeather read the same ordering/content as Home.
+      setAppLocations(nextLocations as DashboardLocation[]);
       if (locationList.length > 0) {
         const match = currentSelected
           ? nextLocations.find((item: any) => {
@@ -881,7 +883,27 @@ export const DashboardScreen = () => {
                       >
                         <Pressable
                           style={styles.weatherCardTop}
-                          onPress={() => navigation.navigate("Forecast")}
+                          onPress={() => {
+                            const selectedSource: any =
+                              activeTab === "district"
+                                ? (item as any)?.districtWiseWeatherData || weatherItem
+                                : item;
+                            setSelectedLocation({
+                              districtID: toNum(
+                                selectedSource?.districtID,
+                                selectedSource?.DistrictID,
+                              ),
+                              blockID: toNum(
+                                selectedSource?.blockID,
+                                selectedSource?.BlockID,
+                              ),
+                              asdID: toNum(
+                                selectedSource?.asdID,
+                                selectedSource?.AsdID,
+                              ),
+                            });
+                            navigation.navigate("Forecast");
+                          }}
                         >
                           <Text
                             style={[styles.placeName, { color: metricColor }]}

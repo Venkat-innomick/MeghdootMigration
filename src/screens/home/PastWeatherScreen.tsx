@@ -209,17 +209,21 @@ const getPastWeatherRows = (rawPayload: any) => {
 };
 
 const getLocationIds = (location: any) => ({
-  stateID: pickNum(location?.stateID, location?.StateID, location?.tempStateID, location?.TempStateID),
-  districtID: pickNum(location?.districtID, location?.DistrictID, location?.tempDistrictID, location?.TempDistrictID),
-  blockID: pickNum(location?.blockID, location?.BlockID, location?.tempBlockID, location?.TempBlockID),
-  asdID: pickNum(location?.asdID, location?.AsdID, location?.tempAsdID, location?.TempAsdID),
+  // Xamarin ForecastView builds weather payload location object with Temp* IDs.
+  stateID: pickNum(location?.tempStateID, location?.TempStateID, location?.stateID, location?.StateID),
+  districtID: pickNum(location?.tempDistrictID, location?.TempDistrictID, location?.districtID, location?.DistrictID),
+  blockID: pickNum(location?.tempBlockID, location?.TempBlockID, location?.blockID, location?.BlockID),
+  asdID: pickNum(location?.tempAsdID, location?.TempAsdID, location?.asdID, location?.AsdID),
 });
 
 const dedupePastWeatherLocations = (items: any[]) => {
   // Old Xamarin Past Weather dedupes only by state + district.
   const seen = new Set<string>();
   return items.filter((item) => {
-    const ids = getLocationIds(item);
+    const ids = {
+      stateID: pickNum(item?.stateID, item?.StateID, item?.tempStateID, item?.TempStateID),
+      districtID: pickNum(item?.districtID, item?.DistrictID, item?.tempDistrictID, item?.TempDistrictID),
+    };
     const key = `${ids.stateID}-${ids.districtID}`;
     if (seen.has(key)) return false;
     seen.add(key);
@@ -231,9 +235,7 @@ export const PastWeatherScreen = () => {
   useAndroidNavigationBar(colors.darkGreen, 'light');
   const user = useAppStore((s) => s.user);
   const language = useAppStore((s) => s.language);
-  const setAppLocations = useAppStore((s) => s.setLocations);
   const selectedLocationRef = useAppStore((s) => s.selectedLocation);
-  const setSelectedLocation = useAppStore((s) => s.setSelectedLocation);
   const userId = getUserProfileId(user);
   const languageLabel = getLanguageLabel(language);
 
@@ -279,30 +281,21 @@ export const PastWeatherScreen = () => {
     const rawList = parseLocationWeatherList(response) as DashboardLocation[];
     const list = dedupePastWeatherLocations(rawList as any[]) as DashboardLocation[];
     setLocations(list);
-    setAppLocations(list);
     if (list.length) {
       const selectedIndex = selectedLocationRef
         ? list.findIndex((loc: any) => {
-            const ids = getLocationIds(loc);
-            const districtID = ids.districtID;
-            const blockID = ids.blockID;
-            const asdID = ids.asdID;
-            return (
-              districtID === selectedLocationRef.districtID &&
-              blockID === selectedLocationRef.blockID &&
-              asdID === selectedLocationRef.asdID
+            const districtID = pickNum(
+              loc?.districtID,
+              loc?.DistrictID,
+              loc?.tempDistrictID,
+              loc?.TempDistrictID,
             );
+            return districtID === selectedLocationRef.districtID;
           })
         : -1;
       const indexToUse = selectedIndex >= 0 ? selectedIndex : 0;
       const target = list[indexToUse] as any;
-      const ids = getLocationIds(target);
       setSelectedLocationIndex(indexToUse);
-      setSelectedLocation({
-        districtID: ids.districtID,
-        blockID: ids.blockID,
-        asdID: ids.asdID,
-      });
       await loadWeatherForLocation(target);
     } else {
       setDays([]);
@@ -343,22 +336,37 @@ export const PastWeatherScreen = () => {
     React.useCallback(() => {
       const cachedLocations = useAppStore.getState().locations;
       if (cachedLocations?.length) {
-        setLocations(cachedLocations as DashboardLocation[]);
+        const list = dedupePastWeatherLocations(cachedLocations as any[]) as DashboardLocation[];
+        setLocations(list);
+        if (list.length) {
+          const selectedIndex = selectedLocationRef
+            ? list.findIndex((loc: any) => {
+                const districtID = pickNum(
+                  loc?.districtID,
+                  loc?.DistrictID,
+                  loc?.tempDistrictID,
+                  loc?.TempDistrictID,
+                );
+                return districtID === selectedLocationRef.districtID;
+              })
+            : -1;
+          const indexToUse = selectedIndex >= 0 ? selectedIndex : 0;
+          const target = list[indexToUse] as any;
+          setSelectedLocationIndex(indexToUse);
+          loadWeatherForLocation(target);
+        } else {
+          setDays([]);
+        }
+        return;
       }
       loadLocations();
-    }, [languageLabel, userId]),
+    }, [languageLabel, userId, selectedLocationRef]),
   );
 
   const selectLocation = async (index: number) => {
     const location = locations[index] as any;
-    const ids = getLocationIds(location);
     setSelectedLocationIndex(index);
     setPickerOpen(false);
-    setSelectedLocation({
-      districtID: ids.districtID,
-      blockID: ids.blockID,
-      asdID: ids.asdID,
-    });
     await loadWeatherForLocation(location);
   };
 
