@@ -65,6 +65,11 @@ const pickUri = (...values: any[]) => {
   return '';
 };
 
+const getHomeLikeMetricColor = (cloudCover: number) => {
+  const whiteTheme = cloudCover === 3 || cloudCover === 4;
+  return whiteTheme ? '#FFFFFF' : '#223C67';
+};
+
 const normalizeImageKey = (value: unknown) => {
   if (typeof value !== 'string' || !value.trim()) return '';
   const file = value.split('/').pop() || value;
@@ -73,26 +78,36 @@ const normalizeImageKey = (value: unknown) => {
 };
 
 const locationBgImageMap: Record<string, ImageSourcePropType> = {
-  Clearsky_new: require('../../../assets/images/Clearsky_new.png'),
-  Mainly_Clear: require('../../../assets/images/Mainly_Clear.png'),
-  Partly_Cloudy: require('../../../assets/images/Partly_Cloudy.png'),
+  clearsky_new: require('../../../assets/images/Clearsky_new.png'),
+  mainly_clear: require('../../../assets/images/Mainly_Clear.png'),
+  partly_cloudy: require('../../../assets/images/Partly_Cloudy.png'),
   generally_cloudy: require('../../../assets/images/generally_cloudy.png'),
-  Cloudy: require('../../../assets/images/Cloudy.png'),
+  cloudy: require('../../../assets/images/Cloudy.png'),
 };
 
-const cloudImageNameByCover = (cloudCover: number) => {
+const cloudKeyByCover = (cloudCover: number) => {
   if (cloudCover < 0) return '';
-  if (cloudCover === 0) return 'Clearsky_new';
-  if (cloudCover === 1 || cloudCover === 2) return 'Mainly_Clear';
-  if (cloudCover === 3 || cloudCover === 4) return 'Partly_Cloudy';
+  if (cloudCover === 0) return 'clearsky_new';
+  if (cloudCover === 1 || cloudCover === 2) return 'mainly_clear';
+  if (cloudCover === 3 || cloudCover === 4) return 'partly_cloudy';
   if (cloudCover === 5 || cloudCover === 6 || cloudCover === 7) return 'generally_cloudy';
-  return 'Cloudy';
+  return 'cloudy';
+};
+
+const cloudKeyByWeatherText = (value: string) => {
+  const text = value.toLowerCase();
+  if (text.includes('clear')) return 'clearsky_new';
+  if (text.includes('partly')) return 'partly_cloudy';
+  if (text.includes('mainly')) return 'mainly_clear';
+  if (text.includes('cloud')) return 'generally_cloudy';
+  return '';
 };
 
 const pickXamarinCloudImageName = (item: any) => {
   const direct = toText(item.cloudImage ?? item.CloudImage);
-  if (direct && locationBgImageMap[direct]) return direct;
-  return cloudImageNameByCover(toNum(item.cloudCover ?? item.CloudCover, -1));
+  const directKey = normalizeImageKey(direct);
+  if (directKey && locationBgImageMap[directKey]) return directKey;
+  return cloudKeyByCover(toNum(item.cloudCover ?? item.CloudCover, -1));
 };
 
 const isDistrictOnlyRow = (item: LocationRow) =>
@@ -532,11 +547,16 @@ export const LocationsScreen = () => {
 
   const renderCardBody = (item: LocationRow) => {
     const uri = pickUri(item.cloudImage);
+    const weatherKey =
+      normalizeImageKey(item.cloudImage) ||
+      cloudKeyByCover(item.cloudCover) ||
+      cloudKeyByWeatherText(item.weatherType || '');
     const source =
       uri
         ? { uri }
-        : locationBgImageMap[item.cloudImage] ||
+        : locationBgImageMap[weatherKey] ||
           require('../../../assets/images/Clearsky_new.png');
+    const textColor = getHomeLikeMetricColor(item.cloudCover);
 
     return (
       <ImageBackground
@@ -544,10 +564,17 @@ export const LocationsScreen = () => {
         style={styles.card}
         imageStyle={styles.cardBg}
       >
-        <Text style={[styles.cityText, { color: item.colorCode || '#fff' }]} numberOfLines={1}>
-          {item.cityName || 'Location'}
-        </Text>
-        <Text style={[styles.stateText, { color: item.colorCode || '#fff' }]} numberOfLines={1}>
+        <View style={styles.cityRow}>
+          <Image
+            source={require('../../../assets/images/ic_location.png')}
+            style={[styles.cityIcon, { tintColor: textColor }]}
+            resizeMode="contain"
+          />
+          <Text style={[styles.cityText, { color: textColor }]} numberOfLines={1}>
+            {item.cityName || 'Location'}
+          </Text>
+        </View>
+        <Text style={[styles.stateText, { color: textColor }]} numberOfLines={1}>
           {item.stateName || '--'}
         </Text>
       </ImageBackground>
@@ -787,6 +814,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 19,
   },
   cardBg: { borderRadius: 10, resizeMode: 'cover' },
+  cityRow: { flexDirection: 'row', alignItems: 'center' },
+  cityIcon: { width: 15, height: 15, marginRight: 6 },
   cityText: { color: '#fff', fontFamily: 'RobotoMedium', fontSize: 16 },
   stateText: { color: '#fff', fontFamily: 'RobotoRegular', fontSize: 14, marginTop: 2 },
   swipeDelete: {
