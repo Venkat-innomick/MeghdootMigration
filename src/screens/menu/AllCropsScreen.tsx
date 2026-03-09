@@ -13,6 +13,7 @@ import {
   useNavigation,
 } from "@react-navigation/native";
 import Constants from "expo-constants";
+import { useTranslation } from "react-i18next";
 import { Screen } from "../../components/Screen";
 import { colors } from "../../theme/colors";
 import { cropService } from "../../api/services";
@@ -85,6 +86,7 @@ const pickList = (payload: any, keys: string[]) => {
 
 export const AllCropsScreen = () => {
   useAndroidNavigationBar(colors.background, "dark");
+  const { t } = useTranslation();
   const navigation = useNavigation<any>();
   const user = useAppStore((s) => s.user);
   const language = useAppStore((s) => s.language);
@@ -172,7 +174,7 @@ export const AllCropsScreen = () => {
     }
 
     if (!items.length) {
-      return <Text style={styles.empty}>No data currently available.</Text>;
+      return <Text style={styles.empty}>{t("crop.noDataCurrentlyAvailable")}</Text>;
     }
 
     return (
@@ -238,7 +240,7 @@ export const AllCropsScreen = () => {
         }}
       />
     );
-  }, [items, loading]);
+  }, [items, loading, t]);
 
   return <Screen>{content}</Screen>;
 };

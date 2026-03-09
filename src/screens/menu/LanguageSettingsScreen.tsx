@@ -7,16 +7,18 @@ import { spacing } from "../../theme/spacing";
 import { colors } from "../../theme/colors";
 import i18n from "../../locales/i18n";
 import { useAndroidNavigationBar } from "../../hooks/useAndroidNavigationBar";
+import { useTranslation } from "react-i18next";
 
 export const LanguageSettingsScreen = () => {
   useAndroidNavigationBar(colors.background, "dark");
+  const { t } = useTranslation();
   const current = useAppStore((s) => s.language);
   const setLanguage = useAppStore((s) => s.setLanguage);
 
   return (
     <Screen>
       <View style={styles.container}>
-        <Text style={styles.title}>Change Language</Text>
+        <Text style={styles.title}>{t("menu.language")}</Text>
         <FlatList
           data={LANGUAGES}
           keyExtractor={(item) => item.code}

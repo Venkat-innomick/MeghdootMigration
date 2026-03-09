@@ -4,6 +4,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Audio, AVPlaybackStatus } from 'expo-av';
 import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
+import { useTranslation } from 'react-i18next';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CropAudioPlayer'>;
 
@@ -15,7 +16,8 @@ const formatTime = (ms: number) => {
 };
 
 export const CropAudioPlayerScreen = ({ navigation, route }: Props) => {
-  const { title = 'Audio', imageUrl = '', audioUrl = '' } = route.params;
+  const { t } = useTranslation();
+  const { title = t('crop.audio'), imageUrl = '', audioUrl = '' } = route.params;
   const validImageUrl =
     typeof imageUrl === 'string' &&
     imageUrl.trim() &&
@@ -44,7 +46,7 @@ export const CropAudioPlayerScreen = ({ navigation, route }: Props) => {
       const onStatus = (status: AVPlaybackStatus) => {
         if (!mounted) return;
         if (!status.isLoaded) {
-          if (status.error) setStatusText('error...');
+          if (status.error) setStatusText(t('crop.statusError'));
           return;
         }
 
@@ -52,10 +54,10 @@ export const CropAudioPlayerScreen = ({ navigation, route }: Props) => {
         setDuration(status.durationMillis || 0);
         setIsPlaying(!!status.isPlaying);
 
-        if (status.isBuffering) setStatusText('loading...');
-        else if (status.didJustFinish) setStatusText('completed...');
-        else if (status.isPlaying) setStatusText('playing...');
-        else setStatusText('paused...');
+        if (status.isBuffering) setStatusText(t('crop.statusLoading'));
+        else if (status.didJustFinish) setStatusText(t('crop.statusCompleted'));
+        else if (status.isPlaying) setStatusText(t('crop.statusPlaying'));
+        else setStatusText(t('crop.statusPaused'));
       };
 
       const created = await Audio.Sound.createAsync(
@@ -72,7 +74,7 @@ export const CropAudioPlayerScreen = ({ navigation, route }: Props) => {
       setSound(created.sound);
     };
 
-    load().catch(() => setStatusText('error...'));
+    load().catch(() => setStatusText(t('crop.statusError')));
 
     return () => {
       mounted = false;
@@ -80,7 +82,7 @@ export const CropAudioPlayerScreen = ({ navigation, route }: Props) => {
         sound.unloadAsync().catch(() => {});
       }
     };
-  }, [audioUrl]);
+  }, [audioUrl, t]);
 
   const close = async () => {
     if (sound) {
@@ -155,7 +157,7 @@ export const CropAudioPlayerScreen = ({ navigation, route }: Props) => {
           <Text style={styles.timeText}>{formatTime(duration)}</Text>
         </View>
 
-        <Text style={styles.statusText}>{audioUrl ? statusText : 'audio unavailable'}</Text>
+        <Text style={styles.statusText}>{audioUrl ? statusText : t('crop.audioUnavailable')}</Text>
       </View>
     </View>
   );

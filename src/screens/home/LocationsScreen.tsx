@@ -32,6 +32,7 @@ import {
   toText,
 } from '../../utils/locationApi';
 import { useAndroidNavigationBar } from '../../hooks/useAndroidNavigationBar';
+import { useTranslation } from 'react-i18next';
 
 type LocationRow = {
   stateID: number;
@@ -135,11 +136,12 @@ const shapeLocationRows = (rows: LocationRow[]) => {
 };
 
 const usesAsdMasters = (stateID: number) => stateID === 28 || stateID === 36;
-const getSubLocationLabel = (stateID: number) =>
-  usesAsdMasters(stateID) ? 'ASD' : 'block';
+const getSubLocationLabel = (stateID: number, t: (key: string) => string) =>
+  usesAsdMasters(stateID) ? t('home.asd') : t('home.block');
 
 export const LocationsScreen = () => {
   useAndroidNavigationBar(colors.darkGreen, 'light');
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const user: any = useAppStore((s) => s.user);
@@ -182,7 +184,7 @@ export const LocationsScreen = () => {
       const districtName = toText(item.districtName ?? item.DistrictName);
       const blockName = toText(item.blockName ?? item.BlockName);
       const asdName = toText(item.asdName ?? item.AsdName);
-      const cityName = blockName || asdName || districtName || 'Location';
+      const cityName = blockName || asdName || districtName || t('home.location');
       const cloudImage = pickXamarinCloudImageName(item);
 
       return {
@@ -208,7 +210,7 @@ export const LocationsScreen = () => {
     });
 
     return shapeLocationRows(mapped.filter((x) => x.districtID > 0));
-  }, []);
+  }, [t]);
 
   const normalizedLocations = useMemo(() => {
     const map = new Map<string, LocationRow>();
@@ -341,7 +343,7 @@ export const LocationsScreen = () => {
       setBlockPickerOpen(true);
     } catch (e: any) {
       setBlocks([]);
-      Alert.alert('Error', e.message || 'Unable to load blocks');
+      Alert.alert(t('common.error'), e.message || t('register.unableLoadBlocks'));
     } finally {
       setAddLoading(false);
     }
@@ -361,7 +363,7 @@ export const LocationsScreen = () => {
     try {
       await loadStates();
     } catch {
-      Alert.alert('Error', 'Unable to load states');
+      Alert.alert(t('common.error'), t('home.unableLoadStates'));
     } finally {
       setAddLoading(false);
     }
@@ -369,21 +371,23 @@ export const LocationsScreen = () => {
 
   const saveAddedLocation = async () => {
     if (!userId) {
-      Alert.alert('Failed', 'User not found. Please login again.');
+      Alert.alert(t('home.failed'), t('home.userNotFoundPleaseLoginAgain'));
       return;
     }
     if (!selectedState) {
-      Alert.alert('Validation', 'Please select state');
+      Alert.alert(t('common.validation'), t('register.validationSelectState'));
       return;
     }
     if (!selectedDistrict) {
-      Alert.alert('Validation', 'Please select district');
+      Alert.alert(t('common.validation'), t('register.validationSelectDistrict'));
       return;
     }
     if (!selectedBlock) {
       Alert.alert(
-        'Validation',
-        usesAsdMasters(selectedState.stateID) ? 'Please select ASD' : 'Please select block'
+        t('common.validation'),
+        usesAsdMasters(selectedState.stateID)
+          ? t('register.validationSelectAsd')
+          : t('register.validationSelectBlock')
       );
       return;
     }
@@ -403,7 +407,7 @@ export const LocationsScreen = () => {
     try {
       const response: any = await userService.saveLocation(payload);
       if (!isApiSuccess(response)) {
-        Alert.alert('Failed', response?.errorMessage || response?.ErrorMessage || 'Unable to add location');
+        Alert.alert(t('home.failed'), response?.errorMessage || response?.ErrorMessage || t('home.unableAddLocation'));
         return;
       }
 
@@ -470,14 +474,14 @@ export const LocationsScreen = () => {
         blockID: optimistic.blockID,
         asdID: optimistic.asdID,
       });
-      Alert.alert('Success', 'Location added successfully', [
+      Alert.alert(t('common.success'), t('home.locationAddedSuccessfully'), [
         {
-          text: 'OK',
+          text: t('common.ok'),
           onPress: () => navigation.navigate('Home'),
         },
       ]);
     } catch (e: any) {
-      Alert.alert('Failed', e.message || 'Unable to add location');
+      Alert.alert(t('home.failed'), e.message || t('home.unableAddLocation'));
     } finally {
       setAddLoading(false);
     }
@@ -486,11 +490,11 @@ export const LocationsScreen = () => {
   const deleteLocation = async (item: LocationRow) => {
     if (!userId) return;
     if (addedLocations.length <= 1) {
-      Alert.alert('Info', `Cannot delete only location (${item.stateName}, ${item.cityName}).`);
+      Alert.alert(t('home.info'), t('home.cannotDeleteOnlyLocation', { state: item.stateName, city: item.cityName }));
       return;
     }
     if (item.isCurrentLocation) {
-      Alert.alert('Info', 'Current location cannot be deleted.');
+      Alert.alert(t('home.info'), t('home.currentLocationCannotBeDeleted'));
       return;
     }
 
@@ -523,13 +527,13 @@ export const LocationsScreen = () => {
       );
       const response: any = await userService.deleteLocation(payload);
       if (!isApiSuccess(response)) {
-        Alert.alert('Delete failed', response?.errorMessage || response?.ErrorMessage || 'Unable to delete location');
+        Alert.alert(t('home.deleteFailed'), response?.errorMessage || response?.ErrorMessage || t('home.unableDeleteLocation'));
         await loadLocations();
         return;
       }
       await loadLocations();
     } catch (e: any) {
-      Alert.alert('Delete failed', e.message || 'Unable to delete location');
+      Alert.alert(t('home.deleteFailed'), e.message || t('home.unableDeleteLocation'));
     }
   };
 
@@ -571,7 +575,7 @@ export const LocationsScreen = () => {
             resizeMode="contain"
           />
           <Text style={[styles.cityText, { color: textColor }]} numberOfLines={1}>
-            {item.cityName || 'Location'}
+            {item.cityName || t('home.location')}
           </Text>
         </View>
         <Text style={[styles.stateText, { color: textColor }]} numberOfLines={1}>
@@ -589,7 +593,7 @@ export const LocationsScreen = () => {
           renderRightActions={() => (
             <Pressable style={styles.swipeDelete} onPress={() => deleteLocation(item)}>
               <Image source={require('../../../assets/images/ic_delete.png')} style={styles.swipeDeleteIcon} resizeMode="contain" />
-              <Text style={styles.swipeDeleteText}>Delete</Text>
+              <Text style={styles.swipeDeleteText}>{t('home.delete')}</Text>
             </Pressable>
           )}
         >
@@ -629,39 +633,39 @@ export const LocationsScreen = () => {
               <>
                 {currentLocation ? (
                   <>
-                    <Text style={styles.currentLbl}>Current Locations</Text>
+                    <Text style={styles.currentLbl}>{t('home.currentLocations')}</Text>
                     <Pressable onPress={() => openInHome(currentLocation)}>{renderCard(currentLocation, false)}</Pressable>
                     {addedLocations.length ? <View style={styles.separator} /> : null}
                   </>
                 ) : null}
-                {addedLocations.length ? <Text style={styles.addedLbl}>Added locations</Text> : null}
+                {addedLocations.length ? <Text style={styles.addedLbl}>{t('home.addedLocations')}</Text> : null}
               </>
             }
-            ListEmptyComponent={<Text style={styles.empty}>No data currently available.</Text>}
+            ListEmptyComponent={<Text style={styles.empty}>{t('home.noDataCurrentlyAvailable')}</Text>}
             renderItem={({ item }) => <Pressable onPress={() => openInHome(item)}>{renderCard(item, true)}</Pressable>}
           />
         )}
 
         <Pressable style={[styles.addButton, { bottom: floatingBottom }]} onPress={openAdd}>
-          <Text style={styles.addButtonText}>Add location</Text>
+          <Text style={styles.addButtonText}>{t('home.addLocation')}</Text>
         </Pressable>
       </View>
 
       <Modal visible={addOpen} transparent animationType="slide" onRequestClose={() => setAddOpen(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalSheet}>
-            <Text style={styles.modalTitle}>Add location</Text>
+            <Text style={styles.modalTitle}>{t('home.addLocation')}</Text>
 
             <Pressable style={styles.selector} onPress={() => setStatePickerOpen(true)}>
               <Text style={[styles.selectorText, !selectedState && styles.selectorPlaceholder]}>
-                {selectedState?.stateName || 'Select state'}
+                {selectedState?.stateName || t('register.selectStateMandatory')}
               </Text>
               <Image source={require('../../../assets/images/dropdown.png')} style={styles.dropdownIcon} resizeMode="contain" />
             </Pressable>
 
             <Pressable style={[styles.selector, { marginTop: 10 }]} onPress={() => selectedState && setDistrictPickerOpen(true)}>
               <Text style={[styles.selectorText, !selectedDistrict && styles.selectorPlaceholder]}>
-                {selectedDistrict?.districtName || 'Select district'}
+                {selectedDistrict?.districtName || t('register.selectDistrictMandatory')}
               </Text>
               <Image source={require('../../../assets/images/dropdown.png')} style={styles.dropdownIcon} resizeMode="contain" />
             </Pressable>
@@ -674,19 +678,19 @@ export const LocationsScreen = () => {
                 {selectedBlock?.label ||
                   (selectedState
                     ? addLoading && selectedDistrict
-                      ? `Loading ${getSubLocationLabel(selectedState.stateID)}...`
-                      : `Select ${getSubLocationLabel(selectedState.stateID)}`
-                    : 'Select block')}
+                      ? t('home.loadingLabel', { label: getSubLocationLabel(selectedState.stateID, t) })
+                      : t('home.selectLabel', { label: getSubLocationLabel(selectedState.stateID, t) })
+                    : t('register.selectBlockMandatory'))}
               </Text>
               <Image source={require('../../../assets/images/dropdown.png')} style={styles.dropdownIcon} resizeMode="contain" />
             </Pressable>
 
             <View style={styles.modalActions}>
               <Pressable style={[styles.actionBtn, styles.cancelBtn]} onPress={() => setAddOpen(false)}>
-                <Text style={styles.cancelText}>Cancel</Text>
+                <Text style={styles.cancelText}>{t('common.cancel')}</Text>
               </Pressable>
               <Pressable style={[styles.actionBtn, styles.saveBtn]} onPress={saveAddedLocation}>
-                <Text style={styles.saveText}>Add</Text>
+                <Text style={styles.saveText}>{t('home.add')}</Text>
               </Pressable>
             </View>
 
@@ -772,8 +776,8 @@ export const LocationsScreen = () => {
                 <View style={styles.emptyPickerWrap}>
                   <Text style={styles.pickerText}>
                     {addLoading
-                      ? `Loading ${getSubLocationLabel(selectedState?.stateID || 0)}...`
-                      : `No ${getSubLocationLabel(selectedState?.stateID || 0)} data`}
+                      ? t('home.loadingLabel', { label: getSubLocationLabel(selectedState?.stateID || 0, t) })
+                      : t('home.noLabelData', { label: getSubLocationLabel(selectedState?.stateID || 0, t) })}
                   </Text>
                 </View>
               )}

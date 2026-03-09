@@ -4,20 +4,22 @@ import { Screen } from '../../components/Screen';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { useAndroidNavigationBar } from '../../hooks/useAndroidNavigationBar';
+import { useTranslation } from 'react-i18next';
 
 const TERMS_URL = 'https://sites.google.com/view/meghdoot-terms-and-conditions/home';
 
 export const TermsScreen = () => {
+  const { t } = useTranslation();
   useAndroidNavigationBar(colors.background, 'dark');
   return (
     <Screen>
       <View style={styles.container}>
-        <Text style={styles.title}>Terms and conditions</Text>
+        <Text style={styles.title}>{t('info.termsTitle')}</Text>
         <Text style={styles.body}>
-          The original Xamarin app opens terms in a web view. Tap below to open the same terms page.
+          {t('info.termsBody')}
         </Text>
         <Pressable style={styles.button} onPress={() => Linking.openURL(TERMS_URL)}>
-          <Text style={styles.buttonText}>Open Terms Page</Text>
+          <Text style={styles.buttonText}>{t('info.termsOpenPage')}</Text>
         </Pressable>
         <Text style={styles.url}>{TERMS_URL}</Text>
       </View>
