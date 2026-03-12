@@ -44,6 +44,9 @@ const pickUri = (...values: any[]) => {
   for (const value of values) {
     if (typeof value !== 'string' || !value.trim()) continue;
     const raw = value.trim();
+    if (raw.startsWith('data:image/')) {
+      return raw;
+    }
     if (raw.startsWith('http://') || raw.startsWith('https://') || raw.startsWith('file://')) {
       return raw;
     }
@@ -53,6 +56,25 @@ const pickUri = (...values: any[]) => {
         API_BASE_URL
       ).replace(/\/+$/, '');
       return `${base}/${raw.replace(/^\/+/, '')}`;
+    }
+  }
+  return '';
+};
+
+const looksLikeBase64 = (value: string) => {
+  const normalized = value.replace(/\s+/g, '');
+  return normalized.length > 64 && normalized.length % 4 === 0 && /^[A-Za-z0-9+/=]+$/.test(normalized);
+};
+
+const pickImageDataUri = (...values: any[]) => {
+  for (const value of values) {
+    if (typeof value !== 'string' || !value.trim()) continue;
+    const raw = value.trim();
+    if (raw.startsWith('data:image/')) {
+      return raw;
+    }
+    if (looksLikeBase64(raw)) {
+      return `data:image/jpeg;base64,${raw}`;
     }
   }
   return '';
@@ -244,8 +266,16 @@ export const CropAdvisoryScreen = () => {
       cropService.getAdvisoryAttachments({ ...commonPayload, Type: 'Audio' }),
     ]);
 
-    const imageList = pickList(imgRes.result || imgRes.data || imgRes, ['objCropAdvisoryImageList', 'ObjCropAdvisoryImageList']);
-    const audioList = pickList(audRes.result || audRes.data || audRes, ['objCropAdvisoryImageList', 'ObjCropAdvisoryImageList']);
+    const imageList = pickList(imgRes.result || imgRes.data || imgRes, [
+      'objCropAdvisoryImageList',
+      'ObjCropAdvisoryImageList',
+    ]);
+    const audioList = pickList(audRes.result || audRes.data || audRes, [
+      'objCropAdvisoryAudioList',
+      'ObjCropAdvisoryAudioList',
+      'objCropAdvisoryImageList',
+      'ObjCropAdvisoryImageList',
+    ]);
 
     setImages(imageList);
     setAudios(audioList);
@@ -360,6 +390,28 @@ export const CropAdvisoryScreen = () => {
   const openImagePreview = (imageUrl: string) => {
     navigation.navigate('CropImagePreview', { imageUrl });
   };
+
+  const getAttachmentPreviewUri = (item: any) =>
+    pickImageDataUri(
+      item?.thumbNailImageName,
+      item?.ThumbNailImageName,
+      item?.thumbnailBytes,
+      item?.ThumbnailBytes
+    ) ||
+    pickUri(
+      item?.imagePath,
+      item?.ImagePath,
+      item?.localFilePath,
+      item?.LocalFilePath
+    );
+
+  const getAttachmentImageUri = (item: any) =>
+    pickUri(
+      item?.imagePath,
+      item?.ImagePath,
+      item?.localFilePath,
+      item?.LocalFilePath
+    ) || getAttachmentPreviewUri(item);
 
   const prevEnabled = index > 0;
   const nextEnabled = index < items.length - 1;
@@ -515,22 +567,26 @@ export const CropAdvisoryScreen = () => {
               <>
                 {images.length ? (
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.attachRow}>
-                    {images.map((item, i) => (
-                      <Pressable
-                        key={`img-${i}`}
-                        onPress={() => openImagePreview(pickUri(item.imagePath, item.ImagePath, item.localFilePath, item.LocalFilePath))}
-                      >
-                        <Image
-                          source={
-                            pickUri(item.imagePath, item.ImagePath, item.localFilePath, item.LocalFilePath)
-                              ? { uri: pickUri(item.imagePath, item.ImagePath, item.localFilePath, item.LocalFilePath) }
-                              : require('../../../assets/images/defult_crop_plane.png')
-                          }
-                          style={styles.attachImage}
-                          resizeMode="cover"
-                        />
-                      </Pressable>
-                    ))}
+                    {images.map((item, i) => {
+                      const previewUri = getAttachmentPreviewUri(item);
+                      const imageUri = getAttachmentImageUri(item);
+                      return (
+                        <Pressable
+                          key={`img-${i}`}
+                          onPress={() => openImagePreview(imageUri)}
+                        >
+                          <Image
+                            source={
+                              previewUri
+                                ? { uri: previewUri }
+                                : require('../../../assets/images/defult_crop_plane.png')
+                            }
+                            style={styles.attachImage}
+                            resizeMode="cover"
+                          />
+                        </Pressable>
+                      );
+                    })}
                   </ScrollView>
                 ) : null}
 
