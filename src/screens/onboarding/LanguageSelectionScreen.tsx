@@ -17,10 +17,13 @@ import { useAppStore } from "../../store/appStore";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { OnboardingStackParamList } from "../../navigation/types";
 import { colors } from "../../theme/colors";
+import { useTranslation } from "react-i18next";
+import i18n from "../../locales/i18n";
 
 type Props = NativeStackScreenProps<OnboardingStackParamList, "Language">;
 
 export const LanguageSelectionScreen = ({ navigation }: Props) => {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const [open, setOpen] = useState(false);
   const beginOnboarding = useAppStore((s) => s.beginOnboarding);
@@ -46,9 +49,9 @@ export const LanguageSelectionScreen = ({ navigation }: Props) => {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.content}>
-          <Text style={styles.title}>Choose Language</Text>
+          <Text style={styles.title}>{t("onboarding.chooseLanguage")}</Text>
           <Text style={styles.subtitle}>
-            A Mobile App to Assist Farmers for Weather Based Farm Management
+            {t("onboarding.subtitle")}
           </Text>
 
           <View style={styles.logoWrap}>
@@ -61,13 +64,13 @@ export const LanguageSelectionScreen = ({ navigation }: Props) => {
 
           <View style={styles.selectorWrap}>
             <Pressable style={styles.selector} onPress={() => setOpen(true)}>
-              <Text style={styles.selectorText}>{selectedLabel}</Text>
+            <Text style={styles.selectorText}>{selectedLabel}</Text>
               <Image
                 source={require("../../../assets/images/ic_dropDownWhite.png")}
                 style={styles.arrow}
               />
             </Pressable>
-            <Text style={styles.selectorLabel}>Select Language</Text>
+            <Text style={styles.selectorLabel}>{t("onboarding.selectLanguage")}</Text>
           </View>
 
           <View style={styles.actions}>
@@ -78,7 +81,7 @@ export const LanguageSelectionScreen = ({ navigation }: Props) => {
                 navigation.replace("OnboardingOne");
               }}
             >
-              <Text style={styles.nextText}>Next</Text>
+              <Text style={styles.nextText}>{t("onboarding.next")}</Text>
             </Pressable>
           </View>
         </View>
@@ -99,6 +102,7 @@ export const LanguageSelectionScreen = ({ navigation }: Props) => {
                   style={styles.modalItem}
                   onPress={() => {
                     setLanguage(item.code);
+                    i18n.changeLanguage(item.code).catch(() => undefined);
                     setOpen(false);
                   }}
                 >

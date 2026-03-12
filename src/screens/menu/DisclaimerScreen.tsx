@@ -4,13 +4,11 @@ import { Screen } from "../../components/Screen";
 import { colors } from "../../theme/colors";
 import { spacing } from "../../theme/spacing";
 import { useAndroidNavigationBar } from "../../hooks/useAndroidNavigationBar";
-
-const DISCLAIMER_TEXT = `This MEGHDOOT app has been designed for general public and intends to enable easier access to real time weather based information. It does not guarantee accuracy of the weather information nor any other aspect with regards to any information published on the app.
-
-The user assumes the entire risk related to the use of information on this app. In no event shall the MoES or its constituents be liable to you or to any third party for any direct, indirect, incidental, consequential, special or exemplary damages or lost profit resulting from any use or misuse of this data.`;
+import { useTranslation } from "react-i18next";
 
 export const DisclaimerScreen = () => {
   useAndroidNavigationBar(colors.background, "dark");
+  const { t } = useTranslation();
   return (
     <Screen>
       <ScrollView contentContainerStyle={styles.container}>
@@ -18,7 +16,7 @@ export const DisclaimerScreen = () => {
           source={require("../../../assets/images/disclaimer.png")}
           style={styles.hero}
         />
-        <Text style={styles.body}>{DISCLAIMER_TEXT}</Text>
+        <Text style={styles.body}>{t("info.disclaimerBody")}</Text>
       </ScrollView>
     </Screen>
   );

@@ -5,6 +5,7 @@ import { Screen } from '../../components/Screen';
 import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
 import { cropService } from '../../api/services';
+import { useTranslation } from 'react-i18next';
 
 const pickNum = (...values: any[]) => {
   for (const value of values) {
@@ -20,37 +21,38 @@ type RatingKey = 1 | 3 | 4 | 5;
 
 const RATING_OPTIONS: Array<{
   key: RatingKey;
-  label: string;
+  labelKey: string;
   blank: any;
   selected: any;
 }> = [
   {
     key: 1,
-    label: 'Poor',
+    labelKey: 'crop.ratingPoor',
     blank: require('../../../assets/images/ic_poor.png'),
     selected: require('../../../assets/images/ic_selectpoor.png'),
   },
   {
     key: 3,
-    label: 'Good',
+    labelKey: 'crop.ratingGood',
     blank: require('../../../assets/images/ic_good.png'),
     selected: require('../../../assets/images/ic_selectgood.png'),
   },
   {
     key: 4,
-    label: 'Very Good',
+    labelKey: 'crop.ratingVeryGood',
     blank: require('../../../assets/images/ic_verygood.png'),
     selected: require('../../../assets/images/ic_selectverygood.png'),
   },
   {
     key: 5,
-    label: 'Excellent',
+    labelKey: 'crop.ratingExcellent',
     blank: require('../../../assets/images/ic_excellent.png'),
     selected: require('../../../assets/images/ic_selectExcellent.png'),
   },
 ];
 
 export const CropFeedbackScreen = ({ navigation, route }: Props) => {
+  const { t } = useTranslation();
   const { advisoryId, userProfileId, feedbackId = 0, avgFeedback = 0 } = route.params;
 
   const alreadySubmitted = feedbackId > 0;
@@ -72,14 +74,14 @@ export const CropFeedbackScreen = ({ navigation, route }: Props) => {
 
   const submit = () => {
     if (!selectedValue) {
-      Alert.alert('Alert', 'Please select a rating.');
+      Alert.alert(t('crop.alert'), t('crop.selectRatingPrompt'));
       return;
     }
 
-    Alert.alert('Feedback', 'Do you want to submit feedback?', [
-      { text: 'No', style: 'cancel' },
+    Alert.alert(t('crop.feedback'), t('crop.submitFeedbackPrompt'), [
+      { text: t('crop.no'), style: 'cancel' },
       {
-        text: 'Yes',
+        text: t('crop.yes'),
         onPress: async () => {
           try {
             setSubmitting(true);
@@ -100,18 +102,18 @@ export const CropFeedbackScreen = ({ navigation, route }: Props) => {
 
             const response = await cropService.saveFeedback(payload);
             if (response?.isSuccessful === false) {
-              Alert.alert('Fail', String(response?.errorMessage || 'Failed to save feedback.'));
+              Alert.alert(t('crop.fail'), String(response?.errorMessage || t('crop.failedToSaveFeedback')));
               return;
             }
 
-            Alert.alert('Success', 'Feedback submitted successfully.', [
+            Alert.alert(t('common.success'), t('crop.feedbackSubmittedSuccessfully'), [
               {
-                text: 'OK',
+                text: t('common.ok'),
                 onPress: () => navigation.goBack(),
               },
             ]);
           } catch {
-            Alert.alert('Fail', 'Failed to save feedback.');
+            Alert.alert(t('crop.fail'), t('crop.failedToSaveFeedback'));
           } finally {
             setSubmitting(false);
           }
@@ -132,7 +134,7 @@ export const CropFeedbackScreen = ({ navigation, route }: Props) => {
             onPress={() => setRating(option.key)}
           >
             <Image source={selected ? option.selected : option.blank} style={styles.ratingIcon} resizeMode="contain" />
-            <Text style={[styles.ratingLabel, selected && styles.ratingLabelActive]}>{option.label}</Text>
+            <Text style={[styles.ratingLabel, selected && styles.ratingLabelActive]}>{t(option.labelKey)}</Text>
           </Pressable>
         );
       })}
@@ -142,8 +144,8 @@ export const CropFeedbackScreen = ({ navigation, route }: Props) => {
   return (
     <Screen>
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        <Text style={styles.title}>Rate your experience</Text>
-        <Text style={styles.subtitle}>Are you satisfied with this advisory?</Text>
+        <Text style={styles.title}>{t('crop.rateYourExperience')}</Text>
+        <Text style={styles.subtitle}>{t('crop.satisfiedWithAdvisory')}</Text>
 
         {alreadySubmitted ? (
           <View style={styles.readOnlyBox}>{renderRating(true)}</View>
@@ -153,35 +155,35 @@ export const CropFeedbackScreen = ({ navigation, route }: Props) => {
 
             {selectedValue ? (
               <View style={styles.formWrap}>
-                <Text style={styles.groupTitle}>What can be improved?</Text>
+                <Text style={styles.groupTitle}>{t('crop.whatCanBeImproved')}</Text>
 
-                <Text style={styles.fieldLabel}>Overall</Text>
+                <Text style={styles.fieldLabel}>{t('crop.overall')}</Text>
                 <TextInput
                   value={comments}
                   onChangeText={setComments}
-                  placeholder="Write your feedback"
+                  placeholder={t('crop.writeYourFeedback')}
                   placeholderTextColor={colors.muted}
                   multiline
                   style={styles.input}
                   textAlignVertical="top"
                 />
 
-                <Text style={styles.fieldLabel}>Weather</Text>
+                <Text style={styles.fieldLabel}>{t('crop.weather')}</Text>
                 <TextInput
                   value={weather}
                   onChangeText={setWeather}
-                  placeholder="Weather summary"
+                  placeholder={t('crop.weatherSummary')}
                   placeholderTextColor={colors.muted}
                   multiline
                   style={styles.input}
                   textAlignVertical="top"
                 />
 
-                <Text style={styles.fieldLabel}>Advisor</Text>
+                <Text style={styles.fieldLabel}>{t('crop.advisor')}</Text>
                 <TextInput
                   value={advisory}
                   onChangeText={setAdvisory}
-                  placeholder="Feedback for crop advisory"
+                  placeholder={t('crop.feedbackForCropAdvisory')}
                   placeholderTextColor={colors.muted}
                   multiline
                   style={styles.input}
@@ -191,7 +193,7 @@ export const CropFeedbackScreen = ({ navigation, route }: Props) => {
             ) : null}
 
             <Pressable style={styles.submitBtn} onPress={submit} disabled={submitting}>
-              {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitText}>Submit</Text>}
+              {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitText}>{t('crop.submit')}</Text>}
             </Pressable>
           </>
         )}

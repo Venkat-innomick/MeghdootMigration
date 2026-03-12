@@ -14,6 +14,7 @@ import {
 import { Swipeable } from "react-native-gesture-handler";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import Constants from "expo-constants";
+import { useTranslation } from "react-i18next";
 import { Screen } from "../../components/Screen";
 import { colors } from "../../theme/colors";
 import { cropService } from "../../api/services";
@@ -75,7 +76,11 @@ const pickList = (payload: any, keys: string[]) => {
   return [];
 };
 
-const normalizeDate = (raw: string) => {
+const normalizeDate = (
+  raw: string,
+  todayLabel: string,
+  yesterdayLabel: string,
+) => {
   if (!raw) return "-";
   const now = new Date();
   const y = new Date(now);
@@ -91,13 +96,14 @@ const normalizeDate = (raw: string) => {
   const yyy = y.getFullYear();
   const yesterday = `${ydd}-${ymm}-${yyy}`;
 
-  if (raw === today) return "Today";
-  if (raw === yesterday) return "Yesterday";
+  if (raw === today) return todayLabel;
+  if (raw === yesterday) return yesterdayLabel;
   return raw;
 };
 
 export const FavouritesScreen = () => {
   useAndroidNavigationBar(colors.background, "dark");
+  const { t } = useTranslation();
   const navigation = useNavigation<any>();
   const user = useAppStore((s) => s.user);
   const language = useAppStore((s) => s.language);
@@ -142,10 +148,10 @@ export const FavouritesScreen = () => {
     const cropAdvisoryId = pickNum(item.cropAdvisoryID, item.CropAdvisoryID);
     if (!cropAdvisoryId || !userId) return;
 
-    Alert.alert("Remove", "Remove this item from favourites?", [
-      { text: "Cancel", style: "cancel" },
+    Alert.alert(t("crop.remove"), t("crop.removeFromFavouritesPrompt"), [
+      { text: t("common.cancel"), style: "cancel" },
       {
-        text: "Remove",
+        text: t("crop.remove"),
         onPress: async () => {
           try {
             const payload = {
@@ -161,10 +167,10 @@ export const FavouritesScreen = () => {
             const ok = typeof okRaw === "boolean" ? okRaw : false;
             if (!ok) {
               Alert.alert(
-                "Delete failed",
+                t("home.deleteFailed"),
                 response?.ErrorMessage ||
                   response?.errorMessage ||
-                  "Unable to remove favourite",
+                  t("crop.unableToRemoveFavourite"),
               );
               return;
             }
@@ -175,10 +181,13 @@ export const FavouritesScreen = () => {
               ),
             );
             if (Platform.OS === "android") {
-              ToastAndroid.show("Deleted successfully", ToastAndroid.SHORT);
+              ToastAndroid.show(t("crop.deletedSuccessfully"), ToastAndroid.SHORT);
             }
           } catch (error: any) {
-            Alert.alert("Delete failed", error?.message || "Unable to remove favourite");
+            Alert.alert(
+              t("home.deleteFailed"),
+              error?.message || t("crop.unableToRemoveFavourite"),
+            );
           }
         },
       },
@@ -195,7 +204,7 @@ export const FavouritesScreen = () => {
     }
 
     if (!items.length) {
-      return <Text style={styles.empty}>No favourites found.</Text>;
+      return <Text style={styles.empty}>{t("crop.noFavouritesFound")}</Text>;
     }
 
     return (
@@ -211,6 +220,8 @@ export const FavouritesScreen = () => {
           const category = pickText(item.category, item.Category, "-");
           const date = normalizeDate(
             pickText(item.createdDate, item.CreatedDate, "-"),
+            t("home.today"),
+            t("home.yesterday"),
           );
           const image = pickUri(
             item.cropImageURL,
@@ -234,7 +245,7 @@ export const FavouritesScreen = () => {
                       style={styles.swipeDeleteIcon}
                       resizeMode="contain"
                     />
-                    <Text style={styles.swipeDeleteText}>Remove</Text>
+                    <Text style={styles.swipeDeleteText}>{t("crop.remove")}</Text>
                   </Pressable>
                 )}
               >
@@ -308,7 +319,7 @@ export const FavouritesScreen = () => {
         }}
       />
     );
-  }, [items, loading, navigation]);
+  }, [items, loading, navigation, t]);
 
   return <Screen>{content}</Screen>;
 };

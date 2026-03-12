@@ -13,6 +13,7 @@ import { colors } from "../../theme/colors";
 import { useAndroidNavigationBar } from "../../hooks/useAndroidNavigationBar";
 import { getUserProfileId } from "../../utils/locationApi";
 import { useFocusEffect } from "@react-navigation/native";
+import { useTranslation } from "react-i18next";
 
 const pickText = (...values: any[]) => {
   for (const value of values) {
@@ -23,6 +24,7 @@ const pickText = (...values: any[]) => {
 
 export const NowcastScreen = () => {
   useAndroidNavigationBar(colors.background, "dark");
+  const { t } = useTranslation();
   const user = useAppStore((s) => s.user);
 
   const [loading, setLoading] = useState(false);
@@ -65,7 +67,7 @@ export const NowcastScreen = () => {
     }
 
     if (!items.length) {
-      return <Text style={styles.empty}>No data currently available.</Text>;
+      return <Text style={styles.empty}>{t("home.noDataCurrentlyAvailable")}</Text>;
     }
 
     return (
@@ -87,7 +89,7 @@ export const NowcastScreen = () => {
             item.NotificationTitle,
             item.title,
             item.Title,
-            "Nowcast",
+            t("notification.nowcastDefaultTitle"),
           );
           const issueDate = pickText(
             item.issueDate,
@@ -132,7 +134,7 @@ export const NowcastScreen = () => {
         }}
       />
     );
-  }, [items, loading]);
+  }, [items, loading, t]);
 
   return <Screen>{content}</Screen>;
 };

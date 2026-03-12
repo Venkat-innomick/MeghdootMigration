@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, Image, ImageSourcePropType, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, ImageSourcePropType, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { CommonActions, NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createDrawerNavigator, DrawerContentScrollView, DrawerItem } from '@react-navigation/drawer';
@@ -11,6 +11,8 @@ import { RootStackParamList, AuthStackParamList, OnboardingStackParamList } from
 import { useAppStore } from '../store/appStore';
 import { colors } from '../theme/colors';
 import { API_BASE_URL } from '../constants/api';
+import i18n from '../locales/i18n';
+import { LANGUAGES } from '../constants/languages';
 
 import { LanguageSelectionScreen } from '../screens/onboarding/LanguageSelectionScreen';
 import { OnboardingOneScreen } from '../screens/onboarding/OnboardingOneScreen';
@@ -38,7 +40,6 @@ import { CropFeedbackScreen } from '../screens/crop/CropFeedbackScreen';
 import { CropAudioPlayerScreen } from '../screens/crop/CropAudioPlayerScreen';
 import { CropImagePreviewScreen } from '../screens/crop/CropImagePreviewScreen';
 import { SearchScreen } from '../screens/search/SearchScreen';
-import { LanguageSettingsScreen } from '../screens/menu/LanguageSettingsScreen';
 import { SplashScreen } from '../screens/splash/SplashScreen';
 import { unregisterPushTokenForUser } from '../hooks/usePushNotifications';
 import { rootNavigationRef } from './navigationRef';
@@ -109,6 +110,8 @@ const MainHeader = ({ navigation, title }: any) => ({
 
 const HomeTabs = () => {
   const insets = useSafeAreaInsets();
+  const language = useAppStore((s) => s.language);
+  const t = (key: string) => i18n.t(key, { lng: language });
 
   return (
     <Tabs.Navigator
@@ -117,14 +120,14 @@ const HomeTabs = () => {
           navigation,
           title:
             route.name === 'Home'
-              ? 'Home'
+              ? t('home.home')
               : route.name === 'PastWeather'
-              ? 'Past Weather'
+              ? t('home.pastWeather')
               : route.name === 'Forecast'
-              ? 'Forecast'
+              ? t('home.forecast')
               : route.name === 'Locations'
-              ? 'Locations'
-              : 'MEGHDOOT',
+              ? t('home.locations')
+              : t('common.appName'),
         }),
         tabBarStyle: {
           backgroundColor: colors.darkGreen,
@@ -158,10 +161,10 @@ const HomeTabs = () => {
         },
       })}
     >
-      <Tabs.Screen name="Home" component={DashboardScreen} options={{ title: 'Home' }} />
-      <Tabs.Screen name="PastWeather" component={PastWeatherScreen} options={{ title: 'Past Weather' }} />
-      <Tabs.Screen name="Forecast" component={ForecastScreen} options={{ title: 'Forecast' }} />
-      <Tabs.Screen name="Locations" component={LocationsScreen} options={{ title: 'Locations' }} />
+      <Tabs.Screen name="Home" component={DashboardScreen} options={{ title: t('home.home') }} />
+      <Tabs.Screen name="PastWeather" component={PastWeatherScreen} options={{ title: t('home.pastWeather') }} />
+      <Tabs.Screen name="Forecast" component={ForecastScreen} options={{ title: t('home.forecast') }} />
+      <Tabs.Screen name="Locations" component={LocationsScreen} options={{ title: t('home.locations') }} />
     </Tabs.Navigator>
   );
 };
@@ -193,8 +196,12 @@ const OnboardingNavigator = () => {
 };
 
 const MenuContent = (props: any) => {
+  const language = useAppStore((s) => s.language);
+  const setLanguage = useAppStore((s) => s.setLanguage);
+  const t = (key: string) => i18n.t(key, { lng: language });
   const logout = useAppStore((s) => s.logout);
   const user: any = useAppStore((s) => s.user);
+  const [languageModalOpen, setLanguageModalOpen] = useState(false);
   const profileImageRaw = user?.imagePath || user?.ImagePath;
   const [imageLoadFailed, setImageLoadFailed] = useState(false);
   const profileImage = imageLoadFailed
@@ -216,10 +223,10 @@ const MenuContent = (props: any) => {
     props.navigation.navigate('MainTabs');
   };
   const handleLogout = () => {
-    Alert.alert('Logout', 'Are you sure to Logout?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('menu.logout'), t('menu.logoutConfirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'OK',
+        text: t('common.ok'),
         onPress: async () => {
           const userProfileId = Number(
             user?.userProfileId ??
@@ -264,15 +271,53 @@ const MenuContent = (props: any) => {
         />
         <Text style={styles.profileName}>{fullName}</Text>
       </Pressable>
-      <DrawerItem label="Home" labelStyle={{ color: '#fff' }} icon={() => <Image source={require('../../assets/images/ic_home.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />} onPress={goHome} />
-      <DrawerItem label="All Crops" labelStyle={{ color: '#fff' }} icon={() => <Image source={require('../../assets/images/ic_allCrop.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />} onPress={() => goMenu('AllCrops')} />
-      <DrawerItem label="My Favourites" labelStyle={{ color: '#fff' }} icon={() => <Image source={require('../../assets/images/ic_fav.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />} onPress={() => goMenu('Favourites')} />
-      <DrawerItem label="Nowcast" labelStyle={{ color: '#fff' }} icon={() => <Image source={require('../../assets/images/ic_nowcast.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />} onPress={() => goMenu('Nowcast')} />
-      <DrawerItem label="Notifications" labelStyle={{ color: '#fff' }} icon={() => <Image source={require('../../assets/images/ic_notification.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />} onPress={() => goMenu('Notifications')} />
-      <DrawerItem label="Change Language" labelStyle={{ color: '#fff' }} icon={() => <Image source={require('../../assets/images/ic_languageWhite.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />} onPress={() => goMenu('LanguageSettings')} />
-      <DrawerItem label="Disclaimer" labelStyle={{ color: '#fff' }} icon={() => <Image source={require('../../assets/images/ic_disclaimer.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />} onPress={() => goMenu('Disclaimer')} />
-      <DrawerItem label="About" labelStyle={{ color: '#fff' }} icon={() => <Image source={require('../../assets/images/ic_about.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />} onPress={() => goMenu('About')} />
-      <DrawerItem label="Logout" labelStyle={{ color: '#fff' }} icon={() => <Image source={require('../../assets/images/ic_logout.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />} onPress={handleLogout} />
+      <DrawerItem label={t('home.home')} labelStyle={{ color: '#fff' }} icon={() => <Image source={require('../../assets/images/ic_home.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />} onPress={goHome} />
+      <DrawerItem label={t('menu.allCrops')} labelStyle={{ color: '#fff' }} icon={() => <Image source={require('../../assets/images/ic_allCrop.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />} onPress={() => goMenu('AllCrops')} />
+      <DrawerItem label={t('menu.favourites')} labelStyle={{ color: '#fff' }} icon={() => <Image source={require('../../assets/images/ic_fav.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />} onPress={() => goMenu('Favourites')} />
+      <DrawerItem label={t('menu.nowcast')} labelStyle={{ color: '#fff' }} icon={() => <Image source={require('../../assets/images/ic_nowcast.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />} onPress={() => goMenu('Nowcast')} />
+      <DrawerItem label={t('menu.notifications')} labelStyle={{ color: '#fff' }} icon={() => <Image source={require('../../assets/images/ic_notification.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />} onPress={() => goMenu('Notifications')} />
+      <DrawerItem
+        label={t('menu.language')}
+        labelStyle={{ color: '#fff' }}
+        icon={() => <Image source={require('../../assets/images/ic_languageWhite.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />}
+        onPress={() => setLanguageModalOpen(true)}
+      />
+      <DrawerItem label={t('menu.disclaimer')} labelStyle={{ color: '#fff' }} icon={() => <Image source={require('../../assets/images/ic_disclaimer.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />} onPress={() => goMenu('Disclaimer')} />
+      <DrawerItem label={t('menu.about')} labelStyle={{ color: '#fff' }} icon={() => <Image source={require('../../assets/images/ic_about.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />} onPress={() => goMenu('About')} />
+      <DrawerItem label={t('menu.logout')} labelStyle={{ color: '#fff' }} icon={() => <Image source={require('../../assets/images/ic_logout.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />} onPress={handleLogout} />
+
+      <Modal
+        visible={languageModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLanguageModalOpen(false)}
+      >
+        <Pressable style={styles.langModalBackdrop} onPress={() => setLanguageModalOpen(false)}>
+          <Pressable style={styles.langModalCard} onPress={() => undefined}>
+            <Text style={styles.langModalTitle}>{t('menu.language')}</Text>
+            <ScrollView style={styles.langModalScroll} showsVerticalScrollIndicator>
+              {LANGUAGES.map((item) => {
+                const active = language === item.code;
+                return (
+                  <Pressable
+                    key={item.code}
+                    style={[styles.langModalItem, active && styles.langModalItemActive]}
+                    onPress={() => {
+                      setLanguage(item.code);
+                      i18n.changeLanguage(item.code).catch(() => undefined);
+                      setLanguageModalOpen(false);
+                    }}
+                  >
+                    <Text style={[styles.langModalItemText, active && styles.langModalItemTextActive]}>
+                      {item.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </DrawerContentScrollView>
   );
 };
@@ -304,9 +349,53 @@ const styles = StyleSheet.create({
     fontFamily: 'RobotoMedium',
     fontSize: 16,
   },
+  langModalBackdrop: {
+    flex: 1,
+    backgroundColor: '#00000066',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  langModalCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    overflow: 'hidden',
+    maxHeight: '70%',
+  },
+  langModalTitle: {
+    fontFamily: 'RobotoMedium',
+    color: colors.text,
+    fontSize: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomColor: '#e5e5e5',
+    borderBottomWidth: 1,
+  },
+  langModalScroll: {
+    maxHeight: 360,
+  },
+  langModalItem: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomColor: '#ececec',
+    borderBottomWidth: 1,
+  },
+  langModalItemActive: {
+    backgroundColor: '#EAF7EE',
+  },
+  langModalItemText: {
+    fontFamily: 'RobotoRegular',
+    fontSize: 16,
+    color: colors.text,
+  },
+  langModalItemTextActive: {
+    color: colors.darkGreen,
+    fontFamily: 'RobotoMedium',
+  },
 });
 
 const MainDrawer = () => {
+  const language = useAppStore((s) => s.language);
+  const t = (key: string) => i18n.t(key, { lng: language });
   return (
     <Drawer.Navigator
       screenOptions={{
@@ -319,18 +408,22 @@ const MainDrawer = () => {
       drawerContent={(props) => <MenuContent {...props} />}
     >
       <Drawer.Screen name="MainTabs" component={HomeTabs} options={{ headerShown: false }} />
-      <Drawer.Screen name="AllCrops" component={AllCropsScreen} options={{ title: 'All Crops' }} />
-      <Drawer.Screen name="Favourites" component={FavouritesScreen} options={{ title: 'My Favourites' }} />
-      <Drawer.Screen name="Nowcast" component={NowcastScreen} options={{ title: 'Nowcast' }} />
-      <Drawer.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
-      <Drawer.Screen name="LanguageSettings" component={LanguageSettingsScreen} options={{ title: 'Change Language' }} />
-      <Drawer.Screen name="Disclaimer" component={DisclaimerScreen} options={{ title: 'Disclaimer' }} />
-      <Drawer.Screen name="About" component={AboutScreen} options={{ title: 'About' }} />
+      <Drawer.Screen name="AllCrops" component={AllCropsScreen} options={{ title: t('menu.allCrops') }} />
+      <Drawer.Screen name="Favourites" component={FavouritesScreen} options={{ title: t('menu.favourites') }} />
+      <Drawer.Screen name="Nowcast" component={NowcastScreen} options={{ title: t('menu.nowcast') }} />
+      <Drawer.Screen name="Notifications" component={NotificationsScreen} options={{ title: t('menu.notifications') }} />
+      <Drawer.Screen name="Disclaimer" component={DisclaimerScreen} options={{ title: t('menu.disclaimer') }} />
+      <Drawer.Screen name="About" component={AboutScreen} options={{ title: t('menu.about') }} />
     </Drawer.Navigator>
   );
 };
 
 export const AppNavigator = () => {
+  const language = useAppStore((s) => s.language);
+  const t = (key: string) => i18n.t(key, { lng: language });
+  useEffect(() => {
+    i18n.changeLanguage(language).catch(() => undefined);
+  }, [language]);
   return (
     <NavigationContainer ref={rootNavigationRef}>
       <RootStack.Navigator initialRouteName="Splash">
@@ -338,13 +431,13 @@ export const AppNavigator = () => {
         <RootStack.Screen name="Onboarding" component={OnboardingNavigator} options={{ headerShown: false }} />
         <RootStack.Screen name="Auth" component={AuthNavigator} options={{ headerShown: false }} />
         <RootStack.Screen name="Main" component={MainDrawer} options={{ headerShown: false }} />
-        <RootStack.Screen name="CropAdvisory" component={CropAdvisoryScreen} options={{ headerStyle: { backgroundColor: colors.primary }, headerTintColor: '#fff', title: 'Crop Advisory' }} />
-        <RootStack.Screen name="CropFeedback" component={CropFeedbackScreen} options={{ headerStyle: { backgroundColor: colors.primary }, headerTintColor: '#fff', title: 'Crop Advisory Feedback' }} />
+        <RootStack.Screen name="CropAdvisory" component={CropAdvisoryScreen} options={{ headerStyle: { backgroundColor: colors.primary }, headerTintColor: '#fff', title: t('crop.cropAdvisoryTitle') }} />
+        <RootStack.Screen name="CropFeedback" component={CropFeedbackScreen} options={{ headerStyle: { backgroundColor: colors.primary }, headerTintColor: '#fff', title: t('crop.cropAdvisoryFeedbackTitle') }} />
         <RootStack.Screen name="CropAudioPlayer" component={CropAudioPlayerScreen} options={{ headerShown: false, presentation: 'transparentModal', animation: 'slide_from_bottom' }} />
         <RootStack.Screen name="CropImagePreview" component={CropImagePreviewScreen} options={{ headerShown: false }} />
-        <RootStack.Screen name="Notifications" component={NotificationsScreen} options={{ headerStyle: { backgroundColor: colors.primary }, headerTintColor: '#fff', title: 'Notifications' }} />
+        <RootStack.Screen name="Notifications" component={NotificationsScreen} options={{ headerStyle: { backgroundColor: colors.primary }, headerTintColor: '#fff', title: t('menu.notifications') }} />
         <RootStack.Screen name="Search" component={SearchScreen} options={{ headerShown: false }} />
-        <RootStack.Screen name="Profile" component={ProfileScreen} options={{ headerStyle: { backgroundColor: colors.primary }, headerTintColor: '#fff', title: 'Profile' }} />
+        <RootStack.Screen name="Profile" component={ProfileScreen} options={{ headerStyle: { backgroundColor: colors.primary }, headerTintColor: '#fff', title: t('profile.title') }} />
       </RootStack.Navigator>
     </NavigationContainer>
   );

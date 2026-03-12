@@ -35,6 +35,7 @@ import {
 } from "../../utils/locationApi";
 import { API_REFRESH_DATES } from "../../utils/apiDates";
 import { useAndroidNavigationBar } from "../../hooks/useAndroidNavigationBar";
+import { useTranslation } from "react-i18next";
 
 const pickText = (...values: any[]) => {
   for (const value of values) {
@@ -56,7 +57,7 @@ const pickUri = (...values: any[]) => {
   return "";
 };
 
-const formatAdvisoryDate = (raw: string) => {
+const formatAdvisoryDate = (raw: string, t: (key: string) => string) => {
   if (!raw) return "";
   const today = new Date();
   const yesterday = new Date(today);
@@ -66,8 +67,8 @@ const formatAdvisoryDate = (raw: string) => {
   const toLegacy = (d: Date) =>
     `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()}`;
 
-  if (raw === toLegacy(today)) return "Today";
-  if (raw === toLegacy(yesterday)) return "Yesterday";
+  if (raw === toLegacy(today)) return t("home.today");
+  if (raw === toLegacy(yesterday)) return t("home.yesterday");
   return raw;
 };
 
@@ -296,6 +297,7 @@ const buildHomeCropPayload = async (
 
 export const DashboardScreen = () => {
   useAndroidNavigationBar(colors.darkGreen, "light");
+  const { t } = useTranslation();
   const { width } = useWindowDimensions();
   const navigation = useNavigation<any>();
   const user = useAppStore((s) => s.user);
@@ -503,8 +505,8 @@ export const DashboardScreen = () => {
       (currentLocation as any)?.StateID,
       0,
     );
-    return stateID === 28 || stateID === 36 ? "ASD" : "Block";
-  }, [currentLocation]);
+    return stateID === 28 || stateID === 36 ? "ASD" : t("home.block");
+  }, [currentLocation, t]);
 
   useEffect(() => {
     if (!carouselLocations.length) return;
@@ -553,7 +555,7 @@ export const DashboardScreen = () => {
     if (!currentWeatherLocation) return [];
     return [
       metric(
-        "Rainfall",
+        t("home.rainfall"),
         pickText(
           (currentWeatherLocation as any).rainFall,
           (currentWeatherLocation as any).RainFall,
@@ -562,7 +564,7 @@ export const DashboardScreen = () => {
         require("../../../assets/images/ic_rainfall.png"),
       ),
       metric(
-        "Wind Speed",
+        t("home.windSpeed"),
         pickText(
           (currentWeatherLocation as any).windSpeed,
           (currentWeatherLocation as any).WindSpeed,
@@ -571,7 +573,7 @@ export const DashboardScreen = () => {
         require("../../../assets/images/ic_windspeed.png"),
       ),
       metric(
-        "Humidity",
+        t("home.humidity"),
         pickText(
           (currentWeatherLocation as any).humidity,
           (currentWeatherLocation as any).Humidity,
@@ -580,7 +582,7 @@ export const DashboardScreen = () => {
         require("../../../assets/images/ic_humidity.png"),
       ),
       metric(
-        "Direction",
+        t("home.direction"),
         pickText(
           (currentWeatherLocation as any).windDirection,
           (currentWeatherLocation as any).WindDirection,
@@ -589,7 +591,7 @@ export const DashboardScreen = () => {
         require("../../../assets/images/ic_winddirection.png"),
       ),
     ];
-  }, [currentWeatherLocation]);
+  }, [currentWeatherLocation, t]);
 
   const advisoryRows = useMemo(() => {
     if (!currentLocation) return [];
@@ -712,7 +714,7 @@ export const DashboardScreen = () => {
                       : styles.topTabText
                   }
                 >
-                  District
+                  {t("home.district")}
                 </Text>
               </Pressable>
             </View>
@@ -749,7 +751,7 @@ export const DashboardScreen = () => {
                     <View style={[styles.weatherCardPress, { width: cardWidth }]}>
                       <View style={styles.noWeatherCard}>
                         <Text style={styles.noWeatherText}>
-                          No block-level weather data.
+                          {t("home.noBlockWeather")}
                         </Text>
                       </View>
                     </View>
@@ -808,7 +810,7 @@ export const DashboardScreen = () => {
 
                 const itemMetrics = [
                   metric(
-                    "Rainfall",
+                    t("home.rainfall"),
                     pickText(
                       (weatherItem as any).rainFall,
                       (weatherItem as any).RainFall,
@@ -817,7 +819,7 @@ export const DashboardScreen = () => {
                     rainImage,
                   ),
                   metric(
-                    "Wind Speed",
+                    t("home.windSpeed"),
                     pickText(
                       (weatherItem as any).windSpeed,
                       (weatherItem as any).WindSpeed,
@@ -826,7 +828,7 @@ export const DashboardScreen = () => {
                     windSpeedImage,
                   ),
                   metric(
-                    "Humidity",
+                    t("home.humidity"),
                     pickText(
                       (weatherItem as any).humidity,
                       (weatherItem as any).Humidity,
@@ -835,7 +837,7 @@ export const DashboardScreen = () => {
                     humidityImage,
                   ),
                   metric(
-                    "Direction",
+                    t("home.direction"),
                     pickText(
                       (weatherItem as any).windDirection,
                       (weatherItem as any).WindDirection,
@@ -861,7 +863,7 @@ export const DashboardScreen = () => {
                         pickDistrictName(
                           (item as any)?.districtWiseWeatherData || weatherItem,
                         ),
-                        "Location",
+                        t("home.location"),
                       )
                     : pickText(
                         (weatherItem as any)?.placeName,
@@ -870,7 +872,7 @@ export const DashboardScreen = () => {
                         pickDistrictName(
                           (item as any)?.districtWiseWeatherData || weatherItem,
                         ),
-                        "Location",
+                        t("home.location"),
                       );
 
                 return (
@@ -920,13 +922,13 @@ export const DashboardScreen = () => {
                           <Text
                             style={[styles.minMaxText, { color: metricColor }]}
                           >
-                            Min{" "}
+                            {t("home.min")}{" "}
                             {pickText(
                               (weatherItem as any)?.minTemp,
                               (weatherItem as any)?.MinTemp,
                               "-",
                             )}{" "}
-                            C | Max{" "}
+                            C | {t("home.max")}{" "}
                             {pickText(
                               (weatherItem as any)?.maxTemp,
                               (weatherItem as any)?.MaxTemp,
@@ -987,7 +989,7 @@ export const DashboardScreen = () => {
                     ) : (
                       <View style={styles.noWeatherCard}>
                         <Text style={styles.noWeatherText}>
-                          No block-level weather data.
+                          {t("home.noBlockWeather")}
                         </Text>
                       </View>
                     )}
@@ -1018,8 +1020,8 @@ export const DashboardScreen = () => {
                 <View style={styles.noWeatherCard}>
                   <Text style={styles.noWeatherText}>
                     {activeTab === "block"
-                      ? "No block-level weather data."
-                      : "No district-level weather data."}
+                      ? t("home.noBlockWeather")
+                      : t("home.noDistrictWeather")}
                   </Text>
                 </View>
               </View>
@@ -1065,7 +1067,7 @@ export const DashboardScreen = () => {
             ) : null}
 
             <Text style={styles.recentTitle}>
-              {`Recent crop advisories${pickText(
+              {`${t("home.recentCropAdvisories")}${pickText(
                 (currentWeatherLocation as any)?.recCropName,
                 (currentWeatherLocation as any)?.RecCropName,
                 "",
@@ -1080,7 +1082,7 @@ export const DashboardScreen = () => {
             row.Title,
             row.cropName,
             row.CropName,
-            "Crop Advisory",
+            t("home.cropAdvisory"),
           );
           const created = pickText(row.createdDate, row.CreatedDate, "");
           const category = pickText(
@@ -1113,7 +1115,7 @@ export const DashboardScreen = () => {
                     row.CropName,
                     row.title,
                     row.Title,
-                    "Crop Advisory",
+                    t("home.cropAdvisory"),
                   ),
                 })
               }
@@ -1134,7 +1136,7 @@ export const DashboardScreen = () => {
                     {title}
                   </Text>
                   <Text style={styles.advisoryDate}>
-                    {formatAdvisoryDate(created)}
+                    {formatAdvisoryDate(created, t)}
                   </Text>
                 </View>
 
@@ -1157,8 +1159,8 @@ export const DashboardScreen = () => {
         ListEmptyComponent={
           <Text style={styles.noData}>
             {activeTab === "block" && hasDistrictAdvisories
-              ? "District-level advisories available. Select District tab."
-              : "No advisory data."}
+              ? t("home.districtAdvisoriesAvailable")
+              : t("home.noAdvisoryData")}
           </Text>
         }
       />
