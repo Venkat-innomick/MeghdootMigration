@@ -12,6 +12,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  ToastAndroid,
   View,
 } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -45,29 +46,60 @@ export const LoginScreen = ({ navigation }: Props) => {
     [language],
   );
 
+  const showLoginMessage = (message: string) => {
+    if (Platform.OS === "android") {
+      ToastAndroid.show(message, ToastAndroid.SHORT);
+      return;
+    }
+    Alert.alert(t("auth.loginFailed"), message);
+  };
+
   const login = async () => {
-    if (mobile.length !== 10) {
-      Alert.alert(t("common.validation"), t("auth.validationMobile"));
+    const trimmedMobile = mobile.trim();
+    if (trimmedMobile.length !== 10) {
+      showLoginMessage(t("auth.validationMobile"));
       return;
     }
     setLoading(true);
     try {
       // Match Xamarin payload contract for GetUserLoginDetails.
       const response = await userService.login({
-        LogInId: mobile,
+        LogInId: trimmedMobile,
         LogInPassword: "1234",
         LanguageType: currentLanguageLabel,
         Refreshdatetime: "2016-01-01",
       });
 
       const root: any = response || {};
-      const isSuccessful = Boolean(root.IsSuccessful ?? root.isSuccessful);
-      const users = (root.ObjUserList ||
-        root.objUserList ||
-        root.result ||
-        root.data ||
-        []) as any[];
+      const responseRoot = root?.result ?? root?.data ?? root;
+      const isSuccessful = Boolean(
+        responseRoot?.IsSuccessful ??
+          responseRoot?.isSuccessful ??
+          root?.IsSuccessful ??
+          root?.isSuccessful,
+      );
+      const users = (
+        responseRoot?.ObjUserList ||
+        responseRoot?.objUserList ||
+        root?.ObjUserList ||
+        root?.objUserList ||
+        responseRoot ||
+        []
+      ) as any[];
       const data = Array.isArray(users) ? users[0] : users;
+      const hasUser = Boolean(data && typeof data === "object");
+
+      if (!isSuccessful || !hasUser) {
+        showLoginMessage(
+          responseRoot?.ErrorMessage ||
+            responseRoot?.errorMessage ||
+            root?.ErrorMessage ||
+            root?.errorMessage ||
+            t("auth.invalidCredentials"),
+        );
+        return;
+      }
+
       const roleId = Number(data?.RoleId ?? data?.roleId ?? 0);
       const typeOfRole = Number(
         data?.TypeOfRole ??
@@ -76,7 +108,7 @@ export const LoginScreen = ({ navigation }: Props) => {
           data?.userProfileId ??
           0,
       );
-      const mobileNumber = data.LogInId || data.mobileNumber || mobile;
+      const mobileNumber = data.LogInId || data.mobileNumber || trimmedMobile;
       const apiImagePath = data.ImagePath || data.imagePath || "";
       const cacheKey = `${STORAGE_KEYS.profileImageCache}:${mobileNumber}`;
       const cachedImagePath = apiImagePath
@@ -84,7 +116,7 @@ export const LoginScreen = ({ navigation }: Props) => {
         : (await AsyncStorage.getItem(cacheKey)) || "";
       const imagePath = apiImagePath || cachedImagePath || undefined;
 
-      if (isSuccessful && data && roleId === 1) {
+      if (roleId === 1) {
         setUser({
           userProfileId: typeOfRole,
           firstName: data.FirstName || data.firstName || "",
@@ -111,13 +143,10 @@ export const LoginScreen = ({ navigation }: Props) => {
             }),
           );
       } else {
-        Alert.alert(
-          t("auth.loginFailed"),
-          root.ErrorMessage || root.errorMessage || t("auth.invalidCredentials"),
-        );
+        showLoginMessage(t("auth.invalidCredentials"));
       }
     } catch (error: any) {
-      Alert.alert(t("auth.loginFailed"), error.message);
+      showLoginMessage(error.message || t("auth.invalidCredentials"));
     } finally {
       setLoading(false);
     }
@@ -191,7 +220,11 @@ export const LoginScreen = ({ navigation }: Props) => {
 
             <Pressable
               style={styles.outlineButton}
-              onPress={() => navigation.navigate("Registration")}
+              onPress={() =>
+                navigation.navigate("Registration", {
+                  selectedLanguageCode: language,
+                })
+              }
             >
               <Text style={styles.outlineButtonText}>{t("auth.signUpButton")}</Text>
             </Pressable>

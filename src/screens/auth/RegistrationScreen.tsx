@@ -11,6 +11,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  ToastAndroid,
   View,
 } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -37,6 +38,7 @@ type Props = NativeStackScreenProps<AuthStackParamList, "Registration">;
 
 type Option = { id: number; label: string };
 type SafeOption = Option & { key: string };
+const MOBILE_REGEX = /^[6-9]\d{9}$/;
 
 const LANGUAGE_ID_BY_CODE: Record<string, number> = {
   en: 2,
@@ -118,9 +120,12 @@ const Selector = ({
         onRequestClose={() => setOpen(false)}
       >
         <Pressable style={styles.modalBackdrop} onPress={() => setOpen(false)}>
-          <View style={styles.modalCard}>
+          <Pressable style={styles.modalCard} onPress={() => undefined}>
             <Text style={styles.modalTitle}>{title}</Text>
-            <ScrollView>
+            <ScrollView
+              style={styles.modalListScroll}
+              showsVerticalScrollIndicator
+            >
               {safeOptions.map((item) => (
                 <Pressable
                   key={item.key}
@@ -134,14 +139,14 @@ const Selector = ({
                 </Pressable>
               ))}
             </ScrollView>
-          </View>
+          </Pressable>
         </Pressable>
       </Modal>
     </>
   );
 };
 
-export const RegistrationScreen = ({ navigation }: Props) => {
+export const RegistrationScreen = ({ navigation, route }: Props) => {
   useAndroidNavigationBar(colors.background, "dark");
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -155,7 +160,15 @@ export const RegistrationScreen = ({ navigation }: Props) => {
   const [panchayat, setPanchayat] = useState("");
   const [acceptedTerms, setAcceptedTerms] = useState(false);
 
-  const [selectedLangCode, setSelectedLangCode] = useState(appLanguage || "en");
+  const initialLanguageCode = useMemo(() => {
+    const routeCode = route.params?.selectedLanguageCode;
+    if (routeCode && LANGUAGES.some((item) => item.code === routeCode)) {
+      return routeCode;
+    }
+    return appLanguage || "en";
+  }, [appLanguage, route.params?.selectedLanguageCode]);
+
+  const [selectedLangCode, setSelectedLangCode] = useState(initialLanguageCode);
   const [selectedGender, setSelectedGender] = useState<Option | null>(null);
   const [selectedState, setSelectedState] = useState<StateMasterItem | null>(
     null,
@@ -178,6 +191,26 @@ export const RegistrationScreen = ({ navigation }: Props) => {
   );
 
   const selectedLanguageID = LANGUAGE_ID_BY_CODE[selectedLangCode] || 2;
+  const shouldShowDistrict = Boolean(selectedState);
+  const shouldShowBlock = Boolean(selectedDistrict);
+  const isAsdState =
+    selectedState?.stateID === 28 || selectedState?.stateID === 36;
+
+  const showRegisterMessage = (
+    title: string,
+    message: string,
+    onOk?: () => void,
+  ) => {
+    if (Platform.OS === "android" && !onOk) {
+      ToastAndroid.show(message, ToastAndroid.SHORT);
+      return;
+    }
+    Alert.alert(title, message, onOk ? [{ text: t("common.ok"), onPress: onOk }] : undefined);
+  };
+
+  useEffect(() => {
+    setSelectedLangCode(initialLanguageCode);
+  }, [initialLanguageCode]);
 
   useEffect(() => {
     const loadMasterData = async () => {
@@ -216,6 +249,7 @@ export const RegistrationScreen = ({ navigation }: Props) => {
       }
     };
 
+    setSelectedGender(null);
     setSelectedState(null);
     setSelectedDistrict(null);
     setSelectedBlock(null);
@@ -271,11 +305,9 @@ export const RegistrationScreen = ({ navigation }: Props) => {
     setSelectedBlock(null);
     setBlockOptions([]);
 
-    const isAsd = selectedState.stateID === 28 || selectedState.stateID === 36;
-
     setLoading(true);
     try {
-      if (isAsd) {
+      if (isAsdState) {
         const asd = await mastersService.getAsd(
           district.districtID,
           languageLabel,
@@ -313,8 +345,9 @@ export const RegistrationScreen = ({ navigation }: Props) => {
   };
 
   const validate = () => {
-    if (!mobile) return t("register.validationEnterMobile");
-    if (mobile.length !== 10 || !/^([0]|\+91)?[789]\d{9}$/.test(mobile))
+    const trimmedMobile = mobile.trim();
+    if (!trimmedMobile) return t("register.validationEnterMobile");
+    if (!MOBILE_REGEX.test(trimmedMobile))
       return t("register.validationValidMobile");
     if (!selectedLanguageID) return t("register.validationSelectLanguage");
     if (!selectedState) return t("register.validationSelectState");
@@ -335,20 +368,18 @@ export const RegistrationScreen = ({ navigation }: Props) => {
   const register = async () => {
     const errorText = validate();
     if (errorText) {
-      Alert.alert(t("common.validation"), errorText);
+      showRegisterMessage(t("common.validation"), errorText);
       return;
     }
 
     if (!selectedState || !selectedDistrict || !selectedBlock) return;
-
-    const isAsd = selectedState.stateID === 28 || selectedState.stateID === 36;
 
     const payload: Record<string, unknown> = {
       TitleId: 0,
       GenderID: selectedGender?.id || 0,
       DOB: "",
       FirstName: firstName.trim(),
-      MobileNumber: mobile,
+      MobileNumber: mobile.trim(),
       LanguageID: selectedLanguageID,
       StateID: selectedState.stateID,
       DistrictID: selectedDistrict.districtID,
@@ -365,7 +396,7 @@ export const RegistrationScreen = ({ navigation }: Props) => {
       ThumbNailBytes: null,
     };
 
-    if (isAsd) {
+    if (isAsdState) {
       payload.AsdID = selectedBlock.id;
       payload.AsdName = selectedBlock.label;
     } else {
@@ -376,24 +407,31 @@ export const RegistrationScreen = ({ navigation }: Props) => {
     setLoading(true);
     try {
       const response: any = await userService.register(payload);
-      const ok = Boolean(response?.isSuccessful ?? response?.IsSuccessful);
+      const responseRoot = response?.result ?? response?.data ?? response;
+      const ok = Boolean(
+        responseRoot?.isSuccessful ??
+          responseRoot?.IsSuccessful ??
+          response?.isSuccessful ??
+          response?.IsSuccessful,
+      );
       if (!ok) {
-        Alert.alert(
+        showRegisterMessage(
           t("register.registrationFailed"),
-          response?.errorMessage ||
+          responseRoot?.errorMessage ||
+            responseRoot?.ErrorMessage ||
+            response?.errorMessage ||
             response?.ErrorMessage ||
             t("register.unableRegister"),
         );
       } else {
-        Alert.alert(t("common.success"), t("register.registrationSuccess"), [
-          {
-            text: t("common.ok"),
-            onPress: () => navigation.replace("Login"),
-          },
-        ]);
+        showRegisterMessage(
+          t("common.success"),
+          t("register.registrationSuccess"),
+          () => navigation.replace("Login"),
+        );
       }
     } catch (error: any) {
-      Alert.alert(
+      showRegisterMessage(
         t("register.registrationFailed"),
         error.message || t("register.unableRegister"),
       );
@@ -486,45 +524,45 @@ export const RegistrationScreen = ({ navigation }: Props) => {
             />
           </View>
 
-          <View style={styles.fieldWrap}>
-            <Text style={styles.floatLabel}>{t("register.selectDistrictMandatory")}</Text>
-            <Selector
-              title={t("register.selectDistrictMandatory")}
-              value={selectedDistrict?.districtName || ""}
-              options={districtOptions.map((d) => ({
-                id: d.districtID,
-                label: d.districtName,
-              }))}
-              onSelect={(item) => {
-                const district = districtOptions.find(
-                  (d) => d.districtID === item.id,
-                );
-                if (district) onDistrictChange(district);
-              }}
-              disabled={!selectedState}
-            />
-          </View>
+          {shouldShowDistrict ? (
+            <View style={styles.fieldWrap}>
+              <Text style={styles.floatLabel}>{t("register.selectDistrictMandatory")}</Text>
+              <Selector
+                title={t("register.selectDistrictMandatory")}
+                value={selectedDistrict?.districtName || ""}
+                options={districtOptions.map((d) => ({
+                  id: d.districtID,
+                  label: d.districtName,
+                }))}
+                onSelect={(item) => {
+                  const district = districtOptions.find(
+                    (d) => d.districtID === item.id,
+                  );
+                  if (district) onDistrictChange(district);
+                }}
+              />
+            </View>
+          ) : null}
 
-          <View style={styles.fieldWrap}>
-            <Text style={styles.floatLabel}>
-              {selectedState &&
-              (selectedState.stateID === 28 || selectedState.stateID === 36)
-                ? t("register.selectAsdMandatory")
-                : t("register.selectBlockMandatory")}
-            </Text>
-            <Selector
-              title={
-                selectedState &&
-                (selectedState.stateID === 28 || selectedState.stateID === 36)
+          {shouldShowBlock ? (
+            <View style={styles.fieldWrap}>
+              <Text style={styles.floatLabel}>
+                {isAsdState
                   ? t("register.selectAsdMandatory")
-                  : t("register.selectBlockMandatory")
-              }
-              value={selectedBlock?.label || ""}
-              options={blockOptions}
-              onSelect={(item) => setSelectedBlock(item)}
-              disabled={!selectedDistrict}
-            />
-          </View>
+                  : t("register.selectBlockMandatory")}
+              </Text>
+              <Selector
+                title={
+                  isAsdState
+                    ? t("register.selectAsdMandatory")
+                    : t("register.selectBlockMandatory")
+                }
+                value={selectedBlock?.label || ""}
+                options={blockOptions}
+                onSelect={(item) => setSelectedBlock(item)}
+              />
+            </View>
+          ) : null}
 
           <View style={styles.fieldWrap}>
             <Text style={styles.floatLabel}>{t("register.village")}</Text>
@@ -756,6 +794,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderRadius: 12,
     paddingVertical: spacing.sm,
+  },
+  modalListScroll: {
+    maxHeight: 320,
   },
   modalTitle: {
     fontFamily: "RobotoMedium",
