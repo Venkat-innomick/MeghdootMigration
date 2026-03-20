@@ -20,13 +20,12 @@
       "backgroundColor": "#749C53",
       "barStyle": "light-content"
     },
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.imd.meghdoot",
-      "buildNumber": "1"
+      "buildNumber": "1",
+      "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {
       "package": "com.aas.meghdoot",
@@ -65,14 +64,7 @@
     "extra": {
       "eas": {
         "projectId": "892bdf49-05e8-451e-b736-233aa417d8d0"
-      },
-      "apiBaseUrl": "http://103.215.208.11"
-    },
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
-    "updates": {
-      "url": "https://u.expo.dev/892bdf49-05e8-451e-b736-233aa417d8d0"
+      }
     }
   }
 }

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -283,6 +283,7 @@ export const PastWeatherScreen = () => {
   const [selectedLocationIndex, setSelectedLocationIndex] = useState(0);
   const [days, setDays] = useState<WeatherForecastItem[]>([]);
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
+  const lastLanguageRef = useRef(languageLabel);
 
   const selectedLocation = locations[selectedLocationIndex] as any;
   const selectedDay = (days[selectedDayIndex] || {}) as any;
@@ -379,8 +380,12 @@ export const PastWeatherScreen = () => {
     }
   };
 
-  useFocusEffect(
-    React.useCallback(() => {
+  const refreshScreenData = useCallback((forceLocationReload = false) => {
+      if (forceLocationReload) {
+        loadLocations();
+        return;
+      }
+
       const cachedLocations = useAppStore.getState().locations;
       if (cachedLocations?.length) {
         const list = dedupePastWeatherLocations(cachedLocations as any[]) as DashboardLocation[];
@@ -407,8 +412,20 @@ export const PastWeatherScreen = () => {
         return;
       }
       loadLocations();
-    }, [languageLabel, userId, selectedLocationRef]),
+    }, [languageLabel, userId, selectedLocationRef]);
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshScreenData();
+    }, [refreshScreenData]),
   );
+
+  useEffect(() => {
+    if (lastLanguageRef.current !== languageLabel) {
+      lastLanguageRef.current = languageLabel;
+      refreshScreenData(true);
+    }
+  }, [languageLabel, refreshScreenData]);
 
   const selectLocation = async (index: number) => {
     const location = locations[index] as any;
