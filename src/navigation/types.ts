@@ -32,7 +32,11 @@ export type RootStackParamList = {
 
 export type AuthStackParamList = {
   Login: undefined;
-  Registration: undefined;
+  Registration:
+    | {
+        selectedLanguageCode?: string;
+      }
+    | undefined;
   Terms: undefined;
 };
 

@@ -22,6 +22,7 @@ import { useAppStore } from '../../store/appStore';
 import { getLanguageLabel, getUserProfileId } from '../../utils/locationApi';
 import { API_REFRESH_DATES } from '../../utils/apiDates';
 import { API_BASE_URL } from '../../constants/api';
+import { useTranslation } from 'react-i18next';
 
 const pickText = (...values: any[]) => {
   for (const value of values) {
@@ -43,6 +44,9 @@ const pickUri = (...values: any[]) => {
   for (const value of values) {
     if (typeof value !== 'string' || !value.trim()) continue;
     const raw = value.trim();
+    if (raw.startsWith('data:image/')) {
+      return raw;
+    }
     if (raw.startsWith('http://') || raw.startsWith('https://') || raw.startsWith('file://')) {
       return raw;
     }
@@ -52,6 +56,25 @@ const pickUri = (...values: any[]) => {
         API_BASE_URL
       ).replace(/\/+$/, '');
       return `${base}/${raw.replace(/^\/+/, '')}`;
+    }
+  }
+  return '';
+};
+
+const looksLikeBase64 = (value: string) => {
+  const normalized = value.replace(/\s+/g, '');
+  return normalized.length > 64 && normalized.length % 4 === 0 && /^[A-Za-z0-9+/=]+$/.test(normalized);
+};
+
+const pickImageDataUri = (...values: any[]) => {
+  for (const value of values) {
+    if (typeof value !== 'string' || !value.trim()) continue;
+    const raw = value.trim();
+    if (raw.startsWith('data:image/')) {
+      return raw;
+    }
+    if (looksLikeBase64(raw)) {
+      return `data:image/jpeg;base64,${raw}`;
     }
   }
   return '';
@@ -90,6 +113,7 @@ const AdvisorySection = ({ title, open, onToggle, content }: AdvisorySectionProp
 };
 
 export const CropAdvisoryScreen = () => {
+  const { t } = useTranslation();
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const user = useAppStore((s) => s.user);
@@ -159,8 +183,8 @@ export const CropAdvisoryScreen = () => {
   // Old Xamarin screen keeps agro section hidden in Crop Advisory view.
   const hasAgroSection = false;
   const recommendationTitle = pickText(current.title, current.Title)
-    ? `Advisory - ${pickText(current.title, current.Title)}`
-    : 'Advisory';
+    ? t('crop.advisoryWithTitle', { title: pickText(current.title, current.Title) })
+    : t('crop.advisory');
 
   const loadAdvisories = async () => {
     if (!userProfileId) return;
@@ -242,8 +266,16 @@ export const CropAdvisoryScreen = () => {
       cropService.getAdvisoryAttachments({ ...commonPayload, Type: 'Audio' }),
     ]);
 
-    const imageList = pickList(imgRes.result || imgRes.data || imgRes, ['objCropAdvisoryImageList', 'ObjCropAdvisoryImageList']);
-    const audioList = pickList(audRes.result || audRes.data || audRes, ['objCropAdvisoryImageList', 'ObjCropAdvisoryImageList']);
+    const imageList = pickList(imgRes.result || imgRes.data || imgRes, [
+      'objCropAdvisoryImageList',
+      'ObjCropAdvisoryImageList',
+    ]);
+    const audioList = pickList(audRes.result || audRes.data || audRes, [
+      'objCropAdvisoryAudioList',
+      'ObjCropAdvisoryAudioList',
+      'objCropAdvisoryImageList',
+      'ObjCropAdvisoryImageList',
+    ]);
 
     setImages(imageList);
     setAudios(audioList);
@@ -266,10 +298,10 @@ export const CropAdvisoryScreen = () => {
 
   const toggleFavourite = async () => {
     if (!advisoryId || !userProfileId || isFavourite || favouriteBusy) return;
-    Alert.alert('', 'Add to favourites?', [
-      { text: 'No', style: 'cancel' },
+    Alert.alert('', t('crop.addToFavouritesPrompt'), [
+      { text: t('crop.no'), style: 'cancel' },
       {
-        text: 'Yes',
+        text: t('crop.yes'),
         onPress: async () => {
           const payload = {
             CAFLID: 0,
@@ -300,7 +332,7 @@ export const CropAdvisoryScreen = () => {
               })
             );
             if (Platform.OS === 'android') {
-              ToastAndroid.show('Added to favourites', ToastAndroid.SHORT);
+              ToastAndroid.show(t('crop.addedToFavourites'), ToastAndroid.SHORT);
             }
           } catch {
             // no-op: keep UX identical to old app (silent on some failures)
@@ -324,7 +356,7 @@ export const CropAdvisoryScreen = () => {
 
     await Share.share({
       title: 'MEGHDOOT',
-      message: `Checkout Meghdoot Crop Advisory\n${shareUrl}`,
+      message: `${t('crop.checkoutAdvisory')}\n${shareUrl}`,
       url: shareUrl,
     });
   };
@@ -350,7 +382,7 @@ export const CropAdvisoryScreen = () => {
   const openAudioPopup = (audioUrl: string) => {
     navigation.navigate('CropAudioPlayer', {
       audioUrl,
-      title: pickText(current.title, current.Title, 'Audio'),
+      title: pickText(current.title, current.Title, t('crop.audio')),
       imageUrl: pickUri(current.cropImageURL, current.CropImageURL),
     });
   };
@@ -358,6 +390,28 @@ export const CropAdvisoryScreen = () => {
   const openImagePreview = (imageUrl: string) => {
     navigation.navigate('CropImagePreview', { imageUrl });
   };
+
+  const getAttachmentPreviewUri = (item: any) =>
+    pickImageDataUri(
+      item?.thumbNailImageName,
+      item?.ThumbNailImageName,
+      item?.thumbnailBytes,
+      item?.ThumbnailBytes
+    ) ||
+    pickUri(
+      item?.imagePath,
+      item?.ImagePath,
+      item?.localFilePath,
+      item?.LocalFilePath
+    );
+
+  const getAttachmentImageUri = (item: any) =>
+    pickUri(
+      item?.imagePath,
+      item?.ImagePath,
+      item?.localFilePath,
+      item?.LocalFilePath
+    ) || getAttachmentPreviewUri(item);
 
   const prevEnabled = index > 0;
   const nextEnabled = index < items.length - 1;
@@ -378,7 +432,7 @@ export const CropAdvisoryScreen = () => {
     return (
       <Screen>
         <View style={styles.loaderWrap}>
-          <Text style={styles.emptyText}>No data currently available.</Text>
+          <Text style={styles.emptyText}>{t('crop.noDataCurrentlyAvailable')}</Text>
         </View>
       </Screen>
     );
@@ -402,7 +456,7 @@ export const CropAdvisoryScreen = () => {
             {pickText(current.youTubeLink, current.YouTubeLink) ? (
               <Pressable style={styles.actionItem} onPress={() => openUrl(pickText(current.youTubeLink, current.YouTubeLink))}>
                 <Image source={require('../../../assets/images/ic_video.png')} style={styles.actionIcon} resizeMode="contain" />
-                <Text style={styles.actionText}>Video</Text>
+                <Text style={styles.actionText}>{t('crop.video')}</Text>
               </Pressable>
             ) : null}
 
@@ -427,7 +481,7 @@ export const CropAdvisoryScreen = () => {
                 }
               >
                 <Image source={require('../../../assets/images/ic_audio.png')} style={styles.actionIcon} resizeMode="contain" />
-                <Text style={styles.actionText}>Audio</Text>
+                <Text style={styles.actionText}>{t('crop.audio')}</Text>
               </Pressable>
             ) : null}
 
@@ -437,20 +491,22 @@ export const CropAdvisoryScreen = () => {
                 style={styles.actionIcon}
                 resizeMode="contain"
               />
-              <Text style={styles.actionText}>{favouriteBusy ? 'Saving...' : isFavourite ? 'Added Fav' : 'Add Fav'}</Text>
+              <Text style={styles.actionText}>
+                {favouriteBusy ? t('crop.saving') : isFavourite ? t('crop.addedFav') : t('crop.addFav')}
+              </Text>
             </Pressable>
 
             <Pressable style={styles.actionItem} onPress={shareCurrent}>
               <View style={styles.shareIconWrap}>
                 <Image source={require('../../../assets/images/share_wh.png')} style={styles.shareIconGlyph} resizeMode="contain" />
               </View>
-              <Text style={styles.actionText}>Share</Text>
+              <Text style={styles.actionText}>{t('crop.share')}</Text>
             </Pressable>
           </View>
         </View>
 
         <View style={styles.detailWrap}>
-          <Text style={styles.title}>{pickText(current.title, current.Title, 'Advisory')}</Text>
+          <Text style={styles.title}>{pickText(current.title, current.Title, t('crop.advisory'))}</Text>
 
           <View style={styles.metaRow}>
             <View style={styles.metaItem}>
@@ -469,30 +525,30 @@ export const CropAdvisoryScreen = () => {
           </View>
 
           <Text style={styles.periodText}>
-            Period: {pickText(current.periodStartDate, current.PeriodStartDate, '-')} to {pickText(current.periodEndDate, current.PeriodEndDate, '-')}
+            {t('crop.period')}: {pickText(current.periodStartDate, current.PeriodStartDate, '-')} {t('crop.to')} {pickText(current.periodEndDate, current.PeriodEndDate, '-')}
           </Text>
-          <Text style={styles.periodText}>Variety: {pickText(current.varietyName, current.VarietyName, '--')}</Text>
+          <Text style={styles.periodText}>{t('crop.variety')}: {pickText(current.varietyName, current.VarietyName, '--')}</Text>
           <Pressable onPress={openFeedback}>
-            <Text style={styles.feedbackLink}>Feedback Rating</Text>
+            <Text style={styles.feedbackLink}>{t('crop.feedbackRating')}</Text>
           </Pressable>
 
           <View style={styles.langToggleRow}>
             <Pressable style={[styles.langBtn, isEnglish && styles.langBtnActive]} onPress={() => setIsEnglish(true)}>
-              <Text style={[styles.langBtnText, isEnglish && styles.langBtnTextActive]}>English</Text>
+              <Text style={[styles.langBtnText, isEnglish && styles.langBtnTextActive]}>{t('crop.english')}</Text>
             </Pressable>
             <Pressable style={[styles.langBtn, !isEnglish && styles.langBtnActive]} onPress={() => setIsEnglish(false)}>
-              <Text style={[styles.langBtnText, !isEnglish && styles.langBtnTextActive]}>Regional</Text>
+              <Text style={[styles.langBtnText, !isEnglish && styles.langBtnTextActive]}>{t('crop.regional')}</Text>
             </Pressable>
           </View>
         </View>
 
         {hasWeatherSection ? (
-          <AdvisorySection title="Weather Condition" open={weatherOpen} onToggle={() => setWeatherOpen((v) => !v)} content={weatherText} />
+          <AdvisorySection title={t('crop.weatherCondition')} open={weatherOpen} onToggle={() => setWeatherOpen((v) => !v)} content={weatherText} />
         ) : null}
         {hasAgroSection ? (
-          <AdvisorySection title="Agro Advisory" open={agroOpen} onToggle={() => setAgroOpen((v) => !v)} content={agroText} />
+          <AdvisorySection title={t('crop.agroAdvisory')} open={agroOpen} onToggle={() => setAgroOpen((v) => !v)} content={agroText} />
         ) : null}
-        <AdvisorySection title="SMS Text" open={smsOpen} onToggle={() => setSmsOpen((v) => !v)} content={briefText} />
+        <AdvisorySection title={t('crop.smsText')} open={smsOpen} onToggle={() => setSmsOpen((v) => !v)} content={briefText} />
         {hasRecommendationSection ? (
           <AdvisorySection title={recommendationTitle} open={recommendationOpen} onToggle={() => setRecommendationOpen((v) => !v)} content={recommendationText} />
         ) : null}
@@ -500,7 +556,7 @@ export const CropAdvisoryScreen = () => {
         {hasAttachments ? (
           <View style={styles.sectionWrap}>
             <Pressable style={styles.sectionHeader} onPress={() => setAttachmentsOpen((v) => !v)}>
-              <Text style={styles.sectionTitle}>Attachments</Text>
+              <Text style={styles.sectionTitle}>{t('crop.attachments')}</Text>
               <Image
                 source={require('../../../assets/images/ic_uparrow.png')}
                 style={[styles.sectionArrow, { transform: [{ rotate: attachmentsOpen ? '180deg' : '0deg' }] }]}
@@ -511,22 +567,26 @@ export const CropAdvisoryScreen = () => {
               <>
                 {images.length ? (
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.attachRow}>
-                    {images.map((item, i) => (
-                      <Pressable
-                        key={`img-${i}`}
-                        onPress={() => openImagePreview(pickUri(item.imagePath, item.ImagePath, item.localFilePath, item.LocalFilePath))}
-                      >
-                        <Image
-                          source={
-                            pickUri(item.imagePath, item.ImagePath, item.localFilePath, item.LocalFilePath)
-                              ? { uri: pickUri(item.imagePath, item.ImagePath, item.localFilePath, item.LocalFilePath) }
-                              : require('../../../assets/images/defult_crop_plane.png')
-                          }
-                          style={styles.attachImage}
-                          resizeMode="cover"
-                        />
-                      </Pressable>
-                    ))}
+                    {images.map((item, i) => {
+                      const previewUri = getAttachmentPreviewUri(item);
+                      const imageUri = getAttachmentImageUri(item);
+                      return (
+                        <Pressable
+                          key={`img-${i}`}
+                          onPress={() => openImagePreview(imageUri)}
+                        >
+                          <Image
+                            source={
+                              previewUri
+                                ? { uri: previewUri }
+                                : require('../../../assets/images/defult_crop_plane.png')
+                            }
+                            style={styles.attachImage}
+                            resizeMode="cover"
+                          />
+                        </Pressable>
+                      );
+                    })}
                   </ScrollView>
                 ) : null}
 

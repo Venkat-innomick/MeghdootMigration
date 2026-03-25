@@ -21,8 +21,8 @@ export const OnboardingThreeScreen = ({ navigation }: Props) => {
 
   return (
     <OnboardingScreen
-      title="Real Time Weather Update"
-      description="The app displayed a quantitative weather forecast for critical weather parameters (rainfall, temperatures, wind, relative humidity, and cloudiness) for the next five days, encompassing all districts and blocks across the country."
+      titleKey="onboarding.titleOnBoardThree"
+      descriptionKey="onboarding.discrptionOnBoardThree"
       image={require('../../../assets/images/ic_onBoardThress.png')}
       onNext={finishOnboarding}
       onSkip={finishOnboarding}

@@ -5,12 +5,14 @@ import {
   Alert,
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  ToastAndroid,
   View,
 } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -24,11 +26,13 @@ import { LANGUAGES } from "../../constants/languages";
 import i18n from "../../locales/i18n";
 import { useAndroidNavigationBar } from "../../hooks/useAndroidNavigationBar";
 import { STORAGE_KEYS } from "../../constants/storageKeys";
+import { useTranslation } from "react-i18next";
 
 type Props = NativeStackScreenProps<AuthStackParamList, "Login">;
 
 export const LoginScreen = ({ navigation }: Props) => {
   useAndroidNavigationBar(colors.background, "dark");
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const [mobile, setMobile] = useState("");
   const [loading, setLoading] = useState(false);
@@ -42,29 +46,60 @@ export const LoginScreen = ({ navigation }: Props) => {
     [language],
   );
 
+  const showLoginMessage = (message: string) => {
+    if (Platform.OS === "android") {
+      ToastAndroid.show(message, ToastAndroid.SHORT);
+      return;
+    }
+    Alert.alert(t("auth.loginFailed"), message);
+  };
+
   const login = async () => {
-    if (mobile.length !== 10) {
-      Alert.alert("Validation", "Please enter valid mobile number");
+    const trimmedMobile = mobile.trim();
+    if (trimmedMobile.length !== 10) {
+      showLoginMessage(t("auth.validationMobile"));
       return;
     }
     setLoading(true);
     try {
       // Match Xamarin payload contract for GetUserLoginDetails.
       const response = await userService.login({
-        LogInId: mobile,
+        LogInId: trimmedMobile,
         LogInPassword: "1234",
         LanguageType: currentLanguageLabel,
         Refreshdatetime: "2016-01-01",
       });
 
       const root: any = response || {};
-      const isSuccessful = Boolean(root.IsSuccessful ?? root.isSuccessful);
-      const users = (root.ObjUserList ||
-        root.objUserList ||
-        root.result ||
-        root.data ||
-        []) as any[];
+      const responseRoot = root?.result ?? root?.data ?? root;
+      const isSuccessful = Boolean(
+        responseRoot?.IsSuccessful ??
+          responseRoot?.isSuccessful ??
+          root?.IsSuccessful ??
+          root?.isSuccessful,
+      );
+      const users = (
+        responseRoot?.ObjUserList ||
+        responseRoot?.objUserList ||
+        root?.ObjUserList ||
+        root?.objUserList ||
+        responseRoot ||
+        []
+      ) as any[];
       const data = Array.isArray(users) ? users[0] : users;
+      const hasUser = Boolean(data && typeof data === "object");
+
+      if (!isSuccessful || !hasUser) {
+        showLoginMessage(
+          responseRoot?.ErrorMessage ||
+            responseRoot?.errorMessage ||
+            root?.ErrorMessage ||
+            root?.errorMessage ||
+            t("auth.invalidCredentials"),
+        );
+        return;
+      }
+
       const roleId = Number(data?.RoleId ?? data?.roleId ?? 0);
       const typeOfRole = Number(
         data?.TypeOfRole ??
@@ -73,7 +108,7 @@ export const LoginScreen = ({ navigation }: Props) => {
           data?.userProfileId ??
           0,
       );
-      const mobileNumber = data.LogInId || data.mobileNumber || mobile;
+      const mobileNumber = data.LogInId || data.mobileNumber || trimmedMobile;
       const apiImagePath = data.ImagePath || data.imagePath || "";
       const cacheKey = `${STORAGE_KEYS.profileImageCache}:${mobileNumber}`;
       const cachedImagePath = apiImagePath
@@ -81,7 +116,7 @@ export const LoginScreen = ({ navigation }: Props) => {
         : (await AsyncStorage.getItem(cacheKey)) || "";
       const imagePath = apiImagePath || cachedImagePath || undefined;
 
-      if (isSuccessful && data && roleId === 1) {
+      if (roleId === 1) {
         setUser({
           userProfileId: typeOfRole,
           firstName: data.FirstName || data.firstName || "",
@@ -108,13 +143,10 @@ export const LoginScreen = ({ navigation }: Props) => {
             }),
           );
       } else {
-        Alert.alert(
-          "Login failed",
-          root.ErrorMessage || root.errorMessage || "Invalid credentials",
-        );
+        showLoginMessage(t("auth.invalidCredentials"));
       }
     } catch (error: any) {
-      Alert.alert("Login failed", error.message);
+      showLoginMessage(error.message || t("auth.invalidCredentials"));
     } finally {
       setLoading(false);
     }
@@ -132,10 +164,8 @@ export const LoginScreen = ({ navigation }: Props) => {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.headerBlock}>
-            <Text style={styles.title}>Login to Meghdoot</Text>
-            <Text style={styles.subtitle}>
-              A Mobile App to Assist Farmers for Weather Based Farm Management
-            </Text>
+            <Text style={styles.title}>{t("auth.loginTitle")}</Text>
+            <Text style={styles.subtitle}>{t("auth.subtitle")}</Text>
             <Image
               source={require("../../../assets/images/ic_logo.png")}
               style={styles.logo}
@@ -145,23 +175,23 @@ export const LoginScreen = ({ navigation }: Props) => {
 
           <View style={styles.formBlock}>
             <View style={styles.fieldWrap}>
-              <Text style={styles.floatLabel}>Enter Mobile Number</Text>
+              <Text style={styles.floatLabel}>{t("auth.enterMobileNumber")}</Text>
               <TextInput
                 style={styles.input}
                 value={mobile}
                 onChangeText={setMobile}
                 keyboardType="number-pad"
                 maxLength={10}
-                placeholder="Mobile"
+                placeholder={t("auth.mobilePlaceholder")}
                 placeholderTextColor={colors.muted}
               />
             </View>
 
             <View style={styles.fieldWrap}>
-              <Text style={styles.floatLabel}>Select Language</Text>
+              <Text style={styles.floatLabel}>{t("auth.selectLanguage")}</Text>
               <Pressable
                 style={styles.langHeader}
-                onPress={() => setLangOpen((s) => !s)}
+                onPress={() => setLangOpen(true)}
               >
                 <Text style={styles.langHeaderText}>
                   {currentLanguageLabel}
@@ -172,23 +202,6 @@ export const LoginScreen = ({ navigation }: Props) => {
                   resizeMode="contain"
                 />
               </Pressable>
-              {langOpen && (
-                <View style={styles.langList}>
-                  {LANGUAGES.map((item) => (
-                    <Pressable
-                      key={item.code}
-                      style={styles.langItem}
-                      onPress={() => {
-                        setLanguage(item.code);
-                        i18n.changeLanguage(item.code).catch(() => undefined);
-                        setLangOpen(false);
-                      }}
-                    >
-                      <Text style={styles.langItemText}>{item.label}</Text>
-                    </Pressable>
-                  ))}
-                </View>
-              )}
             </View>
           </View>
 
@@ -199,21 +212,59 @@ export const LoginScreen = ({ navigation }: Props) => {
               disabled={loading}
             >
               <Text style={styles.primaryButtonText}>
-                {loading ? "Signing In..." : "Login"}
+                {loading ? t("auth.signingIn") : t("auth.loginButton")}
               </Text>
             </Pressable>
 
-            <Text style={styles.orText}>or</Text>
+            <Text style={styles.orText}>{t("common.or")}</Text>
 
             <Pressable
               style={styles.outlineButton}
-              onPress={() => navigation.navigate("Registration")}
+              onPress={() =>
+                navigation.navigate("Registration", {
+                  selectedLanguageCode: language,
+                })
+              }
             >
-              <Text style={styles.outlineButtonText}>Sign-Up</Text>
+              <Text style={styles.outlineButtonText}>{t("auth.signUpButton")}</Text>
             </Pressable>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <Modal
+        visible={langOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLangOpen(false)}
+      >
+        <Pressable
+          style={styles.modalBackdrop}
+          onPress={() => setLangOpen(false)}
+        >
+          <Pressable style={styles.modalCard} onPress={() => undefined}>
+            <Text style={styles.modalTitle}>{t("auth.selectLanguage")}</Text>
+            <ScrollView
+              style={styles.langListScroll}
+              showsVerticalScrollIndicator
+            >
+              {LANGUAGES.map((item) => (
+                <Pressable
+                  key={item.code}
+                  style={styles.langItem}
+                  onPress={() => {
+                    setLanguage(item.code);
+                    i18n.changeLanguage(item.code).catch(() => undefined);
+                    setLangOpen(false);
+                  }}
+                >
+                  <Text style={styles.langItemText}>{item.label}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </Screen>
   );
 };
@@ -281,6 +332,7 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     paddingHorizontal: 18,
     paddingVertical: 12,
+    minHeight: 46,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -290,18 +342,15 @@ const styles = StyleSheet.create({
     fontFamily: "RobotoRegular",
     color: colors.text,
     fontSize: 14,
+    flex: 1,
+    marginRight: 8,
   },
   dropdownIcon: {
     width: 15,
     height: 15,
   },
-  langList: {
-    marginTop: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    backgroundColor: "#fff",
-    maxHeight: 220,
+  langListScroll: {
+    maxHeight: 320,
   },
   langItem: {
     paddingHorizontal: 14,
@@ -350,5 +399,31 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontFamily: "RobotoMedium",
     fontSize: 16,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "#00000066",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+  },
+  modalCard: {
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    overflow: "hidden",
+    maxHeight: "70%",
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
+  },
+  modalTitle: {
+    fontFamily: "RobotoMedium",
+    fontSize: 16,
+    color: colors.text,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#ececec",
   },
 });

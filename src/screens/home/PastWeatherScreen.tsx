@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -27,6 +27,7 @@ import {
 } from '../../utils/locationApi';
 import { API_REFRESH_DATES } from '../../utils/apiDates';
 import { useAndroidNavigationBar } from '../../hooks/useAndroidNavigationBar';
+import { useTranslation } from 'react-i18next';
 
 const pickText = (...values: any[]) => {
   for (const value of values) {
@@ -269,6 +270,7 @@ const dedupePastWeatherLocations = (items: any[]) => {
 
 export const PastWeatherScreen = () => {
   useAndroidNavigationBar(colors.darkGreen, 'light');
+  const { t } = useTranslation();
   const user = useAppStore((s) => s.user);
   const language = useAppStore((s) => s.language);
   const selectedLocationRef = useAppStore((s) => s.selectedLocation);
@@ -281,6 +283,7 @@ export const PastWeatherScreen = () => {
   const [selectedLocationIndex, setSelectedLocationIndex] = useState(0);
   const [days, setDays] = useState<WeatherForecastItem[]>([]);
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
+  const lastLanguageRef = useRef(languageLabel);
 
   const selectedLocation = locations[selectedLocationIndex] as any;
   const selectedDay = (days[selectedDayIndex] || {}) as any;
@@ -299,16 +302,16 @@ export const PastWeatherScreen = () => {
   );
 
   const locationLabel = useMemo(() => {
-    if (!selectedLocation) return 'Select location';
+    if (!selectedLocation) return t('home.selectLocation');
     const ids = getLocationIds(selectedLocation);
     const stateID = ids.stateID;
     const district = pickText(selectedLocation.districtName, selectedLocation.DistrictName, selectedLocation.tempDistrictName, selectedLocation.TempDistrictName, '');
     const block = pickText(selectedLocation.blockName, selectedLocation.BlockName, selectedLocation.tempBlockName, selectedLocation.TempBlockName, '');
     const asd = pickText(selectedLocation.asdName, selectedLocation.AsdName, selectedLocation.tempAsdName, selectedLocation.TempAsdName, '');
     const location = stateID === 28 || stateID === 36 ? asd : block;
-    if (location && location !== '-') return `${location} (${stateID === 28 || stateID === 36 ? 'ASD' : 'Block'})`;
-    return `${district} (District)`;
-  }, [selectedLocation]);
+    if (location && location !== '-') return `${location} (${stateID === 28 || stateID === 36 ? t('home.asd') : t('home.block')})`;
+    return `${district} (${t('home.district')})`;
+  }, [selectedLocation, t]);
 
   const metricIcons = useMemo(() => getMetricIconsForItem(selectedDay), [selectedDay]);
 
@@ -377,8 +380,12 @@ export const PastWeatherScreen = () => {
     }
   };
 
-  useFocusEffect(
-    React.useCallback(() => {
+  const refreshScreenData = useCallback((forceLocationReload = false) => {
+      if (forceLocationReload) {
+        loadLocations();
+        return;
+      }
+
       const cachedLocations = useAppStore.getState().locations;
       if (cachedLocations?.length) {
         const list = dedupePastWeatherLocations(cachedLocations as any[]) as DashboardLocation[];
@@ -405,8 +412,20 @@ export const PastWeatherScreen = () => {
         return;
       }
       loadLocations();
-    }, [languageLabel, userId, selectedLocationRef]),
+    }, [languageLabel, userId, selectedLocationRef]);
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshScreenData();
+    }, [refreshScreenData]),
   );
+
+  useEffect(() => {
+    if (lastLanguageRef.current !== languageLabel) {
+      lastLanguageRef.current = languageLabel;
+      refreshScreenData(true);
+    }
+  }, [languageLabel, refreshScreenData]);
 
   const selectLocation = async (index: number) => {
     const location = locations[index] as any;
@@ -473,9 +492,9 @@ export const PastWeatherScreen = () => {
                 <View style={styles.metricHalf}>
                   <Image source={metricIcons.temp} style={styles.metricIcon} resizeMode="contain" />
                   <View>
-                    <Text style={[styles.metricLabel, { color: heroTextColor }]}>Temperature</Text>
+                    <Text style={[styles.metricLabel, { color: heroTextColor }]}>{t('home.temperature')}</Text>
                     <Text style={[styles.metricValue, { color: heroTextColor }]}>
-                      Min {pickText(selectedDay.MinTempDegree, selectedDay.minTempDegree, selectedDay.MinTemp, '-')} | Max {pickText(selectedDay.MaxTempDegree, selectedDay.maxTempDegree, selectedDay.MaxTemp, '-')}
+                      {t('home.min')} {pickText(selectedDay.MinTempDegree, selectedDay.minTempDegree, selectedDay.MinTemp, '-')} | {t('home.max')} {pickText(selectedDay.MaxTempDegree, selectedDay.maxTempDegree, selectedDay.MaxTemp, '-')}
                     </Text>
                   </View>
                 </View>
@@ -485,14 +504,14 @@ export const PastWeatherScreen = () => {
                 <View style={styles.metricHalf}>
                   <Image source={metricIcons.rainfall} style={styles.metricIcon} resizeMode="contain" />
                   <View>
-                    <Text style={[styles.metricLabel, { color: heroTextColor }]}>Rainfall</Text>
+                    <Text style={[styles.metricLabel, { color: heroTextColor }]}>{t('home.rainfall')}</Text>
                     <Text style={[styles.metricValue, { color: heroTextColor }]}>{pickText(selectedDay.Rainfall, selectedDay.rainfall, selectedDay.RainFall, selectedDay.rainFall, '-')}</Text>
                   </View>
                 </View>
                 <View style={styles.metricHalf}>
                   <Image source={metricIcons.windSpeed} style={styles.metricIcon} resizeMode="contain" />
                   <View>
-                    <Text style={[styles.metricLabel, { color: heroTextColor }]}>Wind Speed</Text>
+                    <Text style={[styles.metricLabel, { color: heroTextColor }]}>{t('home.windSpeed')}</Text>
                     <Text style={[styles.metricValue, { color: heroTextColor }]}>{pickText(selectedDay.WindSpeed, selectedDay.windSpeed, '-')}</Text>
                   </View>
                 </View>
@@ -502,7 +521,7 @@ export const PastWeatherScreen = () => {
                 <View style={styles.metricHalf}>
                   <Image source={metricIcons.humidity} style={styles.metricIcon} resizeMode="contain" />
                   <View>
-                    <Text style={[styles.metricLabel, { color: heroTextColor }]}>Humidity</Text>
+                    <Text style={[styles.metricLabel, { color: heroTextColor }]}>{t('home.humidity')}</Text>
                     <Text style={[styles.metricValue, { color: heroTextColor }]}>{pickText(selectedDay.Humidity, selectedDay.humidity, '-')}</Text>
                   </View>
                 </View>
@@ -513,14 +532,14 @@ export const PastWeatherScreen = () => {
                     resizeMode="contain"
                   />
                   <View>
-                    <Text style={[styles.metricLabel, { color: heroTextColor }]}>Wind Direction</Text>
+                    <Text style={[styles.metricLabel, { color: heroTextColor }]}>{t('home.windDirection')}</Text>
                     <Text style={[styles.metricValue, { color: heroTextColor }]}>{pickText(selectedDay.WindDirection, selectedDay.windDirection, '-')}</Text>
                   </View>
                 </View>
               </View>
             </ImageBackground>
             {!days.length ? (
-              <Text style={styles.emptyText}>No data currently available.</Text>
+              <Text style={styles.emptyText}>{t('home.noDataCurrentlyAvailable')}</Text>
             ) : null}
           </ScrollView>
         )}

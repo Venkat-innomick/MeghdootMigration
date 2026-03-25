@@ -37,6 +37,7 @@ import {
 } from "../../utils/locationApi";
 import { useAndroidNavigationBar } from "../../hooks/useAndroidNavigationBar";
 import { API_REFRESH_DATES } from "../../utils/apiDates";
+import { useTranslation } from "react-i18next";
 
 type SearchBlockItem = {
   blockID: number;
@@ -51,6 +52,7 @@ const usesAsdMasters = (stateID: number) => stateID === 28 || stateID === 36;
 
 export const SearchScreen = () => {
   useAndroidNavigationBar(colors.background, "dark");
+  const { t } = useTranslation();
   const navigation = useNavigation<any>();
   const user: any = useAppStore((s) => s.user);
   const language = useAppStore((s) => s.language);
@@ -211,7 +213,7 @@ export const SearchScreen = () => {
       );
       setStates(unique);
     } catch (e: any) {
-      Alert.alert("Error", e.message || "Unable to load states");
+      Alert.alert(t("common.error"), e.message || t("home.unableLoadStates"));
     } finally {
       setLoading(false);
     }
@@ -248,7 +250,10 @@ export const SearchScreen = () => {
       );
       setDistricts(unique);
     } catch (e: any) {
-      Alert.alert("Error", e.message || "Unable to load districts");
+      Alert.alert(
+        t("common.error"),
+        e.message || t("register.unableLoadDistricts"),
+      );
     } finally {
       setLoading(false);
     }
@@ -301,7 +306,7 @@ export const SearchScreen = () => {
       const withFav = await refreshFavouriteFlags(unique);
       setBlocks(withFav);
     } catch (e: any) {
-      Alert.alert("Error", e.message || "Unable to load blocks");
+      Alert.alert(t("common.error"), e.message || t("register.unableLoadBlocks"));
     } finally {
       setLoading(false);
     }
@@ -309,7 +314,7 @@ export const SearchScreen = () => {
 
   const addLocation = async (item: SearchBlockItem) => {
     if (!userId) {
-      Alert.alert("Failed", "User profile not loaded. Please login again.");
+      Alert.alert(t("home.failed"), t("home.userNotFoundPleaseLoginAgain"));
       return;
     }
     try {
@@ -327,10 +332,10 @@ export const SearchScreen = () => {
       const response: any = await userService.saveLocation(payload);
       if (!isApiSuccess(response)) {
         Alert.alert(
-          "Failed",
+          t("home.failed"),
           response?.errorMessage ||
             response?.ErrorMessage ||
-            "Unable to add location",
+            t("home.unableAddLocation"),
         );
         return;
       }
@@ -363,18 +368,18 @@ export const SearchScreen = () => {
         ]);
       }
     } catch (e: any) {
-      Alert.alert("Failed", e.message || "Unable to add location");
+      Alert.alert(t("home.failed"), e.message || t("home.unableAddLocation"));
     }
   };
 
   const removeLocation = async (item: SearchBlockItem) => {
     if (!userId) {
-      Alert.alert("Failed", "User profile not loaded. Please login again.");
+      Alert.alert(t("home.failed"), t("home.userNotFoundPleaseLoginAgain"));
       return;
     }
     try {
       if ((appLocations?.length || 0) <= 1) {
-        Alert.alert("Info", "Cannot delete the only saved location.");
+        Alert.alert(t("home.info"), t("search.cannotDeleteOnlySavedLocation"));
         return;
       }
       const payload: Record<string, unknown> = {
@@ -387,10 +392,10 @@ export const SearchScreen = () => {
       const response: any = await userService.deleteLocation(payload);
       if (!isApiSuccess(response)) {
         Alert.alert(
-          "Failed",
+          t("home.failed"),
           response?.errorMessage ||
             response?.ErrorMessage ||
-            "Unable to delete location",
+            t("home.unableDeleteLocation"),
         );
         return;
       }
@@ -417,7 +422,7 @@ export const SearchScreen = () => {
         }),
       );
     } catch (e: any) {
-      Alert.alert("Failed", e.message || "Unable to delete location");
+      Alert.alert(t("home.failed"), e.message || t("home.unableDeleteLocation"));
     }
   };
 
@@ -432,13 +437,16 @@ export const SearchScreen = () => {
 
       const result = await loadSelectedLocationData(item);
       if (!result.locations.length && !result.advisories.length) {
-        Alert.alert("Info", "No data found for selected location.");
+        Alert.alert(t("home.info"), t("search.noDataForSelectedLocation"));
         return;
       }
       setTemporarySearchData(result);
       await moveToHomeForItem(item);
     } catch (e: any) {
-      Alert.alert("Failed", e?.message || "Unable to open selected location");
+      Alert.alert(
+        t("home.failed"),
+        e?.message || t("search.unableOpenSelectedLocation"),
+      );
     } finally {
       setLoading(false);
     }
@@ -446,7 +454,7 @@ export const SearchScreen = () => {
 
   const chooseCurrentLocation = async () => {
     if (!userId) {
-      Alert.alert("Failed", "User profile not loaded. Please login again.");
+      Alert.alert(t("home.failed"), t("home.userNotFoundPleaseLoginAgain"));
       return;
     }
 
@@ -454,7 +462,7 @@ export const SearchScreen = () => {
     try {
       const permission = await Location.requestForegroundPermissionsAsync();
       if (permission.status !== "granted") {
-        Alert.alert("Permission", "Location permission is required.");
+        Alert.alert(t("search.permission"), t("search.locationPermissionRequired"));
         return;
       }
 
@@ -476,7 +484,10 @@ export const SearchScreen = () => {
           params: { screen: "Home" },
         });
     } catch (e: any) {
-      Alert.alert("Failed", e.message || "Unable to get current location");
+      Alert.alert(
+        t("home.failed"),
+        e.message || t("search.unableGetCurrentLocation"),
+      );
     } finally {
       setLoading(false);
     }
@@ -509,7 +520,7 @@ export const SearchScreen = () => {
                   !selectedState && styles.selectorPlaceholder,
                 ]}
               >
-                {selectedState?.stateName || "Select state"}
+                {selectedState?.stateName || t("search.selectState")}
               </Text>
               <Image
                 source={require("../../../assets/images/dropdown.png")}
@@ -529,7 +540,7 @@ export const SearchScreen = () => {
                     !selectedDistrict && styles.selectorPlaceholder,
                   ]}
                 >
-                  {selectedDistrict?.districtName || "Select district"}
+                  {selectedDistrict?.districtName || t("search.selectDistrict")}
                 </Text>
                 <Image
                   source={require("../../../assets/images/dropdown.png")}
@@ -549,7 +560,7 @@ export const SearchScreen = () => {
                 resizeMode="contain"
               />
               <Text style={styles.currentLocationText}>
-                Choose current location
+                {t("search.chooseCurrentLocation")}
               </Text>
             </Pressable>
           </View>
@@ -568,8 +579,8 @@ export const SearchScreen = () => {
             ListEmptyComponent={
               <Text style={styles.empty}>
                 {selectedDistrict
-                  ? "No data currently available."
-                  : "Select state and district to load blocks."}
+                  ? t("home.noDataCurrentlyAvailable")
+                  : t("search.selectStateAndDistrictToLoadBlocks")}
               </Text>
             }
             renderItem={({ item }) => (
@@ -592,7 +603,7 @@ export const SearchScreen = () => {
                     resizeMode="contain"
                   />
                   <Text style={styles.addText}>
-                    {item.favourite ? "Added" : "Add"}
+                    {item.favourite ? t("search.added") : t("home.add")}
                   </Text>
                 </Pressable>
               </Pressable>

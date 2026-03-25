@@ -14,6 +14,7 @@ import { colors } from "../../theme/colors";
 import { useAndroidNavigationBar } from "../../hooks/useAndroidNavigationBar";
 import { getUserProfileId } from "../../utils/locationApi";
 import { useFocusEffect } from "@react-navigation/native";
+import { useTranslation } from "react-i18next";
 
 const pickText = (...values: any[]) => {
   for (const value of values) {
@@ -26,6 +27,7 @@ const SEE_MORE_THRESHOLD = 100;
 
 export const NotificationsScreen = () => {
   useAndroidNavigationBar(colors.background, "dark");
+  const { t } = useTranslation();
   const user = useAppStore((s) => s.user);
   const userId = useMemo(() => getUserProfileId(user), [user]);
 
@@ -86,15 +88,17 @@ export const NotificationsScreen = () => {
     }
 
     if (!items.length) {
-      return <Text style={styles.empty}>No data currently available.</Text>;
+      return <Text style={styles.empty}>{t("home.noDataCurrentlyAvailable")}</Text>;
     }
 
     return (
       <>
         <View style={styles.countBar}>
-          <Text style={styles.countText}>{items.length} notifications</Text>
+          <Text style={styles.countText}>
+            {t("notification.notificationsCount", { count: items.length })}
+          </Text>
           <Pressable onPress={clearAll}>
-            <Text style={styles.clearText}>Clear</Text>
+            <Text style={styles.clearText}>{t("notification.clear")}</Text>
           </Pressable>
         </View>
 
@@ -108,7 +112,7 @@ export const NotificationsScreen = () => {
               item.NotificationTitle,
               item.title,
               item.Title,
-              "Notification",
+              t("notification.notificationDefaultTitle"),
             );
             const issue = pickText(
               item.timeOfIssueMessage,
@@ -149,7 +153,9 @@ export const NotificationsScreen = () => {
                     }
                   >
                     <Text style={styles.seeMoreText}>
-                      {isExpanded ? "Read Less" : "Read More"}
+                      {isExpanded
+                        ? t("notification.readLess")
+                        : t("notification.readMore")}
                     </Text>
                   </Pressable>
                 ) : null}
@@ -159,7 +165,7 @@ export const NotificationsScreen = () => {
         />
       </>
     );
-  }, [clearAll, expanded, items, loading]);
+  }, [clearAll, expanded, items, loading, t]);
 
   return <Screen>{content}</Screen>;
 };

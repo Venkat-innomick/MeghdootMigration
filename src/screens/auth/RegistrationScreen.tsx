@@ -11,6 +11,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  ToastAndroid,
   View,
 } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -29,11 +30,15 @@ import {
 } from "../../types/domain";
 import { LANGUAGES } from "../../constants/languages";
 import { useAndroidNavigationBar } from "../../hooks/useAndroidNavigationBar";
+import { useTranslation } from "react-i18next";
+import i18n from "../../locales/i18n";
+import { useAppStore } from "../../store/appStore";
 
 type Props = NativeStackScreenProps<AuthStackParamList, "Registration">;
 
 type Option = { id: number; label: string };
 type SafeOption = Option & { key: string };
+const MOBILE_REGEX = /^[6-9]\d{9}$/;
 
 const LANGUAGE_ID_BY_CODE: Record<string, number> = {
   en: 2,
@@ -115,9 +120,12 @@ const Selector = ({
         onRequestClose={() => setOpen(false)}
       >
         <Pressable style={styles.modalBackdrop} onPress={() => setOpen(false)}>
-          <View style={styles.modalCard}>
+          <Pressable style={styles.modalCard} onPress={() => undefined}>
             <Text style={styles.modalTitle}>{title}</Text>
-            <ScrollView>
+            <ScrollView
+              style={styles.modalListScroll}
+              showsVerticalScrollIndicator
+            >
               {safeOptions.map((item) => (
                 <Pressable
                   key={item.key}
@@ -131,17 +139,20 @@ const Selector = ({
                 </Pressable>
               ))}
             </ScrollView>
-          </View>
+          </Pressable>
         </Pressable>
       </Modal>
     </>
   );
 };
 
-export const RegistrationScreen = ({ navigation }: Props) => {
+export const RegistrationScreen = ({ navigation, route }: Props) => {
   useAndroidNavigationBar(colors.background, "dark");
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(false);
+  const appLanguage = useAppStore((s) => s.language);
+  const setAppLanguage = useAppStore((s) => s.setLanguage);
 
   const [firstName, setFirstName] = useState("");
   const [mobile, setMobile] = useState("");
@@ -149,7 +160,15 @@ export const RegistrationScreen = ({ navigation }: Props) => {
   const [panchayat, setPanchayat] = useState("");
   const [acceptedTerms, setAcceptedTerms] = useState(false);
 
-  const [selectedLangCode, setSelectedLangCode] = useState("en");
+  const initialLanguageCode = useMemo(() => {
+    const routeCode = route.params?.selectedLanguageCode;
+    if (routeCode && LANGUAGES.some((item) => item.code === routeCode)) {
+      return routeCode;
+    }
+    return appLanguage || "en";
+  }, [appLanguage, route.params?.selectedLanguageCode]);
+
+  const [selectedLangCode, setSelectedLangCode] = useState(initialLanguageCode);
   const [selectedGender, setSelectedGender] = useState<Option | null>(null);
   const [selectedState, setSelectedState] = useState<StateMasterItem | null>(
     null,
@@ -172,6 +191,26 @@ export const RegistrationScreen = ({ navigation }: Props) => {
   );
 
   const selectedLanguageID = LANGUAGE_ID_BY_CODE[selectedLangCode] || 2;
+  const shouldShowDistrict = Boolean(selectedState);
+  const shouldShowBlock = Boolean(selectedDistrict);
+  const isAsdState =
+    selectedState?.stateID === 28 || selectedState?.stateID === 36;
+
+  const showRegisterMessage = (
+    title: string,
+    message: string,
+    onOk?: () => void,
+  ) => {
+    if (Platform.OS === "android" && !onOk) {
+      ToastAndroid.show(message, ToastAndroid.SHORT);
+      return;
+    }
+    Alert.alert(title, message, onOk ? [{ text: t("common.ok"), onPress: onOk }] : undefined);
+  };
+
+  useEffect(() => {
+    setSelectedLangCode(initialLanguageCode);
+  }, [initialLanguageCode]);
 
   useEffect(() => {
     const loadMasterData = async () => {
@@ -201,12 +240,16 @@ export const RegistrationScreen = ({ navigation }: Props) => {
         setGenderOptions(mappedGenders);
         setStateOptions(mappedStates);
       } catch (error: any) {
-        Alert.alert("Error", error.message || "Unable to load master data");
+        Alert.alert(
+          t("common.error"),
+          error.message || t("register.unableLoadMasterData"),
+        );
       } finally {
         setLoading(false);
       }
     };
 
+    setSelectedGender(null);
     setSelectedState(null);
     setSelectedDistrict(null);
     setSelectedBlock(null);
@@ -247,7 +290,10 @@ export const RegistrationScreen = ({ navigation }: Props) => {
         ),
       );
     } catch (error: any) {
-      Alert.alert("Error", error.message || "Unable to load districts");
+      Alert.alert(
+        t("common.error"),
+        error.message || t("register.unableLoadDistricts"),
+      );
     } finally {
       setLoading(false);
     }
@@ -259,11 +305,9 @@ export const RegistrationScreen = ({ navigation }: Props) => {
     setSelectedBlock(null);
     setBlockOptions([]);
 
-    const isAsd = selectedState.stateID === 28 || selectedState.stateID === 36;
-
     setLoading(true);
     try {
-      if (isAsd) {
+      if (isAsdState) {
         const asd = await mastersService.getAsd(
           district.districtID,
           languageLabel,
@@ -291,49 +335,51 @@ export const RegistrationScreen = ({ navigation }: Props) => {
         setBlockOptions(mapped);
       }
     } catch (error: any) {
-      Alert.alert("Error", error.message || "Unable to load blocks");
+      Alert.alert(
+        t("common.error"),
+        error.message || t("register.unableLoadBlocks"),
+      );
     } finally {
       setLoading(false);
     }
   };
 
   const validate = () => {
-    if (!mobile) return "Please enter mobile number";
-    if (mobile.length !== 10 || !/^([0]|\+91)?[789]\d{9}$/.test(mobile))
-      return "Please enter valid mobile number";
-    if (!selectedLanguageID) return "Please select language";
-    if (!selectedState) return "Please select state";
-    if (!selectedDistrict) return "Please select district";
+    const trimmedMobile = mobile.trim();
+    if (!trimmedMobile) return t("register.validationEnterMobile");
+    if (!MOBILE_REGEX.test(trimmedMobile))
+      return t("register.validationValidMobile");
+    if (!selectedLanguageID) return t("register.validationSelectLanguage");
+    if (!selectedState) return t("register.validationSelectState");
+    if (!selectedDistrict) return t("register.validationSelectDistrict");
     if (!selectedBlock)
       return selectedState &&
         (selectedState.stateID === 28 || selectedState.stateID === 36)
-        ? "Please select ASD"
-        : "Please select block";
+        ? t("register.validationSelectAsd")
+        : t("register.validationSelectBlock");
     if (village.trim().length >= 50)
-      return "Village name should be less than 50 characters";
+      return t("register.validationVillageLength");
     if (panchayat.trim().length >= 50)
-      return "Panchayat name should be less than 50 characters";
-    if (!acceptedTerms) return "Please accept the terms and conditions";
+      return t("register.validationPanchayatLength");
+    if (!acceptedTerms) return t("register.validationAcceptTerms");
     return "";
   };
 
   const register = async () => {
     const errorText = validate();
     if (errorText) {
-      Alert.alert("Validation", errorText);
+      showRegisterMessage(t("common.validation"), errorText);
       return;
     }
 
     if (!selectedState || !selectedDistrict || !selectedBlock) return;
-
-    const isAsd = selectedState.stateID === 28 || selectedState.stateID === 36;
 
     const payload: Record<string, unknown> = {
       TitleId: 0,
       GenderID: selectedGender?.id || 0,
       DOB: "",
       FirstName: firstName.trim(),
-      MobileNumber: mobile,
+      MobileNumber: mobile.trim(),
       LanguageID: selectedLanguageID,
       StateID: selectedState.stateID,
       DistrictID: selectedDistrict.districtID,
@@ -350,7 +396,7 @@ export const RegistrationScreen = ({ navigation }: Props) => {
       ThumbNailBytes: null,
     };
 
-    if (isAsd) {
+    if (isAsdState) {
       payload.AsdID = selectedBlock.id;
       payload.AsdName = selectedBlock.label;
     } else {
@@ -361,24 +407,34 @@ export const RegistrationScreen = ({ navigation }: Props) => {
     setLoading(true);
     try {
       const response: any = await userService.register(payload);
-      const ok = Boolean(response?.isSuccessful ?? response?.IsSuccessful);
+      const responseRoot = response?.result ?? response?.data ?? response;
+      const ok = Boolean(
+        responseRoot?.isSuccessful ??
+          responseRoot?.IsSuccessful ??
+          response?.isSuccessful ??
+          response?.IsSuccessful,
+      );
       if (!ok) {
-        Alert.alert(
-          "Registration failed",
-          response?.errorMessage ||
+        showRegisterMessage(
+          t("register.registrationFailed"),
+          responseRoot?.errorMessage ||
+            responseRoot?.ErrorMessage ||
+            response?.errorMessage ||
             response?.ErrorMessage ||
-            "Unable to register",
+            t("register.unableRegister"),
         );
       } else {
-        Alert.alert("Success", "Registration done successfully", [
-          {
-            text: "OK",
-            onPress: () => navigation.replace("Login"),
-          },
-        ]);
+        showRegisterMessage(
+          t("common.success"),
+          t("register.registrationSuccess"),
+          () => navigation.replace("Login"),
+        );
       }
     } catch (error: any) {
-      Alert.alert("Registration failed", error.message || "Unable to register");
+      showRegisterMessage(
+        t("register.registrationFailed"),
+        error.message || t("register.unableRegister"),
+      );
     } finally {
       setLoading(false);
     }
@@ -395,39 +451,37 @@ export const RegistrationScreen = ({ navigation }: Props) => {
           contentContainerStyle={styles.container}
           keyboardShouldPersistTaps="handled"
         >
-          <Text style={styles.title}>Registration</Text>
-          <Text style={styles.subtitle}>
-            A Mobile App to Assist Farmers for Weather Based Farm Management
-          </Text>
+          <Text style={styles.title}>{t("register.title")}</Text>
+          <Text style={styles.subtitle}>{t("register.subtitle")}</Text>
 
           <View style={styles.fieldWrap}>
-            <Text style={styles.floatLabel}>First Name</Text>
+            <Text style={styles.floatLabel}>{t("register.firstName")}</Text>
             <TextInput
               style={styles.input}
               value={firstName}
               onChangeText={setFirstName}
-              placeholder="First name"
+              placeholder={t("register.firstNamePlaceholder")}
               placeholderTextColor={colors.muted}
             />
           </View>
 
           <View style={styles.fieldWrap}>
-            <Text style={styles.floatLabel}>Enter Mobile Number</Text>
+            <Text style={styles.floatLabel}>{t("register.enterMobileNumber")}</Text>
             <TextInput
               style={styles.input}
               value={mobile}
               onChangeText={setMobile}
               keyboardType="number-pad"
               maxLength={10}
-              placeholder="Mobile"
+              placeholder={t("register.mobilePlaceholder")}
               placeholderTextColor={colors.muted}
             />
           </View>
 
           <View style={styles.fieldWrap}>
-            <Text style={styles.floatLabel}>Select Language*</Text>
+            <Text style={styles.floatLabel}>{t("register.selectLanguageMandatory")}</Text>
             <Selector
-              title="Select language"
+              title={t("register.selectLanguage")}
               value={languageLabel}
               options={LANGUAGES.map((l, idx) => ({
                 id: idx + 1,
@@ -435,16 +489,19 @@ export const RegistrationScreen = ({ navigation }: Props) => {
               }))}
               onSelect={(item) => {
                 const found = LANGUAGES.find((l) => l.label === item.label);
-                setSelectedLangCode(found?.code || "en");
+                const code = found?.code || "en";
+                setSelectedLangCode(code);
+                setAppLanguage(code);
+                i18n.changeLanguage(code).catch(() => undefined);
               }}
               borderColor={colors.primary}
             />
           </View>
 
           <View style={styles.fieldWrap}>
-            <Text style={styles.floatLabel}>Gender</Text>
+            <Text style={styles.floatLabel}>{t("register.gender")}</Text>
             <Selector
-              title="Gender"
+              title={t("register.gender")}
               value={selectedGender?.label || ""}
               options={genderOptions}
               onSelect={(item) => setSelectedGender(item)}
@@ -452,9 +509,9 @@ export const RegistrationScreen = ({ navigation }: Props) => {
           </View>
 
           <View style={styles.fieldWrap}>
-            <Text style={styles.floatLabel}>Select State*</Text>
+            <Text style={styles.floatLabel}>{t("register.selectStateMandatory")}</Text>
             <Selector
-              title="Select state*"
+              title={t("register.selectStateMandatory")}
               value={selectedState?.stateName || ""}
               options={stateOptions.map((s) => ({
                 id: s.stateID,
@@ -467,65 +524,65 @@ export const RegistrationScreen = ({ navigation }: Props) => {
             />
           </View>
 
-          <View style={styles.fieldWrap}>
-            <Text style={styles.floatLabel}>Select District*</Text>
-            <Selector
-              title="Select district*"
-              value={selectedDistrict?.districtName || ""}
-              options={districtOptions.map((d) => ({
-                id: d.districtID,
-                label: d.districtName,
-              }))}
-              onSelect={(item) => {
-                const district = districtOptions.find(
-                  (d) => d.districtID === item.id,
-                );
-                if (district) onDistrictChange(district);
-              }}
-              disabled={!selectedState}
-            />
-          </View>
+          {shouldShowDistrict ? (
+            <View style={styles.fieldWrap}>
+              <Text style={styles.floatLabel}>{t("register.selectDistrictMandatory")}</Text>
+              <Selector
+                title={t("register.selectDistrictMandatory")}
+                value={selectedDistrict?.districtName || ""}
+                options={districtOptions.map((d) => ({
+                  id: d.districtID,
+                  label: d.districtName,
+                }))}
+                onSelect={(item) => {
+                  const district = districtOptions.find(
+                    (d) => d.districtID === item.id,
+                  );
+                  if (district) onDistrictChange(district);
+                }}
+              />
+            </View>
+          ) : null}
+
+          {shouldShowBlock ? (
+            <View style={styles.fieldWrap}>
+              <Text style={styles.floatLabel}>
+                {isAsdState
+                  ? t("register.selectAsdMandatory")
+                  : t("register.selectBlockMandatory")}
+              </Text>
+              <Selector
+                title={
+                  isAsdState
+                    ? t("register.selectAsdMandatory")
+                    : t("register.selectBlockMandatory")
+                }
+                value={selectedBlock?.label || ""}
+                options={blockOptions}
+                onSelect={(item) => setSelectedBlock(item)}
+              />
+            </View>
+          ) : null}
 
           <View style={styles.fieldWrap}>
-            <Text style={styles.floatLabel}>
-              {selectedState &&
-              (selectedState.stateID === 28 || selectedState.stateID === 36)
-                ? "Select ASD*"
-                : "Select Block*"}
-            </Text>
-            <Selector
-              title={
-                selectedState &&
-                (selectedState.stateID === 28 || selectedState.stateID === 36)
-                  ? "Select ASD*"
-                  : "Select block*"
-              }
-              value={selectedBlock?.label || ""}
-              options={blockOptions}
-              onSelect={(item) => setSelectedBlock(item)}
-              disabled={!selectedDistrict}
-            />
-          </View>
-
-          <View style={styles.fieldWrap}>
-            <Text style={styles.floatLabel}>Village</Text>
+            <Text style={styles.floatLabel}>{t("register.village")}</Text>
             <TextInput
               style={styles.input}
               value={village}
               onChangeText={setVillage}
-              placeholder="Village"
+              placeholder={t("register.village")}
               placeholderTextColor={colors.muted}
               maxLength={50}
             />
           </View>
 
           <View style={styles.fieldWrap}>
-            <Text style={styles.floatLabel}>Panchayat</Text>
+            <Text style={styles.floatLabel}>{t("register.panchayat")}</Text>
             <TextInput
               style={styles.input}
               value={panchayat}
               onChangeText={setPanchayat}
-              placeholder="Panchayat"
+              placeholder={t("register.panchayat")}
               placeholderTextColor={colors.muted}
               maxLength={50}
             />
@@ -541,18 +598,18 @@ export const RegistrationScreen = ({ navigation }: Props) => {
               ) : null}
             </Pressable>
             <Text style={styles.termsText}>
-              Accept the terms{" "}
+              {t("register.acceptTermsPrefix")}{" "}
               <Text
                 style={styles.termsLinkInline}
                 onPress={() => navigation.navigate("Terms")}
               >
-                terms and conditions
+                {t("register.termsAndConditions")}
               </Text>
             </Text>
           </View>
 
           <Pressable style={styles.registerButton} onPress={register}>
-            <Text style={styles.registerButtonText}>Register</Text>
+            <Text style={styles.registerButtonText}>{t("register.registerButton")}</Text>
           </Pressable>
 
           <Pressable
@@ -560,8 +617,8 @@ export const RegistrationScreen = ({ navigation }: Props) => {
             onPress={() => navigation.replace("Login")}
           >
             <Text style={styles.backText}>
-              <Text style={styles.backPrefix}>Back to </Text>
-              <Text style={styles.backLink}>Login</Text>
+              <Text style={styles.backPrefix}>{t("register.backTo")} </Text>
+              <Text style={styles.backLink}>{t("auth.loginButton")}</Text>
             </Text>
           </Pressable>
         </ScrollView>
@@ -737,6 +794,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderRadius: 12,
     paddingVertical: spacing.sm,
+  },
+  modalListScroll: {
+    maxHeight: 320,
   },
   modalTitle: {
     fontFamily: "RobotoMedium",

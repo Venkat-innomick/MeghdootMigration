@@ -25,6 +25,7 @@ import { userService } from '../../api/services';
 import { LANGUAGES } from '../../constants/languages';
 import i18n from '../../locales/i18n';
 import { STORAGE_KEYS } from '../../constants/storageKeys';
+import { useTranslation } from 'react-i18next';
 
 const pickText = (...values: any[]) => {
   for (const value of values) {
@@ -66,6 +67,7 @@ const InfoField = ({ label, value, divider = true }: { label: string; value: str
 
 export const ProfileScreen = () => {
   useAndroidNavigationBar(colors.background, 'dark');
+  const { t } = useTranslation();
   const user: any = useAppStore((s) => s.user);
   const setUser = useAppStore((s) => s.setUser);
   const languageCode = useAppStore((s) => s.language);
@@ -75,8 +77,8 @@ export const ProfileScreen = () => {
   const [imageLoadFailed, setImageLoadFailed] = useState(false);
 
   const languageLabel = useMemo(
-    () => LANGUAGES.find((l) => l.code === languageCode)?.label || 'English',
-    [languageCode]
+    () => LANGUAGES.find((l) => l.code === languageCode)?.label || t('profile.language'),
+    [languageCode, t]
   );
 
   useFocusEffect(
@@ -155,7 +157,7 @@ export const ProfileScreen = () => {
   const blockName = pickText(user?.blockName, user?.BlockName, user?.asdName, user?.AsdName);
   const language = pickText(user?.languageName, user?.LanguageName, user?.language, user?.Language);
   const stateID = Number(user?.stateID ?? user?.StateID ?? 0);
-  const blockLabel = stateID === 28 || stateID === 36 ? 'ASD' : 'Block';
+  const isAsdState = stateID === 28 || stateID === 36;
   const first = (typeof user?.firstName === 'string' && user.firstName.trim())
     ? user.firstName.trim()
     : (typeof user?.FirstName === 'string' ? user.FirstName.trim() : '');
@@ -314,7 +316,7 @@ export const ProfileScreen = () => {
           <Text style={styles.sectionTitle}>{i18n.t('profile.locationDetails')}</Text>
           <InfoField label={i18n.t('profile.state')} value={stateName} />
           <InfoField label={i18n.t('profile.district')} value={districtName} />
-          <InfoField label={blockLabel === 'ASD' ? i18n.t('profile.asd') : i18n.t('profile.block')} value={blockName} />
+          <InfoField label={isAsdState ? i18n.t('profile.asd') : i18n.t('profile.block')} value={blockName} />
           <InfoField label={i18n.t('profile.village')} value={pickText(user?.villageName, user?.VillageName)} />
           <InfoField label={i18n.t('profile.panchayat')} value={pickText(user?.panchayatName, user?.PanchayatName)} divider={false} />
         </View>

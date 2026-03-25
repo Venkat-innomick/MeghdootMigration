@@ -1,17 +1,48 @@
 {
   "cli": {
-    "version": ">= 10.0.0"
+    "version": ">= 16.15.0",
+    "appVersionSource": "local"
   },
   "build": {
     "development": {
+      "android": {
+        "buildType": "apk"
+      },
+      "ios": {
+        "resourceClass": "m-large"
+      },
+      "env": {
+        "API_BASE_URL": "https://meghdoot.imd.gov.in",
+        "APP_ENV": "development"
+      },
       "developmentClient": true,
       "distribution": "internal"
     },
-    "preview": {
+    "staging": {
+      "android": {
+        "gradleCommand": ":app:assembleRelease"
+      },
+      "ios": {
+        "resourceClass": "m-large"
+      },
+      "env": {
+        "API_BASE_URL": "https://meghdoot.imd.gov.in",
+        "APP_ENV": "staging"
+      },
       "distribution": "internal"
     },
     "production": {
-      "autoIncrement": true
+      "android": {
+        "gradleCommand": ":app:bundleRelease",
+        "ndk": "27.1.12297006"
+      },
+      "ios": {
+        "resourceClass": "m-large"
+      },
+      "env": {
+        "API_BASE_URL": "https://meghdoot.imd.gov.in",
+        "APP_ENV": "production"
+      }
     }
   },
   "submit": {

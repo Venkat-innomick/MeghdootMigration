@@ -12,15 +12,11 @@ import { Screen } from "../../components/Screen";
 import { colors } from "../../theme/colors";
 import { spacing } from "../../theme/spacing";
 import { useAndroidNavigationBar } from "../../hooks/useAndroidNavigationBar";
-
-const ABOUT_TEXT = `Meghdoot, a joint initiative of India Meteorological Department (IMD), Indian Institute of Tropical meteorology (IITM) and Indian Council of Agricultural Research (ICAR) aims to deliver critical information to farmers through a simple and easy to use mobile application.
-
-The mobile application was developed by the Digital Agriculture research team at International Crops Research Institute for the Semi-Arid Tropics (ICRISAT), Hyderabad in collaboration with IITM, Pune and IMD, Delhi.
-
-The app seamlessly aggregates contextualized district and crop wise advisories issued by Agro Met Field Units (AMFU) every Tuesday and Friday with the forecast and historic weather information to the fingertips of the farmers. The advisories are also issued in vernacular wherever available.`;
+import { useTranslation } from "react-i18next";
 
 export const AboutScreen = () => {
   useAndroidNavigationBar(colors.background, "dark");
+  const { t } = useTranslation();
   return (
     <Screen>
       <ScrollView contentContainerStyle={styles.container}>
@@ -47,7 +43,7 @@ export const AboutScreen = () => {
           />
         </ScrollView>
 
-        <Text style={styles.body}>{ABOUT_TEXT}</Text>
+        <Text style={styles.body}>{t("info.aboutBody")}</Text>
 
         <View style={styles.links}>
           <Pressable onPress={() => Linking.openURL("http://www.imd.gov.in/")}>
