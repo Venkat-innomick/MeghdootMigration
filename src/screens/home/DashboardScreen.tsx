@@ -141,6 +141,57 @@ const pickBlockOrAsdName = (item: any) =>
 const pickDistrictName = (item: any) =>
   pickText(item?.districtName, item?.DistrictName, "");
 
+const trimTempValue = (...values: any[]) =>
+  pickText(...values, "--").replace(/\s*C\s*$/i, "");
+
+const normalizeDashboardWeatherRow = (item: any) => {
+  const humidityI = pickText(item?.humidityI, item?.HumidityI, "--");
+  const humidityII = pickText(item?.humidityII, item?.HumidityII, "--");
+
+  return {
+    ...item,
+    MinTemp: trimTempValue(
+      item?.MinTemp,
+      item?.minTemp,
+      item?.TempMin,
+      item?.tempMin,
+    ),
+    MaxTemp: trimTempValue(
+      item?.MaxTemp,
+      item?.maxTemp,
+      item?.TempMax,
+      item?.tempMax,
+    ),
+    RainFall: pickText(
+      item?.RainFall,
+      item?.rainFall,
+      item?.Rainfall,
+      item?.rainfall,
+      "--",
+    ),
+    Humidity:
+      humidityI || humidityII
+        ? `${humidityII || "--"} | ${humidityI || "--"}`
+        : pickText(item?.Humidity, item?.humidity, "--"),
+    Date: pickText(
+      item?.Date,
+      item?.date,
+      item?.ForeCastDate_Lang,
+      item?.KisanDate_Lang,
+      item?.ForeCastDate,
+      item?.KisanDate,
+      "--",
+    ),
+    WeatherType: pickText(
+      item?.WeatherType,
+      item?.weatherType,
+      item?.Cloud,
+      item?.cloud,
+      "--",
+    ),
+  };
+};
+
 const parseAdvisoryList = (payload: any): CropAdvisoryItem[] => {
   const base = payload?.result || payload?.data || payload;
   if (Array.isArray(base)) return base as CropAdvisoryItem[];
@@ -357,8 +408,11 @@ export const DashboardScreen = () => {
         temporarySearchLocations,
         locationList,
       );
+      const normalizedLocations = mergedLocations.map((item: any) =>
+        normalizeDashboardWeatherRow(item),
+      );
       const shapedLocations = shapeHomeLocations(
-        mergedLocations,
+        normalizedLocations,
       ) as DashboardLocation[];
       const currentSelected = useAppStore.getState().selectedLocation;
       const nextLocations = orderLocationsBySelected(
@@ -414,7 +468,7 @@ export const DashboardScreen = () => {
             mergeLocations(
               temporarySearchLocations,
               fallback as DashboardLocation[],
-            ),
+            ).map((item: any) => normalizeDashboardWeatherRow(item)),
           ) as DashboardLocation[],
         );
       }
@@ -582,7 +636,7 @@ export const DashboardScreen = () => {
         require("../../../assets/images/ic_humidity.png"),
       ),
       metric(
-        t("home.direction"),
+        t("home.windDirection"),
         pickText(
           (currentWeatherLocation as any).windDirection,
           (currentWeatherLocation as any).WindDirection,
@@ -837,7 +891,7 @@ export const DashboardScreen = () => {
                     humidityImage,
                   ),
                   metric(
-                    t("home.direction"),
+                    t("home.windDirection"),
                     pickText(
                       (weatherItem as any).windDirection,
                       (weatherItem as any).WindDirection,
@@ -878,35 +932,36 @@ export const DashboardScreen = () => {
                 return (
                   <View style={[styles.weatherCardPress, { width: cardWidth }]}>
                     {weatherItem ? (
-                      <ImageBackground
-                        source={cardBackground}
-                        style={styles.weatherCard}
-                        imageStyle={styles.weatherCardBg}
+                      <Pressable
+                        style={styles.weatherCardTap}
+                        onPress={() => {
+                          const selectedSource: any =
+                            activeTab === "district"
+                              ? (item as any)?.districtWiseWeatherData || weatherItem
+                              : item;
+                          setSelectedLocation({
+                            districtID: toNum(
+                              selectedSource?.districtID,
+                              selectedSource?.DistrictID,
+                            ),
+                            blockID: toNum(
+                              selectedSource?.blockID,
+                              selectedSource?.BlockID,
+                            ),
+                            asdID: toNum(
+                              selectedSource?.asdID,
+                              selectedSource?.AsdID,
+                            ),
+                          });
+                          navigation.navigate("Forecast");
+                        }}
                       >
-                        <Pressable
-                          style={styles.weatherCardTop}
-                          onPress={() => {
-                            const selectedSource: any =
-                              activeTab === "district"
-                                ? (item as any)?.districtWiseWeatherData || weatherItem
-                                : item;
-                            setSelectedLocation({
-                              districtID: toNum(
-                                selectedSource?.districtID,
-                                selectedSource?.DistrictID,
-                              ),
-                              blockID: toNum(
-                                selectedSource?.blockID,
-                                selectedSource?.BlockID,
-                              ),
-                              asdID: toNum(
-                                selectedSource?.asdID,
-                                selectedSource?.AsdID,
-                              ),
-                            });
-                            navigation.navigate("Forecast");
-                          }}
+                        <ImageBackground
+                          source={cardBackground}
+                          style={styles.weatherCard}
+                          imageStyle={styles.weatherCardBg}
                         >
+                        <View style={styles.weatherCardTop}>
                           <Text
                             style={[styles.placeName, { color: metricColor }]}
                           >
@@ -945,7 +1000,7 @@ export const DashboardScreen = () => {
                               "-",
                             )}
                           </Text>
-                        </Pressable>
+                        </View>
 
                         <View style={styles.metricsGrid}>
                           {itemMetrics.map((m, metricIndex) => (
@@ -985,7 +1040,8 @@ export const DashboardScreen = () => {
                             </View>
                           ))}
                         </View>
-                      </ImageBackground>
+                        </ImageBackground>
+                      </Pressable>
                     ) : (
                       <View style={styles.noWeatherCard}>
                         <Text style={styles.noWeatherText}>
@@ -1203,6 +1259,9 @@ const styles = StyleSheet.create({
   weatherCardPress: {
     paddingHorizontal: 0,
     marginBottom: 16,
+  },
+  weatherCardTap: {
+    width: "100%",
   },
   weatherCard: {
     marginHorizontal: 16,
