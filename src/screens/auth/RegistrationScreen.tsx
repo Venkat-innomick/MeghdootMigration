@@ -216,9 +216,14 @@ export const RegistrationScreen = ({ navigation, route }: Props) => {
     const loadMasterData = async () => {
       setLoading(true);
       try {
-        const [genders, states] = await Promise.all([
+        const [genders, states, districts] = await Promise.all([
           mastersService.getGenders(languageLabel, API_REFRESH_DATES.current()),
           mastersService.getStates(languageLabel, API_REFRESH_DATES.current()),
+          mastersService.getDistricts(
+            0,
+            languageLabel,
+            API_REFRESH_DATES.current(),
+          ),
         ]);
 
         const mappedGenders = (genders || [])
@@ -237,8 +242,29 @@ export const RegistrationScreen = ({ navigation, route }: Props) => {
             (s: StateMasterItem) => Number.isFinite(s.stateID) && !!s.stateName,
           );
 
+        const mappedDistricts = (districts || [])
+          .map((d: any, index: number) => ({
+            districtID: Number(d.districtID ?? d.DistrictID ?? index + 1),
+            districtName: String(d.districtName ?? d.DistrictName ?? "").trim(),
+            stateID: Number(d.stateID ?? d.StateID ?? 0),
+          }))
+          .filter(
+            (d: DistrictMasterItem) =>
+              Number.isFinite(d.districtID) &&
+              Number.isFinite(d.stateID) &&
+              !!d.districtName,
+          );
+
+        const validStateIDs = new Set(
+          mappedDistricts.map((district: DistrictMasterItem) => district.stateID),
+        );
+
         setGenderOptions(mappedGenders);
-        setStateOptions(mappedStates);
+        setStateOptions(
+          mappedStates.filter((state: StateMasterItem) =>
+            validStateIDs.has(state.stateID),
+          ),
+        );
       } catch (error: any) {
         Alert.alert(
           t("common.error"),
