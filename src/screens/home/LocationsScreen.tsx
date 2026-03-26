@@ -351,7 +351,9 @@ export const LocationsScreen = () => {
       setBlocks(unique);
     } catch (e: any) {
       setBlocks([]);
-      Alert.alert(t('common.error'), e.message || t('register.unableLoadBlocks'));
+      Alert.alert(t('common.error'), e.message || t('register.unableLoadBlocks'), [
+        { text: t('common.ok') },
+      ]);
     } finally {
       setAddLoading(false);
     }
@@ -371,7 +373,9 @@ export const LocationsScreen = () => {
     try {
       await loadStates();
     } catch {
-      Alert.alert(t('common.error'), t('home.unableLoadStates'));
+      Alert.alert(t('common.error'), t('home.unableLoadStates'), [
+        { text: t('common.ok') },
+      ]);
     } finally {
       setAddLoading(false);
     }
@@ -379,15 +383,21 @@ export const LocationsScreen = () => {
 
   const saveAddedLocation = async () => {
     if (!userId) {
-      Alert.alert(t('home.failed'), t('home.userNotFoundPleaseLoginAgain'));
+      Alert.alert(t('home.failed'), t('home.userNotFoundPleaseLoginAgain'), [
+        { text: t('common.ok') },
+      ]);
       return;
     }
     if (!selectedState) {
-      Alert.alert(t('common.validation'), t('register.validationSelectState'));
+      Alert.alert(t('common.validation'), t('register.validationSelectState'), [
+        { text: t('common.ok') },
+      ]);
       return;
     }
     if (!selectedDistrict) {
-      Alert.alert(t('common.validation'), t('register.validationSelectDistrict'));
+      Alert.alert(t('common.validation'), t('register.validationSelectDistrict'), [
+        { text: t('common.ok') },
+      ]);
       return;
     }
     if (!selectedBlock) {
@@ -395,7 +405,8 @@ export const LocationsScreen = () => {
         t('common.validation'),
         usesAsdMasters(selectedState.stateID)
           ? t('register.validationSelectAsd')
-          : t('register.validationSelectBlock')
+          : t('register.validationSelectBlock'),
+        [{ text: t('common.ok') }]
       );
       return;
     }
@@ -415,7 +426,9 @@ export const LocationsScreen = () => {
     try {
       const response: any = await userService.saveLocation(payload);
       if (!isApiSuccess(response)) {
-        Alert.alert(t('home.failed'), response?.errorMessage || response?.ErrorMessage || t('home.unableAddLocation'));
+        Alert.alert(t('home.failed'), response?.errorMessage || response?.ErrorMessage || t('home.unableAddLocation'), [
+          { text: t('common.ok') },
+        ]);
         return;
       }
 
@@ -485,7 +498,9 @@ export const LocationsScreen = () => {
         },
       ]);
     } catch (e: any) {
-      Alert.alert(t('home.failed'), e.message || t('home.unableAddLocation'));
+      Alert.alert(t('home.failed'), e.message || t('home.unableAddLocation'), [
+        { text: t('common.ok') },
+      ]);
     } finally {
       setAddLoading(false);
     }
@@ -494,11 +509,15 @@ export const LocationsScreen = () => {
   const deleteLocation = async (item: LocationRow) => {
     if (!userId) return;
     if (addedLocations.length <= 1) {
-      Alert.alert(t('home.info'), t('home.cannotDeleteOnlyLocation', { state: item.stateName, city: item.cityName }));
+      Alert.alert(t('home.info'), t('home.cannotDeleteOnlyLocation', { state: item.stateName, city: item.cityName }), [
+        { text: t('common.ok') },
+      ]);
       return;
     }
     if (item.isCurrentLocation) {
-      Alert.alert(t('home.info'), t('home.currentLocationCannotBeDeleted'));
+      Alert.alert(t('home.info'), t('home.currentLocationCannotBeDeleted'), [
+        { text: t('common.ok') },
+      ]);
       return;
     }
 
@@ -531,13 +550,17 @@ export const LocationsScreen = () => {
       );
       const response: any = await userService.deleteLocation(payload);
       if (!isApiSuccess(response)) {
-        Alert.alert(t('home.deleteFailed'), response?.errorMessage || response?.ErrorMessage || t('home.unableDeleteLocation'));
+        Alert.alert(t('home.deleteFailed'), response?.errorMessage || response?.ErrorMessage || t('home.unableDeleteLocation'), [
+          { text: t('common.ok') },
+        ]);
         await loadLocations();
         return;
       }
       await loadLocations();
     } catch (e: any) {
-      Alert.alert(t('home.deleteFailed'), e.message || t('home.unableDeleteLocation'));
+      Alert.alert(t('home.deleteFailed'), e.message || t('home.unableDeleteLocation'), [
+        { text: t('common.ok') },
+      ]);
     }
   };
 

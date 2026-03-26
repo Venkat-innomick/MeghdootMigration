@@ -1354,8 +1354,11 @@ const styles = StyleSheet.create({
     marginTop: -6,
     marginBottom: 10,
     flexDirection: "row",
+    flexWrap: "wrap",
     justifyContent: "center",
     alignItems: "center",
+    alignSelf: "center",
+    maxWidth: "90%",
     gap: 6,
   },
   dot: {
