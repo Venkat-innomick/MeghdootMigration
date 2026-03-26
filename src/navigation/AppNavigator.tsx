@@ -216,11 +216,8 @@ const MenuContent = (props: any) => {
       : 'User';
   const goMenu = (screen: string) => {
     setAndroidNavBar(colors.background, 'dark');
-    props.navigation.navigate(screen);
-  };
-  const goHome = () => {
-    setAndroidNavBar(colors.darkGreen, 'light');
-    props.navigation.navigate('MainTabs');
+    props.navigation.closeDrawer();
+    props.navigation.getParent?.()?.navigate(screen);
   };
   const handleLogout = () => {
     Alert.alert(t('menu.logout'), t('menu.logoutConfirm'), [
@@ -271,7 +268,6 @@ const MenuContent = (props: any) => {
         />
         <Text style={styles.profileName}>{fullName}</Text>
       </Pressable>
-      <DrawerItem label={t('home.home')} labelStyle={{ color: '#fff' }} icon={() => <Image source={require('../../assets/images/ic_home.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />} onPress={goHome} />
       <DrawerItem label={t('menu.allCrops')} labelStyle={{ color: '#fff' }} icon={() => <Image source={require('../../assets/images/ic_allCrop.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />} onPress={() => goMenu('AllCrops')} />
       <DrawerItem label={t('menu.favourites')} labelStyle={{ color: '#fff' }} icon={() => <Image source={require('../../assets/images/ic_fav.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />} onPress={() => goMenu('Favourites')} />
       <DrawerItem label={t('menu.nowcast')} labelStyle={{ color: '#fff' }} icon={() => <Image source={require('../../assets/images/ic_nowcast.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />} onPress={() => goMenu('Nowcast')} />
@@ -394,8 +390,6 @@ const styles = StyleSheet.create({
 });
 
 const MainDrawer = () => {
-  const language = useAppStore((s) => s.language);
-  const t = (key: string) => i18n.t(key, { lng: language });
   return (
     <Drawer.Navigator
       screenOptions={{
@@ -408,12 +402,6 @@ const MainDrawer = () => {
       drawerContent={(props) => <MenuContent {...props} />}
     >
       <Drawer.Screen name="MainTabs" component={HomeTabs} options={{ headerShown: false }} />
-      <Drawer.Screen name="AllCrops" component={AllCropsScreen} options={{ title: t('menu.allCrops') }} />
-      <Drawer.Screen name="Favourites" component={FavouritesScreen} options={{ title: t('menu.favourites') }} />
-      <Drawer.Screen name="Nowcast" component={NowcastScreen} options={{ title: t('menu.nowcast') }} />
-      <Drawer.Screen name="Notifications" component={NotificationsScreen} options={{ title: t('menu.notifications') }} />
-      <Drawer.Screen name="Disclaimer" component={DisclaimerScreen} options={{ title: t('menu.disclaimer') }} />
-      <Drawer.Screen name="About" component={AboutScreen} options={{ title: t('menu.about') }} />
     </Drawer.Navigator>
   );
 };
@@ -435,7 +423,12 @@ export const AppNavigator = () => {
         <RootStack.Screen name="CropFeedback" component={CropFeedbackScreen} options={{ headerStyle: { backgroundColor: colors.primary }, headerTintColor: '#fff', title: t('crop.cropAdvisoryFeedbackTitle') }} />
         <RootStack.Screen name="CropAudioPlayer" component={CropAudioPlayerScreen} options={{ headerShown: false, presentation: 'transparentModal', animation: 'slide_from_bottom' }} />
         <RootStack.Screen name="CropImagePreview" component={CropImagePreviewScreen} options={{ headerShown: false }} />
+        <RootStack.Screen name="AllCrops" component={AllCropsScreen} options={{ headerStyle: { backgroundColor: colors.primary }, headerTintColor: '#fff', title: t('menu.allCrops') }} />
+        <RootStack.Screen name="Favourites" component={FavouritesScreen} options={{ headerStyle: { backgroundColor: colors.primary }, headerTintColor: '#fff', title: t('menu.favourites') }} />
+        <RootStack.Screen name="Nowcast" component={NowcastScreen} options={{ headerStyle: { backgroundColor: colors.primary }, headerTintColor: '#fff', title: t('menu.nowcast') }} />
         <RootStack.Screen name="Notifications" component={NotificationsScreen} options={{ headerStyle: { backgroundColor: colors.primary }, headerTintColor: '#fff', title: t('menu.notifications') }} />
+        <RootStack.Screen name="Disclaimer" component={DisclaimerScreen} options={{ headerStyle: { backgroundColor: colors.primary }, headerTintColor: '#fff', title: t('menu.disclaimer') }} />
+        <RootStack.Screen name="About" component={AboutScreen} options={{ headerStyle: { backgroundColor: colors.primary }, headerTintColor: '#fff', title: t('menu.about') }} />
         <RootStack.Screen name="Search" component={SearchScreen} options={{ headerShown: false }} />
         <RootStack.Screen name="Profile" component={ProfileScreen} options={{ headerStyle: { backgroundColor: colors.primary }, headerTintColor: '#fff', title: t('profile.title') }} />
       </RootStack.Navigator>

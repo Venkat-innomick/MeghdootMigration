@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
+  Dimensions,
   Image,
   Linking,
   Pressable,
@@ -17,31 +18,28 @@ import { useTranslation } from "react-i18next";
 export const AboutScreen = () => {
   useAndroidNavigationBar(colors.background, "dark");
   const { t } = useTranslation();
+  const logos = useMemo(
+    () => [
+      require("../../../assets/images/imd.png"),
+      require("../../../assets/images/iitmp.png"),
+      require("../../../assets/images/icar.png"),
+      require("../../../assets/images/icrisat.png"),
+    ],
+    [],
+  );
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setActiveIndex((prev) => (prev + 1) % logos.length);
+    }, 2000);
+    return () => clearInterval(timer);
+  }, [logos.length]);
+
   return (
     <Screen>
       <ScrollView contentContainerStyle={styles.container}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.imagesRow}
-        >
-          <Image
-            source={require("../../../assets/images/imd.png")}
-            style={styles.logo}
-          />
-          <Image
-            source={require("../../../assets/images/iitmp.png")}
-            style={styles.logo}
-          />
-          <Image
-            source={require("../../../assets/images/icar.png")}
-            style={styles.logo}
-          />
-          <Image
-            source={require("../../../assets/images/icrisat.png")}
-            style={styles.logo}
-          />
-        </ScrollView>
+        <Image source={logos[activeIndex]} style={styles.hero} />
 
         <Text style={styles.body}>{t("info.aboutBody")}</Text>
 
@@ -69,22 +67,21 @@ export const AboutScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { padding: spacing.lg },
-  imagesRow: { gap: spacing.sm, paddingBottom: spacing.md },
-  logo: {
-    width: 180,
-    height: 110,
-    borderRadius: 8,
-    resizeMode: "contain",
-    backgroundColor: "#fff",
+  container: { paddingBottom: spacing.lg },
+  hero: {
+    width: Dimensions.get("window").width,
+    height: 200,
+    resizeMode: "cover",
   },
   body: {
+    marginHorizontal: 20,
+    marginTop: 10,
     fontFamily: "RobotoRegular",
     fontSize: 16,
     lineHeight: 24,
     color: colors.text,
   },
-  links: { marginTop: spacing.md, gap: spacing.xs },
+  links: { marginTop: spacing.md, marginHorizontal: 20, gap: spacing.xs },
   link: {
     color: colors.primary,
     textDecorationLine: "underline",

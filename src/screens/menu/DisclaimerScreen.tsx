@@ -23,16 +23,15 @@ export const DisclaimerScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { padding: spacing.lg, gap: spacing.md },
+  container: { paddingBottom: spacing.lg },
   hero: {
     width: "100%",
-    maxHeight: 260,
-    aspectRatio: 16 / 9,
-    borderRadius: 8,
-    resizeMode: "contain",
-    backgroundColor: "#fff",
+    height: 200,
+    resizeMode: "cover",
   },
   body: {
+    marginHorizontal: 20,
+    marginTop: 10,
     fontFamily: "RobotoRegular",
     fontSize: 16,
     lineHeight: 24,

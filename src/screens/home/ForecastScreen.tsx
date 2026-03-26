@@ -197,6 +197,35 @@ const dedupeForecastLocations = (items: any[]) => {
   });
 };
 
+const findForecastLocationIndex = (
+  list: any[],
+  selectedLocationRef:
+    | {
+        districtID: number;
+        blockID: number;
+        asdID: number;
+      }
+    | null
+    | undefined,
+) => {
+  if (!selectedLocationRef) return -1;
+
+  const exactIndex = list.findIndex((loc: any) => {
+    const ids = getLocationIds(loc);
+    return (
+      ids.districtID === selectedLocationRef.districtID &&
+      ids.blockID === selectedLocationRef.blockID &&
+      ids.asdID === selectedLocationRef.asdID
+    );
+  });
+  if (exactIndex >= 0) return exactIndex;
+
+  return list.findIndex((loc: any) => {
+    const ids = getLocationIds(loc);
+    return ids.districtID === selectedLocationRef.districtID;
+  });
+};
+
 export const ForecastScreen = () => {
   useAndroidNavigationBar(colors.darkGreen, 'light');
   const { t } = useTranslation();
@@ -304,19 +333,7 @@ export const ForecastScreen = () => {
     const list = dedupeForecastLocations(rawList as any[]) as DashboardLocation[];
     setLocations(list);
     if (list.length) {
-      const selectedIndex = selectedLocationRef
-        ? list.findIndex((loc: any) => {
-            const ids = getLocationIds(loc);
-            const districtID = ids.districtID;
-            const blockID = ids.blockID;
-            const asdID = ids.asdID;
-            return (
-              districtID === selectedLocationRef.districtID &&
-              blockID === selectedLocationRef.blockID &&
-              asdID === selectedLocationRef.asdID
-            );
-          })
-        : -1;
+      const selectedIndex = findForecastLocationIndex(list as any[], selectedLocationRef);
       const indexToUse = selectedIndex >= 0 ? selectedIndex : 0;
       const target = list[indexToUse] as any;
       setSelectedLocationIndex(indexToUse);
@@ -367,16 +384,7 @@ export const ForecastScreen = () => {
         const list = dedupeForecastLocations(cachedLocations as any[]) as DashboardLocation[];
         setLocations(list);
         if (list.length) {
-          const selectedIndex = selectedLocationRef
-            ? list.findIndex((loc: any) => {
-                const ids = getLocationIds(loc);
-                return (
-                  ids.districtID === selectedLocationRef.districtID &&
-                  ids.blockID === selectedLocationRef.blockID &&
-                  ids.asdID === selectedLocationRef.asdID
-                );
-              })
-            : -1;
+          const selectedIndex = findForecastLocationIndex(list as any[], selectedLocationRef);
           const indexToUse = selectedIndex >= 0 ? selectedIndex : 0;
           const target = list[indexToUse] as any;
           setSelectedLocationIndex(indexToUse);
