@@ -25,7 +25,12 @@ export type RootStackParamList = {
   CropImagePreview: {
     imageUrl: string;
   };
+  AllCrops: undefined;
+  Favourites: undefined;
+  Nowcast: undefined;
   Notifications: undefined;
+  Disclaimer: undefined;
+  About: undefined;
   Search: undefined;
   Profile: undefined;
 };

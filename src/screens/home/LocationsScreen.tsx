@@ -168,6 +168,9 @@ export const LocationsScreen = () => {
 
   const userId = useMemo(() => getUserProfileId(user), [user]);
   const languageLabel = useMemo(() => getLanguageLabel(language), [language]);
+  const canSubmitAddLocation = Boolean(
+    selectedState && selectedDistrict && selectedBlock,
+  );
 
   const mapRawLocations = React.useCallback((list: any[]): LocationRow[] => {
     const mapped: LocationRow[] = (list || []).map((item: any) => {
@@ -303,16 +306,22 @@ export const LocationsScreen = () => {
     setSelectedDistrict(district);
     setSelectedBlock(null);
     setBlocks([]);
+    await loadBlocksForDistrict(district, selectedState);
   };
 
-  const loadBlocksForDistrict = async () => {
-    if (!selectedDistrict || !selectedState) return;
+  const loadBlocksForDistrict = async (
+    districtArg?: DistrictMasterItem | null,
+    stateArg?: StateMasterItem | null,
+  ) => {
+    const district = districtArg ?? selectedDistrict;
+    const state = stateArg ?? selectedState;
+    if (!district || !state) return;
     setAddLoading(true);
     try {
-      const isAsd = usesAsdMasters(selectedState.stateID);
+      const isAsd = usesAsdMasters(state.stateID);
       const res = isAsd
-        ? await mastersService.getAsd(selectedDistrict.districtID, languageLabel)
-        : await mastersService.getBlocks(selectedDistrict.districtID, languageLabel);
+        ? await mastersService.getAsd(district.districtID, languageLabel)
+        : await mastersService.getBlocks(district.districtID, languageLabel);
 
       const rawList = Array.isArray(res)
         ? res
@@ -340,10 +349,11 @@ export const LocationsScreen = () => {
         (b, i, arr) => arr.findIndex((x) => x.id === b.id) === i,
       );
       setBlocks(unique);
-      setBlockPickerOpen(true);
     } catch (e: any) {
       setBlocks([]);
-      Alert.alert(t('common.error'), e.message || t('register.unableLoadBlocks'));
+      Alert.alert(t('common.error'), e.message || t('register.unableLoadBlocks'), [
+        { text: t('common.ok') },
+      ]);
     } finally {
       setAddLoading(false);
     }
@@ -363,7 +373,9 @@ export const LocationsScreen = () => {
     try {
       await loadStates();
     } catch {
-      Alert.alert(t('common.error'), t('home.unableLoadStates'));
+      Alert.alert(t('common.error'), t('home.unableLoadStates'), [
+        { text: t('common.ok') },
+      ]);
     } finally {
       setAddLoading(false);
     }
@@ -371,15 +383,21 @@ export const LocationsScreen = () => {
 
   const saveAddedLocation = async () => {
     if (!userId) {
-      Alert.alert(t('home.failed'), t('home.userNotFoundPleaseLoginAgain'));
+      Alert.alert(t('home.failed'), t('home.userNotFoundPleaseLoginAgain'), [
+        { text: t('common.ok') },
+      ]);
       return;
     }
     if (!selectedState) {
-      Alert.alert(t('common.validation'), t('register.validationSelectState'));
+      Alert.alert(t('common.validation'), t('register.validationSelectState'), [
+        { text: t('common.ok') },
+      ]);
       return;
     }
     if (!selectedDistrict) {
-      Alert.alert(t('common.validation'), t('register.validationSelectDistrict'));
+      Alert.alert(t('common.validation'), t('register.validationSelectDistrict'), [
+        { text: t('common.ok') },
+      ]);
       return;
     }
     if (!selectedBlock) {
@@ -387,7 +405,8 @@ export const LocationsScreen = () => {
         t('common.validation'),
         usesAsdMasters(selectedState.stateID)
           ? t('register.validationSelectAsd')
-          : t('register.validationSelectBlock')
+          : t('register.validationSelectBlock'),
+        [{ text: t('common.ok') }]
       );
       return;
     }
@@ -407,11 +426,12 @@ export const LocationsScreen = () => {
     try {
       const response: any = await userService.saveLocation(payload);
       if (!isApiSuccess(response)) {
-        Alert.alert(t('home.failed'), response?.errorMessage || response?.ErrorMessage || t('home.unableAddLocation'));
+        Alert.alert(t('home.failed'), response?.errorMessage || response?.ErrorMessage || t('home.unableAddLocation'), [
+          { text: t('common.ok') },
+        ]);
         return;
       }
 
-      // Optimistic UI update to match Xamarin immediate feedback.
       const optimistic: LocationRow = {
         stateID: selectedState.stateID,
         districtID: selectedDistrict.districtID,
@@ -432,56 +452,55 @@ export const LocationsScreen = () => {
         blockName: usesAsdMasters(selectedState.stateID) ? '' : selectedBlock.label,
         asdName: usesAsdMasters(selectedState.stateID) ? selectedBlock.label : '',
       };
-
-      setLocations((prev) => [
-        ...prev,
-        optimistic,
-      ]);
       setAddOpen(false);
-      let refreshed = await loadLocations();
-      let existsAfterRefresh = refreshed.some(
-        (x) =>
-          x.stateID === optimistic.stateID &&
-          x.districtID === optimistic.districtID &&
-          x.blockID === optimistic.blockID &&
-          x.asdID === optimistic.asdID
-      );
-      if (!existsAfterRefresh) {
-        await new Promise((resolve) => setTimeout(resolve, 700));
-        refreshed = await loadLocations();
-        existsAfterRefresh = refreshed.some(
-          (x) =>
-            x.stateID === optimistic.stateID &&
-            x.districtID === optimistic.districtID &&
-            x.blockID === optimistic.blockID &&
-            x.asdID === optimistic.asdID
-        );
-      }
-      if (!existsAfterRefresh) {
-        setLocations((prev) => {
-          const already = prev.some(
-            (x) =>
-              x.stateID === optimistic.stateID &&
-              x.districtID === optimistic.districtID &&
-              x.blockID === optimistic.blockID &&
-              x.asdID === optimistic.asdID
-          );
-          return already ? prev : [...prev, optimistic];
-        });
-      }
-      setSelectedLocation({
-        districtID: optimistic.districtID,
-        blockID: optimistic.blockID,
-        asdID: optimistic.asdID,
-      });
       Alert.alert(t('common.success'), t('home.locationAddedSuccessfully'), [
         {
           text: t('common.ok'),
-          onPress: () => navigation.navigate('Home'),
+          onPress: async () => {
+            let refreshed = await loadLocations();
+            let existsAfterRefresh = refreshed.some(
+              (x) =>
+                x.stateID === optimistic.stateID &&
+                x.districtID === optimistic.districtID &&
+                x.blockID === optimistic.blockID &&
+                x.asdID === optimistic.asdID
+            );
+            if (!existsAfterRefresh) {
+              await new Promise((resolve) => setTimeout(resolve, 700));
+              refreshed = await loadLocations();
+              existsAfterRefresh = refreshed.some(
+                (x) =>
+                  x.stateID === optimistic.stateID &&
+                  x.districtID === optimistic.districtID &&
+                  x.blockID === optimistic.blockID &&
+                  x.asdID === optimistic.asdID
+              );
+            }
+            if (!existsAfterRefresh) {
+              setLocations((prev) => {
+                const already = prev.some(
+                  (x) =>
+                    x.stateID === optimistic.stateID &&
+                    x.districtID === optimistic.districtID &&
+                    x.blockID === optimistic.blockID &&
+                    x.asdID === optimistic.asdID
+                );
+                return already ? prev : [...prev, optimistic];
+              });
+            }
+            setSelectedLocation({
+              districtID: optimistic.districtID,
+              blockID: optimistic.blockID,
+              asdID: optimistic.asdID,
+            });
+            navigation.navigate('Home');
+          },
         },
       ]);
     } catch (e: any) {
-      Alert.alert(t('home.failed'), e.message || t('home.unableAddLocation'));
+      Alert.alert(t('home.failed'), e.message || t('home.unableAddLocation'), [
+        { text: t('common.ok') },
+      ]);
     } finally {
       setAddLoading(false);
     }
@@ -490,11 +509,15 @@ export const LocationsScreen = () => {
   const deleteLocation = async (item: LocationRow) => {
     if (!userId) return;
     if (addedLocations.length <= 1) {
-      Alert.alert(t('home.info'), t('home.cannotDeleteOnlyLocation', { state: item.stateName, city: item.cityName }));
+      Alert.alert(t('home.info'), t('home.cannotDeleteOnlyLocation', { state: item.stateName, city: item.cityName }), [
+        { text: t('common.ok') },
+      ]);
       return;
     }
     if (item.isCurrentLocation) {
-      Alert.alert(t('home.info'), t('home.currentLocationCannotBeDeleted'));
+      Alert.alert(t('home.info'), t('home.currentLocationCannotBeDeleted'), [
+        { text: t('common.ok') },
+      ]);
       return;
     }
 
@@ -527,13 +550,17 @@ export const LocationsScreen = () => {
       );
       const response: any = await userService.deleteLocation(payload);
       if (!isApiSuccess(response)) {
-        Alert.alert(t('home.deleteFailed'), response?.errorMessage || response?.ErrorMessage || t('home.unableDeleteLocation'));
+        Alert.alert(t('home.deleteFailed'), response?.errorMessage || response?.ErrorMessage || t('home.unableDeleteLocation'), [
+          { text: t('common.ok') },
+        ]);
         await loadLocations();
         return;
       }
       await loadLocations();
     } catch (e: any) {
-      Alert.alert(t('home.deleteFailed'), e.message || t('home.unableDeleteLocation'));
+      Alert.alert(t('home.deleteFailed'), e.message || t('home.unableDeleteLocation'), [
+        { text: t('common.ok') },
+      ]);
     }
   };
 
@@ -672,14 +699,14 @@ export const LocationsScreen = () => {
 
             <Pressable
               style={[styles.selector, { marginTop: 10 }]}
-              onPress={() => selectedDistrict && loadBlocksForDistrict()}
+              onPress={() => selectedDistrict && blocks.length && setBlockPickerOpen(true)}
             >
               <Text style={[styles.selectorText, !selectedBlock && styles.selectorPlaceholder]}>
                 {selectedBlock?.label ||
                   (selectedState
-                    ? addLoading && selectedDistrict
-                      ? t('home.loadingLabel', { label: getSubLocationLabel(selectedState.stateID, t) })
-                      : t('home.selectLabel', { label: getSubLocationLabel(selectedState.stateID, t) })
+                    ? usesAsdMasters(selectedState.stateID)
+                      ? t('register.selectAsdMandatory')
+                      : t('register.selectBlockMandatory')
                     : t('register.selectBlockMandatory'))}
               </Text>
               <Image source={require('../../../assets/images/dropdown.png')} style={styles.dropdownIcon} resizeMode="contain" />
@@ -689,7 +716,15 @@ export const LocationsScreen = () => {
               <Pressable style={[styles.actionBtn, styles.cancelBtn]} onPress={() => setAddOpen(false)}>
                 <Text style={styles.cancelText}>{t('common.cancel')}</Text>
               </Pressable>
-              <Pressable style={[styles.actionBtn, styles.saveBtn]} onPress={saveAddedLocation}>
+              <Pressable
+                style={[
+                  styles.actionBtn,
+                  styles.saveBtn,
+                  !canSubmitAddLocation && styles.actionBtnDisabled,
+                ]}
+                disabled={!canSubmitAddLocation}
+                onPress={saveAddedLocation}
+              >
                 <Text style={styles.saveText}>{t('home.add')}</Text>
               </Pressable>
             </View>
@@ -734,7 +769,7 @@ export const LocationsScreen = () => {
                   style={styles.pickerItem}
                   onPress={() => {
                     setDistrictPickerOpen(false);
-                    onDistrictSelect(item);
+                    onDistrictSelect(item).catch(() => undefined);
                   }}
                 >
                   <Text style={styles.pickerText}>{item.districtName}</Text>
@@ -881,6 +916,7 @@ const styles = StyleSheet.create({
   dropdownIcon: { width: 21, height: 11 },
   modalActions: { marginTop: 14, flexDirection: 'row', justifyContent: 'space-between' },
   actionBtn: { flex: 1, borderRadius: 10, paddingVertical: 11, alignItems: 'center' },
+  actionBtnDisabled: { opacity: 0.5 },
   cancelBtn: { backgroundColor: '#ECECEC', marginRight: 8 },
   saveBtn: { backgroundColor: colors.primary, marginLeft: 8 },
   cancelText: { color: '#333', fontFamily: 'RobotoRegular', fontSize: 14 },

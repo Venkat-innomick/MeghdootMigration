@@ -115,13 +115,11 @@ export const SearchScreen = () => {
   const parseSelectedAdvisories = (payload: any) => {
     const base = payload?.result || payload?.data || payload;
     if (Array.isArray(base)) return base;
-    return (
-      base?.objCropAdvisoryDetailsList ||
+    return (base?.objCropAdvisoryDetailsList ||
       base?.ObjCropAdvisoryDetailsList ||
       base?.objCropAdvisoryTopList ||
       base?.ObjCropAdvisoryTopList ||
-      []
-    ) as any[];
+      []) as any[];
   };
 
   const shapeSelectedWeatherRows = (item: SearchBlockItem, rows: any[]) => {
@@ -191,7 +189,10 @@ export const SearchScreen = () => {
         item,
         parseLocationWeatherList(weather) as any[],
       ),
-      advisories: shapeSelectedAdvisoryRows(item, parseSelectedAdvisories(crop)),
+      advisories: shapeSelectedAdvisoryRows(
+        item,
+        parseSelectedAdvisories(crop),
+      ),
     };
   };
 
@@ -295,8 +296,7 @@ export const SearchScreen = () => {
             item.blockID > 0 &&
             !!item.blockName &&
             item.districtID === district.districtID,
-        )
-      ;
+        );
       const unique = mapped.filter(
         (b, i, arr) =>
           arr.findIndex(
@@ -306,7 +306,10 @@ export const SearchScreen = () => {
       const withFav = await refreshFavouriteFlags(unique);
       setBlocks(withFav);
     } catch (e: any) {
-      Alert.alert(t("common.error"), e.message || t("register.unableLoadBlocks"));
+      Alert.alert(
+        t("common.error"),
+        e.message || t("register.unableLoadBlocks"),
+      );
     } finally {
       setLoading(false);
     }
@@ -346,27 +349,10 @@ export const SearchScreen = () => {
             : b,
         ),
       );
-      const currentLocations = useAppStore.getState().locations || [];
-      const exists = currentLocations.some(
-          (loc) =>
-            toNum((loc as any)?.districtID ?? (loc as any)?.DistrictID) ===
-              item.districtID &&
-            toNum((loc as any)?.blockID ?? (loc as any)?.BlockID) ===
-              (item.isAsd ? 0 : item.blockID) &&
-            toNum((loc as any)?.asdID ?? (loc as any)?.AsdID) ===
-              (item.isAsd ? item.blockID : 0),
+      const refreshedWeather = await weatherService.getByLocation(
+        buildByLocationPayload(userId, languageLabel),
       );
-      if (!exists) {
-        setAppLocations([
-          ...currentLocations,
-          {
-            stateID: item.stateID,
-            districtID: item.districtID,
-            blockID: item.isAsd ? 0 : item.blockID,
-            asdID: item.isAsd ? item.blockID : 0,
-          },
-        ]);
-      }
+      setAppLocations(parseLocationWeatherList(refreshedWeather) as any[]);
     } catch (e: any) {
       Alert.alert(t("home.failed"), e.message || t("home.unableAddLocation"));
     }
@@ -422,7 +408,10 @@ export const SearchScreen = () => {
         }),
       );
     } catch (e: any) {
-      Alert.alert(t("home.failed"), e.message || t("home.unableDeleteLocation"));
+      Alert.alert(
+        t("home.failed"),
+        e.message || t("home.unableDeleteLocation"),
+      );
     }
   };
 
@@ -462,7 +451,10 @@ export const SearchScreen = () => {
     try {
       const permission = await Location.requestForegroundPermissionsAsync();
       if (permission.status !== "granted") {
-        Alert.alert(t("search.permission"), t("search.locationPermissionRequired"));
+        Alert.alert(
+          t("search.permission"),
+          t("search.locationPermissionRequired"),
+        );
         return;
       }
 
@@ -590,7 +582,7 @@ export const SearchScreen = () => {
                   style={styles.addedWrap}
                   onPress={(event) => {
                     event.stopPropagation();
-                    item.favourite ? removeLocation(item) : addLocation(item)
+                    item.favourite ? removeLocation(item) : addLocation(item);
                   }}
                 >
                   <Image

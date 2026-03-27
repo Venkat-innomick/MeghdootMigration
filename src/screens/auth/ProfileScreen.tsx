@@ -1,11 +1,18 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   ActionSheetIOS,
   ActivityIndicator,
   Alert,
   Image,
   ImageSourcePropType,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -13,26 +20,26 @@ import {
   Text,
   ToastAndroid,
   View,
-} from 'react-native';
-import Constants from 'expo-constants';
-import { useFocusEffect } from '@react-navigation/native';
-import { Screen } from '../../components/Screen';
-import { useAppStore } from '../../store/appStore';
-import { colors } from '../../theme/colors';
-import { useAndroidNavigationBar } from '../../hooks/useAndroidNavigationBar';
-import { API_BASE_URL } from '../../constants/api';
-import { userService } from '../../api/services';
-import { LANGUAGES } from '../../constants/languages';
-import i18n from '../../locales/i18n';
-import { STORAGE_KEYS } from '../../constants/storageKeys';
-import { useTranslation } from 'react-i18next';
+} from "react-native";
+import Constants from "expo-constants";
+import { useFocusEffect } from "@react-navigation/native";
+import { Screen } from "../../components/Screen";
+import { useAppStore } from "../../store/appStore";
+import { colors } from "../../theme/colors";
+import { useAndroidNavigationBar } from "../../hooks/useAndroidNavigationBar";
+import { API_BASE_URL } from "../../constants/api";
+import { userService } from "../../api/services";
+import { LANGUAGES } from "../../constants/languages";
+import i18n from "../../locales/i18n";
+import { STORAGE_KEYS } from "../../constants/storageKeys";
+import { useTranslation } from "react-i18next";
 
 const pickText = (...values: any[]) => {
   for (const value of values) {
-    if (typeof value === 'string' && value.trim()) return value;
-    if (typeof value === 'number') return String(value);
+    if (typeof value === "string" && value.trim()) return value;
+    if (typeof value === "number") return String(value);
   }
-  return '__';
+  return "__";
 };
 
 const looksLikeBase64 = (value: string) => {
@@ -41,23 +48,42 @@ const looksLikeBase64 = (value: string) => {
   return /^[A-Za-z0-9+/=\r\n]+$/.test(trimmed);
 };
 
-const resolveProfileImage = (rawPath: string | undefined): ImageSourcePropType => {
-  if (!rawPath || !rawPath.trim()) return require('../../../assets/images/ic_defaultProfile.png');
+const resolveProfileImage = (
+  rawPath: string | undefined,
+): ImageSourcePropType => {
+  if (!rawPath || !rawPath.trim())
+    return require("../../../assets/images/ic_defaultProfile.png");
 
   const value = rawPath.trim();
-  if (value.toLowerCase() === 'null' || value.toLowerCase() === 'undefined') {
-    return require('../../../assets/images/ic_defaultProfile.png');
+  if (value.toLowerCase() === "null" || value.toLowerCase() === "undefined") {
+    return require("../../../assets/images/ic_defaultProfile.png");
   }
-  if (value.startsWith('data:image/')) return { uri: value };
+  if (value.startsWith("data:image/")) return { uri: value };
   if (looksLikeBase64(value)) return { uri: `data:image/jpeg;base64,${value}` };
-  if (value.startsWith('http://') || value.startsWith('https://') || value.startsWith('file://')) return { uri: value };
+  if (
+    value.startsWith("http://") ||
+    value.startsWith("https://") ||
+    value.startsWith("file://")
+  )
+    return { uri: value };
 
-  const base = ((Constants.expoConfig?.extra?.apiBaseUrl as string | undefined) || API_BASE_URL).replace(/\/+$/, '');
-  const path = value.startsWith('/') ? value : `/${value}`;
+  const base = (
+    (Constants.expoConfig?.extra?.apiBaseUrl as string | undefined) ||
+    API_BASE_URL
+  ).replace(/\/+$/, "");
+  const path = value.startsWith("/") ? value : `/${value}`;
   return { uri: `${base}${path}` };
 };
 
-const InfoField = ({ label, value, divider = true }: { label: string; value: string; divider?: boolean }) => (
+const InfoField = ({
+  label,
+  value,
+  divider = true,
+}: {
+  label: string;
+  value: string;
+  divider?: boolean;
+}) => (
   <View style={styles.fieldWrap}>
     <Text style={styles.fieldLabel}>{label}</Text>
     <Text style={styles.fieldValue}>{value}</Text>
@@ -66,7 +92,7 @@ const InfoField = ({ label, value, divider = true }: { label: string; value: str
 );
 
 export const ProfileScreen = () => {
-  useAndroidNavigationBar(colors.background, 'dark');
+  useAndroidNavigationBar(colors.background, "dark");
   const { t } = useTranslation();
   const user: any = useAppStore((s) => s.user);
   const setUser = useAppStore((s) => s.setUser);
@@ -75,49 +101,71 @@ export const ProfileScreen = () => {
   const [loading, setLoading] = useState(false);
   const [updatingImage, setUpdatingImage] = useState(false);
   const [imageLoadFailed, setImageLoadFailed] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const languageLabel = useMemo(
-    () => LANGUAGES.find((l) => l.code === languageCode)?.label || t('profile.language'),
-    [languageCode, t]
+    () =>
+      LANGUAGES.find((l) => l.code === languageCode)?.label ||
+      t("profile.language"),
+    [languageCode, t],
   );
 
   useFocusEffect(
     useCallback(() => {
       const loadProfile = async () => {
-        const hasCachedProfile =
-          !!(user?.stateName || user?.StateName || user?.districtName || user?.DistrictName);
+        const hasCachedProfile = !!(
+          user?.stateName ||
+          user?.StateName ||
+          user?.districtName ||
+          user?.DistrictName
+        );
         if (hasLoadedProfileRef.current && hasCachedProfile) return;
 
-        const mobile = user?.mobileNumber || user?.LogInId || user?.MobileNumber;
+        const mobile =
+          user?.mobileNumber || user?.LogInId || user?.MobileNumber;
         if (!mobile) return;
 
         setLoading(true);
         try {
           const response: any = await userService.login({
             LogInId: mobile,
-            LogInPassword: '1234',
+            LogInPassword: "1234",
             LanguageType: languageLabel,
-            Refreshdatetime: '2016-01-01',
+            Refreshdatetime: "2016-01-01",
           });
           const root = response || {};
-          const users = (root.ObjUserList || root.objUserList || root.result || root.data || []) as any[];
+          const users = (root.ObjUserList ||
+            root.objUserList ||
+            root.result ||
+            root.data ||
+            []) as any[];
           const data = Array.isArray(users) ? users[0] : users;
           if (!data) return;
-          const apiImagePath = data.ImagePath || data.imagePath || '';
+          const apiImagePath = data.ImagePath || data.imagePath || "";
           const cachedImagePath = apiImagePath
-            ? ''
-            : (await AsyncStorage.getItem(`${STORAGE_KEYS.profileImageCache}:${mobile}`)) || '';
-          const effectiveImagePath = apiImagePath || cachedImagePath || user?.imagePath;
+            ? ""
+            : (await AsyncStorage.getItem(
+                `${STORAGE_KEYS.profileImageCache}:${mobile}`,
+              )) || "";
+          const effectiveImagePath =
+            apiImagePath || cachedImagePath || user?.imagePath;
 
           const typeOfRole = Number(
-            data?.TypeOfRole ?? data?.typeOfRole ?? data?.UserProfileID ?? data?.userProfileId ?? user?.userProfileId ?? 0
+            data?.TypeOfRole ??
+              data?.typeOfRole ??
+              data?.UserProfileID ??
+              data?.userProfileId ??
+              user?.userProfileId ??
+              0,
           );
 
           setUser({
             userProfileId: typeOfRole || user?.userProfileId || 0,
-            firstName: data.FirstName || data.firstName || user?.firstName || '',
-            lastName: data.LastName || data.lastName || user?.lastName || '',
-            mobileNumber: data.LogInId || data.mobileNumber || user?.mobileNumber || '',
+            firstName:
+              data.FirstName || data.firstName || user?.firstName || "",
+            lastName: data.LastName || data.lastName || user?.lastName || "",
+            mobileNumber:
+              data.LogInId || data.mobileNumber || user?.mobileNumber || "",
             imagePath: effectiveImagePath,
             isLogout: false,
             typeOfRole: typeOfRole || user?.typeOfRole,
@@ -130,7 +178,9 @@ export const ProfileScreen = () => {
             ...(data.BlockName ? { blockName: data.BlockName } : {}),
             ...(data.AsdName ? { asdName: data.AsdName } : {}),
             ...(data.VillageName ? { villageName: data.VillageName } : {}),
-            ...(data.PanchayatName ? { panchayatName: data.PanchayatName } : {}),
+            ...(data.PanchayatName
+              ? { panchayatName: data.PanchayatName }
+              : {}),
             ...(data.LanguageName ? { languageName: data.LanguageName } : {}),
           } as any);
           hasLoadedProfileRef.current = true;
@@ -140,12 +190,18 @@ export const ProfileScreen = () => {
       };
 
       loadProfile().catch(() => setLoading(false));
-    }, [languageLabel, setUser, user?.LogInId, user?.MobileNumber, user?.mobileNumber])
+    }, [
+      languageLabel,
+      setUser,
+      user?.LogInId,
+      user?.MobileNumber,
+      user?.mobileNumber,
+    ]),
   );
 
   const profileImageRaw = user?.imagePath || user?.ImagePath;
   const profileImage = imageLoadFailed
-    ? require('../../../assets/images/ic_defaultProfile.png')
+    ? require("../../../assets/images/ic_defaultProfile.png")
     : resolveProfileImage(profileImageRaw);
 
   useEffect(() => {
@@ -154,20 +210,39 @@ export const ProfileScreen = () => {
 
   const stateName = pickText(user?.stateName, user?.StateName);
   const districtName = pickText(user?.districtName, user?.DistrictName);
-  const blockName = pickText(user?.blockName, user?.BlockName, user?.asdName, user?.AsdName);
-  const language = pickText(user?.languageName, user?.LanguageName, user?.language, user?.Language);
+  const blockName = pickText(
+    user?.blockName,
+    user?.BlockName,
+    user?.asdName,
+    user?.AsdName,
+  );
+  const language = pickText(
+    user?.languageName,
+    user?.LanguageName,
+    user?.language,
+    user?.Language,
+  );
   const stateID = Number(user?.stateID ?? user?.StateID ?? 0);
   const isAsdState = stateID === 28 || stateID === 36;
-  const first = (typeof user?.firstName === 'string' && user.firstName.trim())
-    ? user.firstName.trim()
-    : (typeof user?.FirstName === 'string' ? user.FirstName.trim() : '');
-  const profileName = first || '__';
+  const first =
+    typeof user?.firstName === "string" && user.firstName.trim()
+      ? user.firstName.trim()
+      : typeof user?.FirstName === "string"
+        ? user.FirstName.trim()
+        : "";
+  const profileName = first || "__";
 
   const persistProfileImage = useCallback(
     async (base64Image: string) => {
-      const userProfileId = Number(user?.typeOfRole ?? user?.TypeOfRole ?? user?.userProfileId ?? user?.UserProfileID ?? 0);
+      const userProfileId = Number(
+        user?.typeOfRole ??
+          user?.TypeOfRole ??
+          user?.userProfileId ??
+          user?.UserProfileID ??
+          0,
+      );
       if (!userProfileId) {
-        Alert.alert(i18n.t('profile.title'), i18n.t('profile.loginAgain'));
+        Alert.alert(i18n.t("profile.title"), i18n.t("profile.loginAgain"));
         return;
       }
 
@@ -178,10 +253,14 @@ export const ProfileScreen = () => {
             UserProfileID: userProfileId,
             UserProfileImage: base64Image,
           });
-          const ok = Boolean(response?.isSuccessful ?? response?.IsSuccessful ?? true);
+          const ok = Boolean(
+            response?.isSuccessful ?? response?.IsSuccessful ?? true,
+          );
           if (!ok) {
             // Keep local persistence behavior same as old Xamarin flow.
-            console.log('[ProfileImage] API save returned unsuccessful, keeping local image');
+            console.log(
+              "[ProfileImage] API save returned unsuccessful, keeping local image",
+            );
           }
         } catch {
           // Old Xamarin app also persisted locally even when upload path was not active.
@@ -192,55 +271,65 @@ export const ProfileScreen = () => {
           imagePath: base64Image,
         });
         const mobile = String(
-          user?.mobileNumber || user?.LogInId || user?.MobileNumber || ''
+          user?.mobileNumber || user?.LogInId || user?.MobileNumber || "",
         ).trim();
         if (mobile) {
           await AsyncStorage.setItem(
             `${STORAGE_KEYS.profileImageCache}:${mobile}`,
-            base64Image
+            base64Image,
           );
         }
-        if (Platform.OS === 'android') {
-          ToastAndroid.show(i18n.t('profile.imageUpdated'), ToastAndroid.SHORT);
+        if (Platform.OS === "android") {
+          ToastAndroid.show(i18n.t("profile.imageUpdated"), ToastAndroid.SHORT);
         } else {
-          Alert.alert(i18n.t('profile.title'), i18n.t('profile.imageUpdated'));
+          Alert.alert(i18n.t("profile.title"), i18n.t("profile.imageUpdated"));
         }
       } finally {
         setUpdatingImage(false);
       }
     },
-    [setUser, user]
+    [setUser, user],
   );
 
   const pickAndSaveImage = useCallback(
-    async (mode: 'camera' | 'library') => {
+    async (mode: "camera" | "library") => {
       let ImagePicker: any = null;
       try {
-        ImagePicker = require('expo-image-picker');
+        ImagePicker = require("expo-image-picker");
       } catch {
-        Alert.alert(i18n.t('profile.title'), i18n.t('profile.installImagePicker'));
+        Alert.alert(
+          i18n.t("profile.title"),
+          i18n.t("profile.installImagePicker"),
+        );
         return;
       }
 
-      if (mode === 'camera') {
-        const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
-        const libraryPermission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (cameraPermission?.status !== 'granted' || libraryPermission?.status !== 'granted') {
-          Alert.alert(i18n.t('profile.title'), i18n.t('profile.cameraPhotosDenied'));
+      if (mode === "camera") {
+        const cameraPermission =
+          await ImagePicker.requestCameraPermissionsAsync();
+        const libraryPermission =
+          await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (
+          cameraPermission?.status !== "granted" ||
+          libraryPermission?.status !== "granted"
+        ) {
+          Alert.alert(
+            i18n.t("profile.title"),
+            i18n.t("profile.cameraPhotosDenied"),
+          );
           return;
         }
       } else {
-        const libraryPermission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (libraryPermission?.status !== 'granted') {
-          Alert.alert(i18n.t('profile.title'), i18n.t('profile.photosDenied'));
+        const libraryPermission =
+          await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (libraryPermission?.status !== "granted") {
+          Alert.alert(i18n.t("profile.title"), i18n.t("profile.photosDenied"));
           return;
         }
       }
 
-      const mediaType =
-        ImagePicker?.MediaTypeOptions?.Images ??
-        ImagePicker?.MediaType?.Images ??
-        ['images'];
+      const mediaType = ImagePicker?.MediaTypeOptions?.Images ??
+        ImagePicker?.MediaType?.Images ?? ["images"];
       const commonOptions = {
         mediaTypes: mediaType,
         allowsEditing: true,
@@ -249,7 +338,7 @@ export const ProfileScreen = () => {
       };
 
       const result =
-        mode === 'camera'
+        mode === "camera"
           ? await ImagePicker.launchCameraAsync(commonOptions)
           : await ImagePicker.launchImageLibraryAsync(commonOptions);
 
@@ -257,38 +346,83 @@ export const ProfileScreen = () => {
       const asset = result?.assets?.[0];
       const base64Image = asset?.base64 as string | undefined;
       if (!base64Image) {
-        Alert.alert(i18n.t('profile.title'), i18n.t('profile.unableReadImage'));
+        Alert.alert(i18n.t("profile.title"), i18n.t("profile.unableReadImage"));
         return;
       }
       await persistProfileImage(base64Image);
     },
-    [persistProfileImage]
+    [persistProfileImage],
   );
 
   const onEditProfileImage = useCallback(() => {
-    if (Platform.OS === 'ios') {
+    if (Platform.OS === "ios") {
       ActionSheetIOS.showActionSheetWithOptions(
         {
-          options: [i18n.t('common.cancel'), i18n.t('profile.takePhoto'), i18n.t('profile.chooseFromLibrary')],
+          options: [
+            i18n.t("common.cancel"),
+            i18n.t("profile.takePhoto"),
+            i18n.t("profile.chooseFromLibrary"),
+          ],
           cancelButtonIndex: 0,
         },
         (index) => {
-          if (index === 1) pickAndSaveImage('camera');
-          if (index === 2) pickAndSaveImage('library');
-        }
+          if (index === 1) pickAndSaveImage("camera");
+          if (index === 2) pickAndSaveImage("library");
+        },
       );
       return;
     }
 
-    Alert.alert(i18n.t('profile.chooseOne'), '', [
-      { text: i18n.t('common.cancel'), style: 'cancel' },
-      { text: i18n.t('profile.takePhoto'), onPress: () => pickAndSaveImage('camera') },
-      { text: i18n.t('profile.chooseFromLibrary'), onPress: () => pickAndSaveImage('library') },
-    ]);
+    setPickerOpen(true);
   }, [pickAndSaveImage]);
 
   return (
     <Screen>
+      <Modal
+        visible={pickerOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPickerOpen(false)}
+      >
+        <Pressable
+          style={styles.modalBackdrop}
+          onPress={() => setPickerOpen(false)}
+        >
+          <Pressable style={styles.modalCard} onPress={() => undefined}>
+            <Text style={styles.modalTitle}>{i18n.t("profile.chooseOne")}</Text>
+            <Pressable
+              style={styles.modalAction}
+              onPress={() => {
+                setPickerOpen(false);
+                pickAndSaveImage("library");
+              }}
+            >
+              <Text style={styles.modalActionText}>
+                {i18n.t("profile.chooseFromLibrary")}
+              </Text>
+            </Pressable>
+            <Pressable
+              style={styles.modalAction}
+              onPress={() => {
+                setPickerOpen(false);
+                pickAndSaveImage("camera");
+              }}
+            >
+              <Text style={styles.modalActionText}>
+                {i18n.t("profile.takePhoto")}
+              </Text>
+            </Pressable>
+            <Pressable
+              style={styles.modalAction}
+              onPress={() => setPickerOpen(false)}
+            >
+              <Text style={styles.modalActionText}>
+                {i18n.t("common.cancel")}
+              </Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.avatarWrap}>
           <Image
@@ -298,7 +432,7 @@ export const ProfileScreen = () => {
           />
           <Pressable style={styles.avatarEditBtn} onPress={onEditProfileImage}>
             <Image
-              source={require('../../../assets/images/ic_cameraGallery.png')}
+              source={require("../../../assets/images/ic_cameraGallery.png")}
               style={styles.avatarEditIcon}
               resizeMode="contain"
             />
@@ -306,19 +440,40 @@ export const ProfileScreen = () => {
         </View>
 
         <View style={styles.contentWrap}>
-          <Text style={styles.sectionTitle}>{i18n.t('profile.general')}</Text>
-          <InfoField label={i18n.t('profile.name')} value={profileName} />
-          <InfoField label={i18n.t('profile.mobileNumber')} value={pickText(user?.mobileNumber, user?.LogInId, user?.MobileNumber)} />
+          <Text style={styles.sectionTitle}>{i18n.t("profile.general")}</Text>
+          <InfoField label={i18n.t("profile.name")} value={profileName} />
+          <InfoField
+            label={i18n.t("profile.mobileNumber")}
+            value={pickText(
+              user?.mobileNumber,
+              user?.LogInId,
+              user?.MobileNumber,
+            )}
+          />
 
-          <Text style={styles.sectionTitle}>{i18n.t('profile.profileLanguage')}</Text>
-          <InfoField label={i18n.t('profile.language')} value={language} />
+          <Text style={styles.sectionTitle}>
+            {i18n.t("profile.profileLanguage")}
+          </Text>
+          <InfoField label={i18n.t("profile.language")} value={language} />
 
-          <Text style={styles.sectionTitle}>{i18n.t('profile.locationDetails')}</Text>
-          <InfoField label={i18n.t('profile.state')} value={stateName} />
-          <InfoField label={i18n.t('profile.district')} value={districtName} />
-          <InfoField label={isAsdState ? i18n.t('profile.asd') : i18n.t('profile.block')} value={blockName} />
-          <InfoField label={i18n.t('profile.village')} value={pickText(user?.villageName, user?.VillageName)} />
-          <InfoField label={i18n.t('profile.panchayat')} value={pickText(user?.panchayatName, user?.PanchayatName)} divider={false} />
+          <Text style={styles.sectionTitle}>
+            {i18n.t("profile.locationDetails")}
+          </Text>
+          <InfoField label={i18n.t("profile.state")} value={stateName} />
+          <InfoField label={i18n.t("profile.district")} value={districtName} />
+          <InfoField
+            label={isAsdState ? i18n.t("profile.asd") : i18n.t("profile.block")}
+            value={blockName}
+          />
+          <InfoField
+            label={i18n.t("profile.village")}
+            value={pickText(user?.villageName, user?.VillageName)}
+          />
+          <InfoField
+            label={i18n.t("profile.panchayat")}
+            value={pickText(user?.panchayatName, user?.PanchayatName)}
+            divider={false}
+          />
         </View>
       </ScrollView>
       {loading ? (
@@ -344,10 +499,10 @@ const styles = StyleSheet.create({
   avatarWrap: {
     width: 90,
     height: 90,
-    alignSelf: 'center',
-    alignItems: 'center',
+    alignSelf: "center",
+    alignItems: "center",
     marginBottom: 12,
-    position: 'relative',
+    position: "relative",
   },
   avatar: {
     width: 90,
@@ -357,17 +512,17 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
   },
   avatarEditBtn: {
-    position: 'absolute',
+    position: "absolute",
     right: 0,
     bottom: -2,
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderWidth: 1,
     borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   avatarEditIcon: {
     width: 20,
@@ -375,7 +530,7 @@ const styles = StyleSheet.create({
   },
   avatarEditGlyph: {
     color: colors.primary,
-    fontFamily: 'RobotoMedium',
+    fontFamily: "RobotoMedium",
     fontSize: 18,
     lineHeight: 18,
   },
@@ -386,33 +541,68 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 10,
     color: colors.darkGreen,
-    fontFamily: 'RobotoMedium',
+    fontFamily: "RobotoMedium",
     fontSize: 14,
   },
   fieldWrap: {
     marginBottom: 2,
   },
   fieldLabel: {
-    color: '#A0A0A0',
-    fontFamily: 'RobotoRegular',
+    color: "#A0A0A0",
+    fontFamily: "RobotoRegular",
     fontSize: 12,
   },
   fieldValue: {
     marginTop: 2,
-    color: '#363636',
-    fontFamily: 'RobotoRegular',
+    color: "#363636",
+    fontFamily: "RobotoRegular",
     fontSize: 14,
   },
   divider: {
     marginTop: 6,
     marginBottom: 8,
     height: 1,
-    backgroundColor: '#EBEBEB',
+    backgroundColor: "#EBEBEB",
   },
   loaderOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#00000020',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "#00000020",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "#00000055",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+  },
+  modalCard: {
+    width: "100%",
+    maxWidth: 340,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 4,
+    paddingTop: 18,
+    paddingBottom: 10,
+    elevation: 6,
+  },
+  modalTitle: {
+    paddingHorizontal: 18,
+    paddingBottom: 16,
+    color: "#1A1A1A",
+    fontFamily: "RobotoMedium",
+    fontSize: 16,
+  },
+  modalAction: {
+    minHeight: 48,
+    paddingHorizontal: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalActionText: {
+    color: "#1A1A1A",
+    fontFamily: "RobotoMedium",
+    fontSize: 15,
+    textAlign: "center",
   },
 });

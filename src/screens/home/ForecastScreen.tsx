@@ -197,6 +197,35 @@ const dedupeForecastLocations = (items: any[]) => {
   });
 };
 
+const findForecastLocationIndex = (
+  list: any[],
+  selectedLocationRef:
+    | {
+        districtID: number;
+        blockID: number;
+        asdID: number;
+      }
+    | null
+    | undefined,
+) => {
+  if (!selectedLocationRef) return -1;
+
+  const exactIndex = list.findIndex((loc: any) => {
+    const ids = getLocationIds(loc);
+    return (
+      ids.districtID === selectedLocationRef.districtID &&
+      ids.blockID === selectedLocationRef.blockID &&
+      ids.asdID === selectedLocationRef.asdID
+    );
+  });
+  if (exactIndex >= 0) return exactIndex;
+
+  return list.findIndex((loc: any) => {
+    const ids = getLocationIds(loc);
+    return ids.districtID === selectedLocationRef.districtID;
+  });
+};
+
 export const ForecastScreen = () => {
   useAndroidNavigationBar(colors.darkGreen, 'light');
   const { t } = useTranslation();
@@ -304,19 +333,7 @@ export const ForecastScreen = () => {
     const list = dedupeForecastLocations(rawList as any[]) as DashboardLocation[];
     setLocations(list);
     if (list.length) {
-      const selectedIndex = selectedLocationRef
-        ? list.findIndex((loc: any) => {
-            const ids = getLocationIds(loc);
-            const districtID = ids.districtID;
-            const blockID = ids.blockID;
-            const asdID = ids.asdID;
-            return (
-              districtID === selectedLocationRef.districtID &&
-              blockID === selectedLocationRef.blockID &&
-              asdID === selectedLocationRef.asdID
-            );
-          })
-        : -1;
+      const selectedIndex = findForecastLocationIndex(list as any[], selectedLocationRef);
       const indexToUse = selectedIndex >= 0 ? selectedIndex : 0;
       const target = list[indexToUse] as any;
       setSelectedLocationIndex(indexToUse);
@@ -367,16 +384,7 @@ export const ForecastScreen = () => {
         const list = dedupeForecastLocations(cachedLocations as any[]) as DashboardLocation[];
         setLocations(list);
         if (list.length) {
-          const selectedIndex = selectedLocationRef
-            ? list.findIndex((loc: any) => {
-                const ids = getLocationIds(loc);
-                return (
-                  ids.districtID === selectedLocationRef.districtID &&
-                  ids.blockID === selectedLocationRef.blockID &&
-                  ids.asdID === selectedLocationRef.asdID
-                );
-              })
-            : -1;
+          const selectedIndex = findForecastLocationIndex(list as any[], selectedLocationRef);
           const indexToUse = selectedIndex >= 0 ? selectedIndex : 0;
           const target = list[indexToUse] as any;
           setSelectedLocationIndex(indexToUse);
@@ -453,68 +461,71 @@ export const ForecastScreen = () => {
           </View>
         ) : (
           <ScrollView style={styles.detailsScroll} contentContainerStyle={styles.detailsContainer}>
-            <ImageBackground
-              source={heroBackgroundSource}
-              style={styles.hero}
-              imageStyle={styles.heroImage}
-            >
-              <Text style={[styles.heroDate, { color: heroTextColor }]}>{pickText(selectedDay.date, selectedDay.Date, '-')}</Text>
-              <View style={[styles.heroDivider, { backgroundColor: heroTextColor }]} />
-              <Text style={[styles.heroType, { color: heroTextColor }]}>{pickText(selectedDay.weatherType, selectedDay.WeatherType, '-')}</Text>
+            {days.length ? (
+              <ImageBackground
+                source={heroBackgroundSource}
+                style={styles.hero}
+                imageStyle={styles.heroImage}
+              >
+                <Text style={[styles.heroDate, { color: heroTextColor }]}>{pickText(selectedDay.date, selectedDay.Date, '-')}</Text>
+                <View style={[styles.heroDivider, { backgroundColor: heroTextColor }]} />
+                <Text style={[styles.heroType, { color: heroTextColor }]}>{pickText(selectedDay.weatherType, selectedDay.WeatherType, '-')}</Text>
 
-              <View style={styles.metricRow}>
-                <View style={styles.metricHalf}>
-                  <Image source={metricIcons.temp} style={styles.metricIcon} resizeMode="contain" />
-                  <View>
-                    <Text style={[styles.metricLabel, { color: heroTextColor }]}>{t('home.temperature')}</Text>
-                    <Text style={[styles.metricValue, { color: heroTextColor }]}>
-                      {t('home.min')} {pickText(selectedDay.minTempDegree, selectedDay.MinTempDegree, selectedDay.MinTemp, '-')} | {t('home.max')} {pickText(selectedDay.maxTempDegree, selectedDay.MaxTempDegree, selectedDay.MaxTemp, '-')}
-                    </Text>
+                <View style={styles.metricRow}>
+                  <View style={styles.metricHalf}>
+                    <Image source={metricIcons.temp} style={styles.metricIcon} resizeMode="contain" />
+                    <View>
+                      <Text style={[styles.metricLabel, { color: heroTextColor }]}>{t('home.temperature')}</Text>
+                      <Text style={[styles.metricValue, { color: heroTextColor }]}>
+                        {t('home.min')} {pickText(selectedDay.minTempDegree, selectedDay.MinTempDegree, selectedDay.MinTemp, '-')} | {t('home.max')} {pickText(selectedDay.maxTempDegree, selectedDay.MaxTempDegree, selectedDay.MaxTemp, '-')}
+                      </Text>
+                    </View>
                   </View>
                 </View>
-              </View>
 
-              <View style={styles.metricGridRow}>
-                <View style={styles.metricHalf}>
-                  <Image source={metricIcons.rainfall} style={styles.metricIcon} resizeMode="contain" />
-                  <View>
-                    <Text style={[styles.metricLabel, { color: heroTextColor }]}>{t('home.rainfall')}</Text>
-                    <Text style={[styles.metricValue, { color: heroTextColor }]}>{pickText(selectedDay.rainFall, selectedDay.RainFall, selectedDay.rainfall, selectedDay.Rainfall, '-')}</Text>
+                <View style={styles.metricGridRow}>
+                  <View style={styles.metricHalf}>
+                    <Image source={metricIcons.rainfall} style={styles.metricIcon} resizeMode="contain" />
+                    <View>
+                      <Text style={[styles.metricLabel, { color: heroTextColor }]}>{t('home.rainfall')}</Text>
+                      <Text style={[styles.metricValue, { color: heroTextColor }]}>{pickText(selectedDay.rainFall, selectedDay.RainFall, selectedDay.rainfall, selectedDay.Rainfall, '-')}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.metricHalf}>
+                    <Image source={metricIcons.windSpeed} style={styles.metricIcon} resizeMode="contain" />
+                    <View>
+                      <Text style={[styles.metricLabel, { color: heroTextColor }]}>{t('home.windSpeed')}</Text>
+                      <Text style={[styles.metricValue, { color: heroTextColor }]}>{pickText(selectedDay.windSpeed, selectedDay.WindSpeed, '-')}</Text>
+                    </View>
                   </View>
                 </View>
-                <View style={styles.metricHalf}>
-                  <Image source={metricIcons.windSpeed} style={styles.metricIcon} resizeMode="contain" />
-                  <View>
-                    <Text style={[styles.metricLabel, { color: heroTextColor }]}>{t('home.windSpeed')}</Text>
-                    <Text style={[styles.metricValue, { color: heroTextColor }]}>{pickText(selectedDay.windSpeed, selectedDay.WindSpeed, '-')}</Text>
-                  </View>
-                </View>
-              </View>
 
-              <View style={styles.metricGridRow}>
-                <View style={styles.metricHalf}>
-                  <Image source={metricIcons.humidity} style={styles.metricIcon} resizeMode="contain" />
-                  <View>
-                    <Text style={[styles.metricLabel, { color: heroTextColor }]}>{t('home.humidity')}</Text>
-                    <Text style={[styles.metricValue, { color: heroTextColor }]}>{pickText(selectedDay.humidity, selectedDay.Humidity, '-')}</Text>
+                <View style={styles.metricGridRow}>
+                  <View style={styles.metricHalf}>
+                    <Image source={metricIcons.humidity} style={styles.metricIcon} resizeMode="contain" />
+                    <View>
+                      <Text style={[styles.metricLabel, { color: heroTextColor }]}>{t('home.humidity')}</Text>
+                      <Text style={[styles.metricValue, { color: heroTextColor }]}>{pickText(selectedDay.humidity, selectedDay.Humidity, '-')}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.metricHalf}>
+                    <Image
+                      source={metricIcons.windDirection}
+                      style={[styles.metricIcon, { transform: [{ rotate: `${pickNum(selectedDay.windDirectionAngle, selectedDay.WindDirectionAngle)}deg` }] }]}
+                      resizeMode="contain"
+                    />
+                    <View>
+                      <Text style={[styles.metricLabel, { color: heroTextColor }]}>{t('home.windDirection')}</Text>
+                      <Text style={[styles.metricValue, { color: heroTextColor }]}>{pickText(selectedDay.windDirection, selectedDay.WindDirection, '-')}</Text>
+                    </View>
                   </View>
                 </View>
-                <View style={styles.metricHalf}>
-                  <Image
-                    source={metricIcons.windDirection}
-                    style={[styles.metricIcon, { transform: [{ rotate: `${pickNum(selectedDay.windDirectionAngle, selectedDay.WindDirectionAngle)}deg` }] }]}
-                    resizeMode="contain"
-                  />
-                  <View>
-                    <Text style={[styles.metricLabel, { color: heroTextColor }]}>{t('home.windDirection')}</Text>
-                    <Text style={[styles.metricValue, { color: heroTextColor }]}>{pickText(selectedDay.windDirection, selectedDay.WindDirection, '-')}</Text>
-                  </View>
-                </View>
+              </ImageBackground>
+            ) : (
+              <View style={styles.noDataWrap}>
+                <Text style={styles.emptyText}>{t('home.noDataCurrentlyAvailable')}</Text>
               </View>
-            </ImageBackground>
-            {!days.length ? (
-              <Text style={styles.emptyText}>{t('home.noDataCurrentlyAvailable')}</Text>
-            ) : null}
+            )}
           </ScrollView>
         )}
 
@@ -617,6 +628,14 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
   },
   heroImage: { resizeMode: 'cover' },
+  noDataWrap: {
+    flexGrow: 1,
+    minHeight: 320,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    backgroundColor: '#1B4210',
+  },
   heroDate: {
     color: '#024764',
     fontFamily: 'RobotoRegular',
@@ -665,11 +684,10 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   emptyText: {
-    marginTop: 14,
     textAlign: 'center',
-    color: colors.muted,
+    color: '#fff',
     fontFamily: 'RobotoRegular',
-    fontSize: 14,
+    fontSize: 12,
   },
   modalBackdrop: {
     flex: 1,
