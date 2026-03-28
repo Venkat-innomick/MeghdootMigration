@@ -1238,8 +1238,8 @@ export const DashboardScreen = () => {
           return (
             <Pressable
               style={styles.advisoryCard}
-              onPress={() =>
-                openCropAdvisory({
+              onPress={() => {
+                const advisoryParams = {
                   advisoryId: toNum(row.cropAdvisoryID, row.CropAdvisoryID),
                   cropId: toNum(row.cropID, row.CropID),
                   cropCategoryId: toNum(row.cropCategoryID, row.CropCategoryID),
@@ -1250,8 +1250,13 @@ export const DashboardScreen = () => {
                     row.Title,
                     t("home.cropAdvisory"),
                   ),
-                })
-              }
+                  stateID: toNum(row.stateID, row.StateID),
+                  districtID: toNum(row.districtID, row.DistrictID),
+                  blockID: toNum(row.blockID, row.BlockID),
+                  asdID: toNum(row.asdID, row.AsdID),
+                };
+                openCropAdvisory(advisoryParams);
+              }}
             >
               <Image
                 source={

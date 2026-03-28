@@ -40,6 +40,19 @@ const pickNum = (...values: any[]) => {
   return 0;
 };
 
+const pickPositiveNum = (...values: any[]) => {
+  for (const value of values) {
+    const num =
+      typeof value === 'number'
+        ? value
+        : typeof value === 'string' && value.trim() && !Number.isNaN(Number(value))
+          ? Number(value)
+          : 0;
+    if (num > 0) return num;
+  }
+  return 0;
+};
+
 const pickUri = (...values: any[]) => {
   for (const value of values) {
     if (typeof value !== 'string' || !value.trim()) continue;
@@ -96,14 +109,50 @@ const normalizeAdvisoryDetail = (sourceItem: any, detail: any) => {
   return {
     ...sourceItem,
     ...resolved,
-    stateID: pickNum(resolved?.stateID, resolved?.StateID, sourceItem?.stateID, sourceItem?.StateID, 0),
-    StateID: pickNum(resolved?.StateID, resolved?.stateID, sourceItem?.StateID, sourceItem?.stateID, 0),
-    districtID: pickNum(resolved?.districtID, resolved?.DistrictID, sourceItem?.districtID, sourceItem?.DistrictID, 0),
-    DistrictID: pickNum(resolved?.DistrictID, resolved?.districtID, sourceItem?.DistrictID, sourceItem?.districtID, 0),
-    blockID: pickNum(resolved?.blockID, resolved?.BlockID, sourceItem?.blockID, sourceItem?.BlockID, 0),
-    BlockID: pickNum(resolved?.BlockID, resolved?.blockID, sourceItem?.BlockID, sourceItem?.blockID, 0),
-    asdID: pickNum(resolved?.asdID, resolved?.AsdID, sourceItem?.asdID, sourceItem?.AsdID, 0),
-    AsdID: pickNum(resolved?.AsdID, resolved?.asdID, sourceItem?.AsdID, sourceItem?.asdID, 0),
+    stateID: pickPositiveNum(resolved?.stateID, resolved?.StateID, sourceItem?.stateID, sourceItem?.StateID, sourceItem?.stateId),
+    StateID: pickPositiveNum(resolved?.StateID, resolved?.stateID, sourceItem?.StateID, sourceItem?.stateID, sourceItem?.stateId),
+    districtID: pickPositiveNum(
+      resolved?.districtID,
+      resolved?.DistrictID,
+      sourceItem?.districtID,
+      sourceItem?.DistrictID,
+      sourceItem?.districtId,
+    ),
+    DistrictID: pickPositiveNum(
+      resolved?.DistrictID,
+      resolved?.districtID,
+      sourceItem?.DistrictID,
+      sourceItem?.districtID,
+      sourceItem?.districtId,
+    ),
+    blockID: pickPositiveNum(
+      resolved?.blockID,
+      resolved?.BlockID,
+      sourceItem?.blockID,
+      sourceItem?.BlockID,
+      sourceItem?.blockId,
+    ),
+    BlockID: pickPositiveNum(
+      resolved?.BlockID,
+      resolved?.blockID,
+      sourceItem?.BlockID,
+      sourceItem?.blockID,
+      sourceItem?.blockId,
+    ),
+    asdID: pickPositiveNum(
+      resolved?.asdID,
+      resolved?.AsdID,
+      sourceItem?.asdID,
+      sourceItem?.AsdID,
+      sourceItem?.asdId,
+    ),
+    AsdID: pickPositiveNum(
+      resolved?.AsdID,
+      resolved?.asdID,
+      sourceItem?.AsdID,
+      sourceItem?.asdID,
+      sourceItem?.asdId,
+    ),
     location: pickText(resolved?.location, resolved?.Location, sourceItem?.location, sourceItem?.Location, '--'),
     Location: pickText(resolved?.Location, resolved?.location, sourceItem?.Location, sourceItem?.location, '--'),
     periodStartDate: pickText(
@@ -249,6 +298,43 @@ const normalizeAdvisoryDetail = (sourceItem: any, detail: any) => {
   };
 };
 
+const applyLocationContext = (item: any, context: any) => {
+  if (!context) return item;
+  return {
+    ...item,
+    stateID: pickPositiveNum(item?.stateID, item?.StateID, item?.stateId, context?.stateID),
+    StateID: pickPositiveNum(item?.StateID, item?.stateID, item?.stateId, context?.stateID),
+    districtID: pickPositiveNum(
+      item?.districtID,
+      item?.DistrictID,
+      item?.districtId,
+      context?.districtID,
+    ),
+    DistrictID: pickPositiveNum(
+      item?.DistrictID,
+      item?.districtID,
+      item?.districtId,
+      context?.districtID,
+    ),
+    blockID: pickPositiveNum(item?.blockID, item?.BlockID, item?.blockId, context?.blockID),
+    BlockID: pickPositiveNum(item?.BlockID, item?.blockID, item?.blockId, context?.blockID),
+    asdID: pickPositiveNum(item?.asdID, item?.AsdID, item?.asdId, context?.asdID),
+    AsdID: pickPositiveNum(item?.AsdID, item?.asdID, item?.asdId, context?.asdID),
+  };
+};
+
+const matchesLocationContext = (item: any, context: any) => {
+  if (!context?.districtID) return true;
+  const itemDistrictID = pickPositiveNum(item?.districtID, item?.DistrictID, item?.districtId);
+  if (itemDistrictID !== context.districtID) return false;
+
+  const itemAsdID = pickPositiveNum(item?.asdID, item?.AsdID, item?.asdId);
+  const itemBlockID = pickPositiveNum(item?.blockID, item?.BlockID, item?.blockId);
+  if (context.asdID > 0) return itemAsdID === context.asdID;
+  if (context.blockID > 0) return itemBlockID === context.blockID;
+  return true;
+};
+
 const withEnglishFieldOverrides = (detail: any, englishDetail: any) => {
   if (!englishDetail) return detail;
   return {
@@ -345,6 +431,15 @@ export const CropAdvisoryScreen = () => {
   const requestedAdvisoryId = pickNum(route?.params?.advisoryId, route?.params?.CropAdvisoryID);
   const requestedCropId = pickNum(route?.params?.cropId, route?.params?.CropID);
   const requestedCropCategoryId = pickNum(route?.params?.cropCategoryId, route?.params?.CropCategoryID);
+  const requestedLocation = useMemo(
+    () => ({
+      stateID: pickPositiveNum(route?.params?.stateID, route?.params?.StateID, route?.params?.stateId),
+      districtID: pickPositiveNum(route?.params?.districtID, route?.params?.DistrictID, route?.params?.districtId),
+      blockID: pickPositiveNum(route?.params?.blockID, route?.params?.BlockID, route?.params?.blockId),
+      asdID: pickPositiveNum(route?.params?.asdID, route?.params?.AsdID, route?.params?.asdId),
+    }),
+    [route?.params]
+  );
 
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<any[]>([]);
@@ -450,21 +545,26 @@ export const CropAdvisoryScreen = () => {
         'objCropAdvisoryFavouriteRatingList',
         'ObjCropAdvisoryFavouriteRatingList',
       ]) as any[];
-      setItems(list);
-      if (list.length) {
+      const contextList = list.map((item) => applyLocationContext(item, requestedLocation));
+      const scopedList = requestedLocation.districtID
+        ? contextList.filter((item) => matchesLocationContext(item, requestedLocation))
+        : contextList;
+      const nextList = scopedList.length ? scopedList : contextList;
+      setItems(nextList);
+      if (nextList.length) {
         const matchedByAdvisory = requestedAdvisoryId
-          ? list.findIndex(
+          ? nextList.findIndex(
               (item) => pickNum(item.cropAdvisoryID, item.CropAdvisoryID) === requestedAdvisoryId
             )
           : -1;
         const matchedByCrop = matchedByAdvisory >= 0
           ? -1
           : requestedCropId
-          ? list.findIndex(
+          ? nextList.findIndex(
               (item) => pickNum(item.cropID, item.CropID) === requestedCropId
             )
           : requestedCropCategoryId
-            ? list.findIndex(
+            ? nextList.findIndex(
                 (item) =>
                   pickNum(item.cropCategoryID, item.CropCategoryID) ===
                   requestedCropCategoryId
@@ -475,7 +575,7 @@ export const CropAdvisoryScreen = () => {
           : matchedByCrop >= 0
             ? matchedByCrop
           : activeId
-            ? list.findIndex((item) => pickNum(item.cropAdvisoryID, item.CropAdvisoryID) === activeId)
+            ? nextList.findIndex((item) => pickNum(item.cropAdvisoryID, item.CropAdvisoryID) === activeId)
             : -1;
         setIndex(matchedIndex >= 0 ? matchedIndex : 0);
       }
@@ -563,9 +663,10 @@ export const CropAdvisoryScreen = () => {
       prev.map((item, itemIndex) =>
         itemIndex === index ||
         pickNum(item.cropAdvisoryID, item.CropAdvisoryID) === targetAdvisoryId
-          ? {
-              ...normalizeAdvisoryDetail(item, mergedDetail),
-            }
+          ? applyLocationContext(
+              normalizeAdvisoryDetail(item, mergedDetail),
+              requestedLocation,
+            )
           : item,
       ),
     );
@@ -574,7 +675,7 @@ export const CropAdvisoryScreen = () => {
   useFocusEffect(
     useCallback(() => {
       loadAdvisories();
-    }, [userProfileId, languageLabel, requestedAdvisoryId, requestedCropCategoryId, requestedCropId])
+  }, [userProfileId, languageLabel, requestedAdvisoryId, requestedCropCategoryId, requestedCropId, requestedLocation])
   );
 
   useEffect(() => {
@@ -644,10 +745,30 @@ export const CropAdvisoryScreen = () => {
   };
 
   const shareCurrent = useCallback(async () => {
-    const stateID = pickNum(current.stateID, current.StateID);
-    const districtID = pickNum(current.districtID, current.DistrictID);
-    const blockID = pickNum(current.blockID, current.BlockID);
-    const asdID = pickNum(current.asdID, current.AsdID);
+    const stateID = pickPositiveNum(
+      current.stateID,
+      current.StateID,
+      current.stateId,
+      requestedLocation.stateID,
+    );
+    const districtID = pickPositiveNum(
+      current.districtID,
+      current.DistrictID,
+      current.districtId,
+      requestedLocation.districtID,
+    );
+    const blockID = pickPositiveNum(
+      current.blockID,
+      current.BlockID,
+      current.blockId,
+      requestedLocation.blockID,
+    );
+    const asdID = pickPositiveNum(
+      current.asdID,
+      current.AsdID,
+      current.asdId,
+      requestedLocation.asdID,
+    );
     if (!stateID || !districtID) {
       return;
     }
@@ -663,7 +784,7 @@ export const CropAdvisoryScreen = () => {
       message: `${t('crop.checkoutAdvisory')}\n${shareUrl}`,
       url: shareUrl,
     });
-  }, [current, t]);
+  }, [current, requestedLocation, t]);
 
   useLayoutEffect(() => {
     navigation.setOptions({

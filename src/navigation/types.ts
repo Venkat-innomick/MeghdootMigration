@@ -9,6 +9,10 @@ export type RootStackParamList = {
         cropId?: number;
         cropCategoryId?: number;
         cropName?: string;
+        stateID?: number;
+        districtID?: number;
+        blockID?: number;
+        asdID?: number;
       }
     | undefined;
   CropFeedback: {

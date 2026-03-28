@@ -274,6 +274,14 @@ export const FavouritesScreen = () => {
                         0,
                       ),
                       cropName: pickText(item.cropName, item.CropName, ""),
+                      stateID: pickNum(item.stateID, item.StateID, item.stateId),
+                      districtID: pickNum(
+                        item.districtID,
+                        item.DistrictID,
+                        item.districtId,
+                      ),
+                      blockID: pickNum(item.blockID, item.BlockID, item.blockId),
+                      asdID: pickNum(item.asdID, item.AsdID, item.asdId),
                     })
                   }
                 >

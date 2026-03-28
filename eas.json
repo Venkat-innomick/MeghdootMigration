@@ -15,7 +15,6 @@
         "API_BASE_URL": "https://meghdoot.imd.gov.in",
         "APP_ENV": "development"
       },
-      "developmentClient": true,
       "distribution": "internal"
     },
     "staging": {
