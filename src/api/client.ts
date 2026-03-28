@@ -63,7 +63,11 @@ const request = async <T>(
     );
   } catch (error: any) {
     const message = String(error?.message || "");
-    if (message === "Network request failed" || message === "Failed to fetch") {
+    if (
+      message === "Network request failed" ||
+      message === "Failed to fetch" ||
+      message == "Request timeout"
+    ) {
       throw new Error(getOfflineMessage());
     }
     throw error;

@@ -108,12 +108,7 @@ export const LoginScreen = ({ navigation }: Props) => {
           0,
       );
       const mobileNumber = data.LogInId || data.mobileNumber || trimmedMobile;
-      const apiImagePath = data.ImagePath || data.imagePath || "";
-      const cacheKey = `${STORAGE_KEYS.profileImageCache}:${mobileNumber}`;
-      const cachedImagePath = apiImagePath
-        ? ""
-        : (await AsyncStorage.getItem(cacheKey)) || "";
-      const imagePath = apiImagePath || cachedImagePath || undefined;
+      const imagePath = data.ImagePath || data.imagePath || undefined;
 
       if (roleId === 1) {
         const storedUser = {

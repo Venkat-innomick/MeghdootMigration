@@ -249,6 +249,69 @@ const normalizeAdvisoryDetail = (sourceItem: any, detail: any) => {
   };
 };
 
+const withEnglishFieldOverrides = (detail: any, englishDetail: any) => {
+  if (!englishDetail) return detail;
+  return {
+    ...detail,
+    weatherCondition: pickText(
+      englishDetail?.weatherCondition,
+      englishDetail?.WeatherCondition,
+      detail?.weatherCondition,
+      detail?.WeatherCondition,
+      '--',
+    ),
+    WeatherCondition: pickText(
+      englishDetail?.WeatherCondition,
+      englishDetail?.weatherCondition,
+      detail?.WeatherCondition,
+      detail?.weatherCondition,
+      '--',
+    ),
+    recommendations: pickText(
+      englishDetail?.recommendations,
+      englishDetail?.Recommendations,
+      detail?.recommendations,
+      detail?.Recommendations,
+      '--',
+    ),
+    Recommendations: pickText(
+      englishDetail?.Recommendations,
+      englishDetail?.recommendations,
+      detail?.Recommendations,
+      detail?.recommendations,
+      '--',
+    ),
+    briefText: pickText(
+      englishDetail?.briefText,
+      englishDetail?.BriefText,
+      detail?.briefText,
+      detail?.BriefText,
+      '--',
+    ),
+    BriefText: pickText(
+      englishDetail?.BriefText,
+      englishDetail?.briefText,
+      detail?.BriefText,
+      detail?.briefText,
+      '--',
+    ),
+    agroAdvisoryDetails: pickText(
+      englishDetail?.agroAdvisoryDetails,
+      englishDetail?.AgroAdvisoryDetails,
+      detail?.agroAdvisoryDetails,
+      detail?.AgroAdvisoryDetails,
+      '--',
+    ),
+    AgroAdvisoryDetails: pickText(
+      englishDetail?.AgroAdvisoryDetails,
+      englishDetail?.agroAdvisoryDetails,
+      detail?.AgroAdvisoryDetails,
+      detail?.agroAdvisoryDetails,
+      '--',
+    ),
+  };
+};
+
 type AdvisorySectionProps = {
   title: string;
   open: boolean;
@@ -467,14 +530,14 @@ export const CropAdvisoryScreen = () => {
     setAudios(audioList);
   };
 
-  const fetchAdvisoryDetail = async (targetAdvisoryId: number) => {
-    const cacheKey = `${targetAdvisoryId}:${languageLabel}`;
+  const fetchAdvisoryDetail = async (targetAdvisoryId: number, detailLanguage = languageLabel) => {
+    const cacheKey = `${targetAdvisoryId}:${detailLanguage}`;
     if (detailCacheRef.current[cacheKey]) {
       return detailCacheRef.current[cacheKey];
     }
     const response = await cropService.getAdvisoryById({
       CropAdvisoryID: targetAdvisoryId,
-      LanguageType: languageLabel,
+      LanguageType: detailLanguage,
       RefreshDateTime: API_REFRESH_DATES.current(),
     });
 
@@ -491,12 +554,17 @@ export const CropAdvisoryScreen = () => {
   const loadAdvisoryDetail = async (targetAdvisoryId: number) => {
     if (!targetAdvisoryId) return;
     const detail = await fetchAdvisoryDetail(targetAdvisoryId);
+    const englishDetail =
+      languageLabel.toLowerCase() === 'english'
+        ? detail
+        : await fetchAdvisoryDetail(targetAdvisoryId, 'English');
+    const mergedDetail = withEnglishFieldOverrides(detail, englishDetail);
     setItems((prev) =>
       prev.map((item, itemIndex) =>
         itemIndex === index ||
         pickNum(item.cropAdvisoryID, item.CropAdvisoryID) === targetAdvisoryId
           ? {
-              ...normalizeAdvisoryDetail(item, detail),
+              ...normalizeAdvisoryDetail(item, mergedDetail),
             }
           : item,
       ),
@@ -581,9 +649,6 @@ export const CropAdvisoryScreen = () => {
     const blockID = pickNum(current.blockID, current.BlockID);
     const asdID = pickNum(current.asdID, current.AsdID);
     if (!stateID || !districtID) {
-      Alert.alert('', t('crop.noDataCurrentlyAvailable'), [
-        { text: t('common.ok') },
-      ]);
       return;
     }
 
