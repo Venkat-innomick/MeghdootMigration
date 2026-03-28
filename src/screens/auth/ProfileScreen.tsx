@@ -242,7 +242,9 @@ export const ProfileScreen = () => {
           0,
       );
       if (!userProfileId) {
-        Alert.alert(i18n.t("profile.title"), i18n.t("profile.loginAgain"));
+        Alert.alert("", i18n.t("profile.loginAgain"), [
+          { text: i18n.t("common.ok") },
+        ]);
         return;
       }
 
@@ -282,7 +284,9 @@ export const ProfileScreen = () => {
         if (Platform.OS === "android") {
           ToastAndroid.show(i18n.t("profile.imageUpdated"), ToastAndroid.SHORT);
         } else {
-          Alert.alert(i18n.t("profile.title"), i18n.t("profile.imageUpdated"));
+          Alert.alert("", i18n.t("profile.imageUpdated"), [
+            { text: i18n.t("common.ok") },
+          ]);
         }
       } finally {
         setUpdatingImage(false);
@@ -297,10 +301,9 @@ export const ProfileScreen = () => {
       try {
         ImagePicker = require("expo-image-picker");
       } catch {
-        Alert.alert(
-          i18n.t("profile.title"),
-          i18n.t("profile.installImagePicker"),
-        );
+        Alert.alert("", i18n.t("profile.installImagePicker"), [
+          { text: i18n.t("common.ok") },
+        ]);
         return;
       }
 
@@ -313,17 +316,18 @@ export const ProfileScreen = () => {
           cameraPermission?.status !== "granted" ||
           libraryPermission?.status !== "granted"
         ) {
-          Alert.alert(
-            i18n.t("profile.title"),
-            i18n.t("profile.cameraPhotosDenied"),
-          );
+          Alert.alert("", i18n.t("profile.cameraPhotosDenied"), [
+            { text: i18n.t("common.ok") },
+          ]);
           return;
         }
       } else {
         const libraryPermission =
           await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (libraryPermission?.status !== "granted") {
-          Alert.alert(i18n.t("profile.title"), i18n.t("profile.photosDenied"));
+          Alert.alert("", i18n.t("profile.photosDenied"), [
+            { text: i18n.t("common.ok") },
+          ]);
           return;
         }
       }
@@ -332,7 +336,7 @@ export const ProfileScreen = () => {
         ImagePicker?.MediaType?.Images ?? ["images"];
       const commonOptions = {
         mediaTypes: mediaType,
-        allowsEditing: true,
+        allowsEditing: false,
         quality: 0.6,
         base64: true,
       };
@@ -346,7 +350,9 @@ export const ProfileScreen = () => {
       const asset = result?.assets?.[0];
       const base64Image = asset?.base64 as string | undefined;
       if (!base64Image) {
-        Alert.alert(i18n.t("profile.title"), i18n.t("profile.unableReadImage"));
+        Alert.alert("", i18n.t("profile.unableReadImage"), [
+          { text: i18n.t("common.ok") },
+        ]);
         return;
       }
       await persistProfileImage(base64Image);

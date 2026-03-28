@@ -51,7 +51,7 @@ export const LoginScreen = ({ navigation }: Props) => {
       ToastAndroid.show(message, ToastAndroid.SHORT);
       return;
     }
-    Alert.alert(t("auth.loginFailed"), message);
+    Alert.alert("", message, [{ text: t("common.ok") }]);
   };
 
   const login = async () => {

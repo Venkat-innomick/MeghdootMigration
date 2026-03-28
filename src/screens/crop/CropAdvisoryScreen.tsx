@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -80,6 +80,9 @@ const pickImageDataUri = (...values: any[]) => {
   return '';
 };
 
+const CROP_SHARE_BASE_URL = 'https://www.tropmet.res.in/';
+const ENGLISH_LANGUAGE_LABEL = 'English';
+
 const pickList = (payload: any, keys: string[]) => {
   if (!payload) return [];
   if (Array.isArray(payload)) return payload;
@@ -87,6 +90,211 @@ const pickList = (payload: any, keys: string[]) => {
     if (Array.isArray(payload?.[key])) return payload[key];
   }
   return [];
+};
+
+const normalizeAdvisoryDetail = (
+  sourceItem: any,
+  englishDetail: any,
+  regionalDetail: any,
+) => {
+  const detail = regionalDetail || englishDetail || {};
+  return {
+    ...detail,
+    stateID: pickNum(
+      detail?.stateID,
+      detail?.StateID,
+      sourceItem?.stateID,
+      sourceItem?.StateID,
+      0,
+    ),
+    StateID: pickNum(
+      detail?.StateID,
+      detail?.stateID,
+      sourceItem?.StateID,
+      sourceItem?.stateID,
+      0,
+    ),
+    districtID: pickNum(
+      detail?.districtID,
+      detail?.DistrictID,
+      sourceItem?.districtID,
+      sourceItem?.DistrictID,
+      0,
+    ),
+    DistrictID: pickNum(
+      detail?.DistrictID,
+      detail?.districtID,
+      sourceItem?.DistrictID,
+      sourceItem?.districtID,
+      0,
+    ),
+    blockID: pickNum(
+      detail?.blockID,
+      detail?.BlockID,
+      sourceItem?.blockID,
+      sourceItem?.BlockID,
+      0,
+    ),
+    BlockID: pickNum(
+      detail?.BlockID,
+      detail?.blockID,
+      sourceItem?.BlockID,
+      sourceItem?.blockID,
+      0,
+    ),
+    asdID: pickNum(
+      detail?.asdID,
+      detail?.AsdID,
+      sourceItem?.asdID,
+      sourceItem?.AsdID,
+      0,
+    ),
+    AsdID: pickNum(
+      detail?.AsdID,
+      detail?.asdID,
+      sourceItem?.AsdID,
+      sourceItem?.asdID,
+      0,
+    ),
+    location: pickText(
+      detail?.location,
+      detail?.Location,
+      sourceItem?.location,
+      sourceItem?.Location,
+      '--',
+    ),
+    Location: pickText(
+      detail?.Location,
+      detail?.location,
+      sourceItem?.Location,
+      sourceItem?.location,
+      '--',
+    ),
+    periodStartDate: pickText(
+      detail?.periodStartDate,
+      detail?.PeriodStartDate,
+      sourceItem?.periodStartDate,
+      sourceItem?.PeriodStartDate,
+      '--',
+    ),
+    PeriodStartDate: pickText(
+      detail?.PeriodStartDate,
+      detail?.periodStartDate,
+      sourceItem?.PeriodStartDate,
+      sourceItem?.periodStartDate,
+      '--',
+    ),
+    periodEndDate: pickText(
+      detail?.periodEndDate,
+      detail?.PeriodEndDate,
+      sourceItem?.periodEndDate,
+      sourceItem?.PeriodEndDate,
+      '--',
+    ),
+    PeriodEndDate: pickText(
+      detail?.PeriodEndDate,
+      detail?.periodEndDate,
+      sourceItem?.PeriodEndDate,
+      sourceItem?.periodEndDate,
+      '--',
+    ),
+    weatherCondition: pickText(
+      englishDetail?.weatherCondition,
+      englishDetail?.WeatherCondition,
+      '--',
+    ),
+    WeatherCondition: pickText(
+      englishDetail?.WeatherCondition,
+      englishDetail?.weatherCondition,
+      '--',
+    ),
+    recommendations: pickText(
+      englishDetail?.recommendations,
+      englishDetail?.Recommendations,
+      '--',
+    ),
+    Recommendations: pickText(
+      englishDetail?.Recommendations,
+      englishDetail?.recommendations,
+      '--',
+    ),
+    briefText: pickText(
+      englishDetail?.briefText,
+      englishDetail?.BriefText,
+      '--',
+    ),
+    BriefText: pickText(
+      englishDetail?.BriefText,
+      englishDetail?.briefText,
+      '--',
+    ),
+    agroAdvisoryDetails: pickText(
+      englishDetail?.agroAdvisoryDetails,
+      englishDetail?.AgroAdvisoryDetails,
+      '--',
+    ),
+    AgroAdvisoryDetails: pickText(
+      englishDetail?.AgroAdvisoryDetails,
+      englishDetail?.agroAdvisoryDetails,
+      '--',
+    ),
+    weatherConditionRegional: pickText(
+      sourceItem?.weatherConditionRegional,
+      sourceItem?.WeatherConditionRegional,
+      regionalDetail?.weatherConditionRegional,
+      regionalDetail?.WeatherConditionRegional,
+      '--',
+    ),
+    WeatherConditionRegional: pickText(
+      sourceItem?.WeatherConditionRegional,
+      sourceItem?.weatherConditionRegional,
+      regionalDetail?.WeatherConditionRegional,
+      regionalDetail?.weatherConditionRegional,
+      '--',
+    ),
+    recommendationsRegional: pickText(
+      sourceItem?.recommendationsRegional,
+      sourceItem?.RecommendationsRegional,
+      regionalDetail?.recommendationsRegional,
+      regionalDetail?.RecommendationsRegional,
+      '--',
+    ),
+    RecommendationsRegional: pickText(
+      sourceItem?.RecommendationsRegional,
+      sourceItem?.recommendationsRegional,
+      regionalDetail?.RecommendationsRegional,
+      regionalDetail?.recommendationsRegional,
+      '--',
+    ),
+    briefTextRegional: pickText(
+      sourceItem?.briefTextRegional,
+      sourceItem?.BriefTextRegional,
+      regionalDetail?.briefTextRegional,
+      regionalDetail?.BriefTextRegional,
+      '--',
+    ),
+    BriefTextRegional: pickText(
+      sourceItem?.BriefTextRegional,
+      sourceItem?.briefTextRegional,
+      regionalDetail?.BriefTextRegional,
+      regionalDetail?.briefTextRegional,
+      '--',
+    ),
+    agroAdvisoryDetailsRegional: pickText(
+      sourceItem?.agroAdvisoryDetailsRegional,
+      sourceItem?.AgroAdvisoryDetailsRegional,
+      regionalDetail?.agroAdvisoryDetailsRegional,
+      regionalDetail?.AgroAdvisoryDetailsRegional,
+      '--',
+    ),
+    AgroAdvisoryDetailsRegional: pickText(
+      sourceItem?.AgroAdvisoryDetailsRegional,
+      sourceItem?.agroAdvisoryDetailsRegional,
+      regionalDetail?.AgroAdvisoryDetailsRegional,
+      regionalDetail?.agroAdvisoryDetailsRegional,
+      '--',
+    ),
+  };
 };
 
 type AdvisorySectionProps = {
@@ -133,7 +341,7 @@ export const CropAdvisoryScreen = () => {
 
   const [weatherOpen, setWeatherOpen] = useState(true);
   const [agroOpen, setAgroOpen] = useState(false);
-  const [smsOpen, setSmsOpen] = useState(false);
+  const [smsOpen, setSmsOpen] = useState(true);
   const [recommendationOpen, setRecommendationOpen] = useState(true);
   const [attachmentsOpen, setAttachmentsOpen] = useState(false);
 
@@ -164,19 +372,19 @@ export const CropAdvisoryScreen = () => {
 
   const weatherText = isEnglish
     ? pickText(current.weatherCondition, current.WeatherCondition, '--')
-    : pickText(current.weatherConditionRegional, current.WeatherConditionRegional, current.weatherCondition, current.WeatherCondition, '--');
+    : pickText(current.weatherConditionRegional, current.WeatherConditionRegional, '--');
 
   const agroText = isEnglish
     ? pickText(current.agroAdvisoryDetails, current.AgroAdvisoryDetails, '--')
-    : pickText(current.agroAdvisoryDetailsRegional, current.AgroAdvisoryDetailsRegional, current.agroAdvisoryDetails, current.AgroAdvisoryDetails, '--');
+    : pickText(current.agroAdvisoryDetailsRegional, current.AgroAdvisoryDetailsRegional, '--');
 
   const briefText = isEnglish
     ? pickText(current.briefText, current.BriefText, '--')
-    : pickText(current.briefTextRegional, current.BriefTextRegional, current.briefText, current.BriefText, '--');
+    : pickText(current.briefTextRegional, current.BriefTextRegional, '--');
 
   const recommendationText = isEnglish
     ? pickText(current.recommendations, current.Recommendations, '--')
-    : pickText(current.recommendationsRegional, current.RecommendationsRegional, current.recommendations, current.Recommendations, '--');
+    : pickText(current.recommendationsRegional, current.RecommendationsRegional, '--');
 
   const hasWeatherSection = !!pickText(current.weatherCondition, current.WeatherCondition);
   const hasRecommendationSection = !!pickText(current.recommendations, current.Recommendations);
@@ -281,6 +489,47 @@ export const CropAdvisoryScreen = () => {
     setAudios(audioList);
   };
 
+  const fetchAdvisoryDetail = async (
+    targetAdvisoryId: number,
+    requestedLanguageLabel: string,
+  ) => {
+    const response = await cropService.getAdvisoryById({
+      CropAdvisoryID: targetAdvisoryId,
+      LanguageType: requestedLanguageLabel,
+      RefreshDateTime: API_REFRESH_DATES.current(),
+    });
+
+    const base = response?.result || response?.data || response;
+    const details = pickList(base, [
+      'objCropAdvisoryDetailsList',
+      'ObjCropAdvisoryDetailsList',
+    ]) as any[];
+    return details[0] || null;
+  };
+
+  const loadAdvisoryDetail = async (targetAdvisoryId: number) => {
+    if (!targetAdvisoryId) return;
+    const englishDetail = await fetchAdvisoryDetail(
+      targetAdvisoryId,
+      ENGLISH_LANGUAGE_LABEL,
+    );
+    const regionalDetail =
+      languageLabel === ENGLISH_LANGUAGE_LABEL
+        ? null
+        : await fetchAdvisoryDetail(targetAdvisoryId, languageLabel);
+    setItems((prev) =>
+      prev.map((item, itemIndex) =>
+        itemIndex === index ||
+        pickNum(item.cropAdvisoryID, item.CropAdvisoryID) === targetAdvisoryId
+          ? {
+              ...item,
+              ...normalizeAdvisoryDetail(item, englishDetail, regionalDetail),
+            }
+          : item,
+      ),
+    );
+  };
+
   useFocusEffect(
     useCallback(() => {
       loadAdvisories();
@@ -292,6 +541,14 @@ export const CropAdvisoryScreen = () => {
       loadAttachments(advisoryId).catch(() => {
         setImages([]);
         setAudios([]);
+      });
+    }
+  }, [advisoryId, languageLabel]);
+
+  useEffect(() => {
+    if (advisoryId) {
+      loadAdvisoryDetail(advisoryId).catch(() => {
+        // Keep current list item if detail fetch fails.
       });
     }
   }, [advisoryId, languageLabel]);
@@ -344,22 +601,44 @@ export const CropAdvisoryScreen = () => {
     ]);
   };
 
-  const shareCurrent = async () => {
+  const shareCurrent = useCallback(async () => {
     const stateID = pickNum(current.stateID, current.StateID);
     const districtID = pickNum(current.districtID, current.DistrictID);
     const blockID = pickNum(current.blockID, current.BlockID);
     const asdID = pickNum(current.asdID, current.AsdID);
-    if (!stateID || !districtID) return;
+    if (!stateID || !districtID) {
+      Alert.alert('', t('crop.noDataCurrentlyAvailable'), [
+        { text: t('common.ok') },
+      ]);
+      return;
+    }
+
     const isAsdState = stateID === 28 || stateID === 36;
-    const levelPart = isAsdState ? `ASDID=${asdID}` : `BlockID=${blockID}`;
-    const shareUrl = `https://www.tropmet.res.in/StateID=${stateID}/DistrictID=${districtID}/${levelPart}`;
+    const levelPart = isAsdState
+      ? `ASDID=${asdID || 0}`
+      : `BlockID=${blockID || 0}`;
+    const shareUrl = `${CROP_SHARE_BASE_URL}StateID=${stateID}/DistrictID=${districtID}/${levelPart}`;
 
     await Share.share({
       title: 'MEGHDOOT',
       message: `${t('crop.checkoutAdvisory')}\n${shareUrl}`,
       url: shareUrl,
     });
-  };
+  }, [current, t]);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <Pressable onPress={shareCurrent} style={{ marginRight: 8 }} hitSlop={8}>
+          <Image
+            source={require('../../../assets/images/share_wh.png')}
+            style={{ width: 24, height: 24 }}
+            resizeMode="contain"
+          />
+        </Pressable>
+      ),
+    });
+  }, [navigation, shareCurrent]);
 
   const openUrl = async (url: string) => {
     if (!url) return;
@@ -456,7 +735,9 @@ export const CropAdvisoryScreen = () => {
             {pickText(current.youTubeLink, current.YouTubeLink) ? (
               <Pressable style={styles.actionItem} onPress={() => openUrl(pickText(current.youTubeLink, current.YouTubeLink))}>
                 <Image source={require('../../../assets/images/ic_video.png')} style={styles.actionIcon} resizeMode="contain" />
-                <Text style={styles.actionText}>{t('crop.video')}</Text>
+                <Text style={styles.actionText} numberOfLines={1} ellipsizeMode="tail">
+                  {t('crop.video')}
+                </Text>
               </Pressable>
             ) : null}
 
@@ -481,7 +762,9 @@ export const CropAdvisoryScreen = () => {
                 }
               >
                 <Image source={require('../../../assets/images/ic_audio.png')} style={styles.actionIcon} resizeMode="contain" />
-                <Text style={styles.actionText}>{t('crop.audio')}</Text>
+                <Text style={styles.actionText} numberOfLines={1} ellipsizeMode="tail">
+                  {t('crop.audio')}
+                </Text>
               </Pressable>
             ) : null}
 
@@ -491,17 +774,11 @@ export const CropAdvisoryScreen = () => {
                 style={styles.actionIcon}
                 resizeMode="contain"
               />
-              <Text style={styles.actionText}>
+              <Text style={styles.actionText} numberOfLines={1} ellipsizeMode="tail">
                 {favouriteBusy ? t('crop.saving') : isFavourite ? t('crop.addedFav') : t('crop.addFav')}
               </Text>
             </Pressable>
 
-            <Pressable style={styles.actionItem} onPress={shareCurrent}>
-              <View style={styles.shareIconWrap}>
-                <Image source={require('../../../assets/images/share_wh.png')} style={styles.shareIconGlyph} resizeMode="contain" />
-              </View>
-              <Text style={styles.actionText}>{t('crop.share')}</Text>
-            </Pressable>
           </View>
         </View>
 
@@ -680,24 +957,6 @@ const styles = StyleSheet.create({
   actionIcon: {
     width: 50,
     height: 50,
-  },
-  shareIconWrap: {
-    width: 45,
-    height: 45,
-    borderRadius: 25,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  shareIconGlyph: {
-    width: 35,
-    height: 35,
-    tintColor: colors.darkGreen,
   },
   actionText: {
     marginTop: 2,

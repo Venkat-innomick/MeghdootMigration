@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
   Pressable,
@@ -140,12 +141,17 @@ export const AllCropsScreen = () => {
 
       setItems(unique);
       hasLoadedRef.current = true;
-    } catch {
+    } catch (error: any) {
+      setTimeout(() => {
+        Alert.alert("", error?.message || t("common.error"), [
+          { text: t("common.ok") },
+        ]);
+      }, 50);
       setItems([]);
     } finally {
       setLoading(false);
     }
-  }, [languageLabel, userId]);
+  }, [languageLabel, t, userId]);
 
   useEffect(() => {
     if (lastLanguageRef.current !== languageLabel) {

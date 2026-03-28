@@ -1,9 +1,16 @@
 import Constants from "expo-constants";
 import { API_BASE_URL } from "../constants/api";
+import i18n from "../locales/i18n";
 
 const baseURL =
   (Constants.expoConfig?.extra?.apiBaseUrl as string | undefined) ||
   API_BASE_URL;
+
+const getOfflineMessage = () =>
+  i18n.t("common.connectToInternet", {
+    defaultValue:
+      "Your internet connection is not good. Please improve the connection, otherwise you may not be able to see any data.",
+  });
 
 export const extractApiErrorMessage = (payload: any): string => {
   const candidates = [
@@ -42,16 +49,25 @@ const request = async <T>(
   const url = `${baseURL}${path}`;
   console.log("URL:", url);
   console.log("payload", body);
-  const response = await withTimeout(
-    fetch(url, {
-      method,
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: body ? JSON.stringify(body) : undefined,
-    }),
-    20000,
-  );
+  let response: Response;
+  try {
+    response = await withTimeout(
+      fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: body ? JSON.stringify(body) : undefined,
+      }),
+      20000,
+    );
+  } catch (error: any) {
+    const message = String(error?.message || "");
+    if (message === "Network request failed" || message === "Failed to fetch") {
+      throw new Error(getOfflineMessage());
+    }
+    throw error;
+  }
 
   let data: any = null;
   const text = await response.text();

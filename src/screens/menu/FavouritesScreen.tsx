@@ -140,15 +140,22 @@ export const FavouritesScreen = () => {
 
   useFocusEffect(
     useCallback(() => {
-      load().catch(() => setItems([]));
-    }, [load]),
+      load().catch((error: any) => {
+        setItems([]);
+        setTimeout(() => {
+          Alert.alert("", error?.message || t("common.error"), [
+            { text: t("common.ok") },
+          ]);
+        }, 50);
+      });
+    }, [load, t]),
   );
 
   const removeFavourite = async (item: any) => {
     const cropAdvisoryId = pickNum(item.cropAdvisoryID, item.CropAdvisoryID);
     if (!cropAdvisoryId || !userId) return;
 
-    Alert.alert(t("crop.remove"), t("crop.removeFromFavouritesPrompt"), [
+    Alert.alert("", t("crop.removeFromFavouritesPrompt"), [
       { text: t("common.cancel"), style: "cancel" },
       {
         text: t("crop.remove"),
@@ -167,10 +174,11 @@ export const FavouritesScreen = () => {
             const ok = typeof okRaw === "boolean" ? okRaw : false;
             if (!ok) {
               Alert.alert(
-                t("home.deleteFailed"),
+                "",
                 response?.ErrorMessage ||
                   response?.errorMessage ||
                   t("crop.unableToRemoveFavourite"),
+                [{ text: t("common.ok") }],
               );
               return;
             }
@@ -185,8 +193,9 @@ export const FavouritesScreen = () => {
             }
           } catch (error: any) {
             Alert.alert(
-              t("home.deleteFailed"),
+              "",
               error?.message || t("crop.unableToRemoveFavourite"),
+              [{ text: t("common.ok") }],
             );
           }
         },

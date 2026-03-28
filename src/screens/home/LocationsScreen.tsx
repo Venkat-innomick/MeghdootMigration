@@ -280,6 +280,7 @@ export const LocationsScreen = () => {
     setSelectedState(state);
     setSelectedDistrict(null);
     setSelectedBlock(null);
+    setDistricts([]);
     setBlocks([]);
     setAddLoading(true);
     try {
@@ -297,6 +298,11 @@ export const LocationsScreen = () => {
         .filter((d) => d.districtID > 0 && !!d.districtName && d.stateID === state.stateID);
       const unique = mapped.filter((d, i, arr) => arr.findIndex((x) => x.districtID === d.districtID) === i);
       setDistricts(unique);
+    } catch (e: any) {
+      setDistricts([]);
+      Alert.alert('', e.message || t('register.unableLoadDistricts'), [
+        { text: t('common.ok') },
+      ]);
     } finally {
       setAddLoading(false);
     }
@@ -351,7 +357,7 @@ export const LocationsScreen = () => {
       setBlocks(unique);
     } catch (e: any) {
       setBlocks([]);
-      Alert.alert(t('common.error'), e.message || t('register.unableLoadBlocks'), [
+      Alert.alert('', e.message || t('register.unableLoadBlocks'), [
         { text: t('common.ok') },
       ]);
     } finally {
@@ -372,8 +378,8 @@ export const LocationsScreen = () => {
     setAddLoading(true);
     try {
       await loadStates();
-    } catch {
-      Alert.alert(t('common.error'), t('home.unableLoadStates'), [
+    } catch (e: any) {
+      Alert.alert('', e?.message || t('home.unableLoadStates'), [
         { text: t('common.ok') },
       ]);
     } finally {
@@ -383,26 +389,26 @@ export const LocationsScreen = () => {
 
   const saveAddedLocation = async () => {
     if (!userId) {
-      Alert.alert(t('home.failed'), t('home.userNotFoundPleaseLoginAgain'), [
+      Alert.alert('', t('home.userNotFoundPleaseLoginAgain'), [
         { text: t('common.ok') },
       ]);
       return;
     }
     if (!selectedState) {
-      Alert.alert(t('common.validation'), t('register.validationSelectState'), [
+      Alert.alert('', t('register.validationSelectState'), [
         { text: t('common.ok') },
       ]);
       return;
     }
     if (!selectedDistrict) {
-      Alert.alert(t('common.validation'), t('register.validationSelectDistrict'), [
+      Alert.alert('', t('register.validationSelectDistrict'), [
         { text: t('common.ok') },
       ]);
       return;
     }
     if (!selectedBlock) {
       Alert.alert(
-        t('common.validation'),
+        '',
         usesAsdMasters(selectedState.stateID)
           ? t('register.validationSelectAsd')
           : t('register.validationSelectBlock'),
@@ -426,7 +432,7 @@ export const LocationsScreen = () => {
     try {
       const response: any = await userService.saveLocation(payload);
       if (!isApiSuccess(response)) {
-        Alert.alert(t('home.failed'), response?.errorMessage || response?.ErrorMessage || t('home.unableAddLocation'), [
+        Alert.alert('', response?.errorMessage || response?.ErrorMessage || t('home.unableAddLocation'), [
           { text: t('common.ok') },
         ]);
         return;
@@ -453,7 +459,7 @@ export const LocationsScreen = () => {
         asdName: usesAsdMasters(selectedState.stateID) ? selectedBlock.label : '',
       };
       setAddOpen(false);
-      Alert.alert(t('common.success'), t('home.locationAddedSuccessfully'), [
+      Alert.alert('', t('home.locationAddedSuccessfully'), [
         {
           text: t('common.ok'),
           onPress: async () => {
@@ -498,7 +504,7 @@ export const LocationsScreen = () => {
         },
       ]);
     } catch (e: any) {
-      Alert.alert(t('home.failed'), e.message || t('home.unableAddLocation'), [
+      Alert.alert('', e.message || t('home.unableAddLocation'), [
         { text: t('common.ok') },
       ]);
     } finally {
@@ -509,13 +515,13 @@ export const LocationsScreen = () => {
   const deleteLocation = async (item: LocationRow) => {
     if (!userId) return;
     if (addedLocations.length <= 1) {
-      Alert.alert(t('home.info'), t('home.cannotDeleteOnlyLocation', { state: item.stateName, city: item.cityName }), [
+      Alert.alert('', t('home.cannotDeleteOnlyLocation', { state: item.stateName, city: item.cityName }), [
         { text: t('common.ok') },
       ]);
       return;
     }
     if (item.isCurrentLocation) {
-      Alert.alert(t('home.info'), t('home.currentLocationCannotBeDeleted'), [
+      Alert.alert('', t('home.currentLocationCannotBeDeleted'), [
         { text: t('common.ok') },
       ]);
       return;
@@ -550,7 +556,7 @@ export const LocationsScreen = () => {
       );
       const response: any = await userService.deleteLocation(payload);
       if (!isApiSuccess(response)) {
-        Alert.alert(t('home.deleteFailed'), response?.errorMessage || response?.ErrorMessage || t('home.unableDeleteLocation'), [
+        Alert.alert('', response?.errorMessage || response?.ErrorMessage || t('home.unableDeleteLocation'), [
           { text: t('common.ok') },
         ]);
         await loadLocations();
@@ -558,7 +564,7 @@ export const LocationsScreen = () => {
       }
       await loadLocations();
     } catch (e: any) {
-      Alert.alert(t('home.deleteFailed'), e.message || t('home.unableDeleteLocation'), [
+      Alert.alert('', e.message || t('home.unableDeleteLocation'), [
         { text: t('common.ok') },
       ]);
     }
@@ -699,7 +705,7 @@ export const LocationsScreen = () => {
 
             <Pressable
               style={[styles.selector, { marginTop: 10 }]}
-              onPress={() => selectedDistrict && blocks.length && setBlockPickerOpen(true)}
+              onPress={() => selectedDistrict && setBlockPickerOpen(true)}
             >
               <Text style={[styles.selectorText, !selectedBlock && styles.selectorPlaceholder]}>
                 {selectedBlock?.label ||
@@ -763,18 +769,28 @@ export const LocationsScreen = () => {
         <Pressable style={styles.pickerOverlay} onPress={() => setDistrictPickerOpen(false)}>
           <View style={styles.pickerCard}>
             <ScrollView>
-              {districts.map((item) => (
-                <Pressable
-                  key={`d-${item.districtID}-${item.districtName}`}
-                  style={styles.pickerItem}
-                  onPress={() => {
-                    setDistrictPickerOpen(false);
-                    onDistrictSelect(item).catch(() => undefined);
-                  }}
-                >
-                  <Text style={styles.pickerText}>{item.districtName}</Text>
-                </Pressable>
-              ))}
+              {districts.length ? (
+                districts.map((item) => (
+                  <Pressable
+                    key={`d-${item.districtID}-${item.districtName}`}
+                    style={styles.pickerItem}
+                    onPress={() => {
+                      setDistrictPickerOpen(false);
+                      onDistrictSelect(item).catch(() => undefined);
+                    }}
+                  >
+                    <Text style={styles.pickerText}>{item.districtName}</Text>
+                  </Pressable>
+                ))
+              ) : (
+                <View style={styles.emptyPickerWrap}>
+                  <Text style={styles.pickerText}>
+                    {addLoading
+                      ? t('home.loadingLabel', { label: t('home.district') })
+                      : t('home.noLabelData', { label: t('home.district') })}
+                  </Text>
+                </View>
+              )}
             </ScrollView>
           </View>
         </Pressable>
