@@ -101,10 +101,9 @@ export const LoginScreen = ({ navigation }: Props) => {
       }
 
       const roleId = Number(data?.RoleId ?? data?.roleId ?? 0);
-      const typeOfRole = Number(
-        data?.TypeOfRole ??
-          data?.typeOfRole ??
-          data?.UserProfileID ??
+      const typeOfRole = Number(data?.TypeOfRole ?? data?.typeOfRole ?? 0);
+      const userProfileId = Number(
+        data?.UserProfileID ??
           data?.userProfileId ??
           0,
       );
@@ -117,8 +116,8 @@ export const LoginScreen = ({ navigation }: Props) => {
       const imagePath = apiImagePath || cachedImagePath || undefined;
 
       if (roleId === 1) {
-        setUser({
-          userProfileId: typeOfRole,
+        const storedUser = {
+          userProfileId,
           firstName: data.FirstName || data.firstName || "",
           lastName: data.LastName || data.lastName || "",
           mobileNumber,
@@ -133,7 +132,12 @@ export const LoginScreen = ({ navigation }: Props) => {
           ...(data.VillageName ? { villageName: data.VillageName } : {}),
           ...(data.PanchayatName ? { panchayatName: data.PanchayatName } : {}),
           ...(data.LanguageName ? { languageName: data.LanguageName } : {}),
-        });
+        };
+        await AsyncStorage.setItem(
+          STORAGE_KEYS.loggedInUser,
+          JSON.stringify(storedUser),
+        );
+        setUser(storedUser);
         navigation
           .getParent()
           ?.dispatch(

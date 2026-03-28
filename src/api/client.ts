@@ -59,7 +59,7 @@ const request = async <T>(
         },
         body: body ? JSON.stringify(body) : undefined,
       }),
-      20000,
+      30000,
     );
   } catch (error: any) {
     const message = String(error?.message || "");
