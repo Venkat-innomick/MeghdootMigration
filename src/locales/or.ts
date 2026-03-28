@@ -13,6 +13,8 @@ export default {
     error: 'ତ୍ରୁଟି',
     success: 'ସଫଳତା',
     validation: 'ଯାଞ୍ଚ',
+    connectToInternet:
+      'ଆପଣଙ୍କ ଇଣ୍ଟରନେଟ ସଂଯୋଗ ଭଲ ନାହିଁ। ଦୟାକରି ସଂଯୋଗକୁ ଭଲ କରନ୍ତୁ, ନହେଲେ ଆପଣ କୌଣସି ଡାଟା ଦେଖି ପାରିବେ ନାହିଁ।',
   },
   auth: {
     ...en.auth,

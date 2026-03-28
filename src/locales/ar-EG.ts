@@ -13,6 +13,8 @@ export default {
     error: 'Thil dik lo',
     success: 'Hlawhtling',
     validation: 'Enchhinna',
+    connectToInternet:
+      'I internet connection a tha tha lo. Siamthat rawh, chu lo chuan data engmah i hmu thei lo vang.',
   },
   auth: {
     ...en.auth,

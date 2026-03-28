@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -81,7 +81,6 @@ const pickImageDataUri = (...values: any[]) => {
 };
 
 const CROP_SHARE_BASE_URL = 'https://www.tropmet.res.in/';
-const ENGLISH_LANGUAGE_LABEL = 'English';
 
 const pickList = (payload: any, keys: string[]) => {
   if (!payload) return [];
@@ -92,206 +91,159 @@ const pickList = (payload: any, keys: string[]) => {
   return [];
 };
 
-const normalizeAdvisoryDetail = (
-  sourceItem: any,
-  englishDetail: any,
-  regionalDetail: any,
-) => {
-  const detail = regionalDetail || englishDetail || {};
+const normalizeAdvisoryDetail = (sourceItem: any, detail: any) => {
+  const resolved = detail || {};
   return {
-    ...detail,
-    stateID: pickNum(
-      detail?.stateID,
-      detail?.StateID,
-      sourceItem?.stateID,
-      sourceItem?.StateID,
-      0,
-    ),
-    StateID: pickNum(
-      detail?.StateID,
-      detail?.stateID,
-      sourceItem?.StateID,
-      sourceItem?.stateID,
-      0,
-    ),
-    districtID: pickNum(
-      detail?.districtID,
-      detail?.DistrictID,
-      sourceItem?.districtID,
-      sourceItem?.DistrictID,
-      0,
-    ),
-    DistrictID: pickNum(
-      detail?.DistrictID,
-      detail?.districtID,
-      sourceItem?.DistrictID,
-      sourceItem?.districtID,
-      0,
-    ),
-    blockID: pickNum(
-      detail?.blockID,
-      detail?.BlockID,
-      sourceItem?.blockID,
-      sourceItem?.BlockID,
-      0,
-    ),
-    BlockID: pickNum(
-      detail?.BlockID,
-      detail?.blockID,
-      sourceItem?.BlockID,
-      sourceItem?.blockID,
-      0,
-    ),
-    asdID: pickNum(
-      detail?.asdID,
-      detail?.AsdID,
-      sourceItem?.asdID,
-      sourceItem?.AsdID,
-      0,
-    ),
-    AsdID: pickNum(
-      detail?.AsdID,
-      detail?.asdID,
-      sourceItem?.AsdID,
-      sourceItem?.asdID,
-      0,
-    ),
-    location: pickText(
-      detail?.location,
-      detail?.Location,
-      sourceItem?.location,
-      sourceItem?.Location,
-      '--',
-    ),
-    Location: pickText(
-      detail?.Location,
-      detail?.location,
-      sourceItem?.Location,
-      sourceItem?.location,
-      '--',
-    ),
+    ...sourceItem,
+    ...resolved,
+    stateID: pickNum(resolved?.stateID, resolved?.StateID, sourceItem?.stateID, sourceItem?.StateID, 0),
+    StateID: pickNum(resolved?.StateID, resolved?.stateID, sourceItem?.StateID, sourceItem?.stateID, 0),
+    districtID: pickNum(resolved?.districtID, resolved?.DistrictID, sourceItem?.districtID, sourceItem?.DistrictID, 0),
+    DistrictID: pickNum(resolved?.DistrictID, resolved?.districtID, sourceItem?.DistrictID, sourceItem?.districtID, 0),
+    blockID: pickNum(resolved?.blockID, resolved?.BlockID, sourceItem?.blockID, sourceItem?.BlockID, 0),
+    BlockID: pickNum(resolved?.BlockID, resolved?.blockID, sourceItem?.BlockID, sourceItem?.blockID, 0),
+    asdID: pickNum(resolved?.asdID, resolved?.AsdID, sourceItem?.asdID, sourceItem?.AsdID, 0),
+    AsdID: pickNum(resolved?.AsdID, resolved?.asdID, sourceItem?.AsdID, sourceItem?.asdID, 0),
+    location: pickText(resolved?.location, resolved?.Location, sourceItem?.location, sourceItem?.Location, '--'),
+    Location: pickText(resolved?.Location, resolved?.location, sourceItem?.Location, sourceItem?.location, '--'),
     periodStartDate: pickText(
-      detail?.periodStartDate,
-      detail?.PeriodStartDate,
+      resolved?.periodStartDate,
+      resolved?.PeriodStartDate,
       sourceItem?.periodStartDate,
       sourceItem?.PeriodStartDate,
       '--',
     ),
     PeriodStartDate: pickText(
-      detail?.PeriodStartDate,
-      detail?.periodStartDate,
+      resolved?.PeriodStartDate,
+      resolved?.periodStartDate,
       sourceItem?.PeriodStartDate,
       sourceItem?.periodStartDate,
       '--',
     ),
     periodEndDate: pickText(
-      detail?.periodEndDate,
-      detail?.PeriodEndDate,
+      resolved?.periodEndDate,
+      resolved?.PeriodEndDate,
       sourceItem?.periodEndDate,
       sourceItem?.PeriodEndDate,
       '--',
     ),
     PeriodEndDate: pickText(
-      detail?.PeriodEndDate,
-      detail?.periodEndDate,
+      resolved?.PeriodEndDate,
+      resolved?.periodEndDate,
       sourceItem?.PeriodEndDate,
       sourceItem?.periodEndDate,
       '--',
     ),
     weatherCondition: pickText(
-      englishDetail?.weatherCondition,
-      englishDetail?.WeatherCondition,
+      resolved?.weatherCondition,
+      resolved?.WeatherCondition,
+      sourceItem?.weatherCondition,
+      sourceItem?.WeatherCondition,
       '--',
     ),
     WeatherCondition: pickText(
-      englishDetail?.WeatherCondition,
-      englishDetail?.weatherCondition,
+      resolved?.WeatherCondition,
+      resolved?.weatherCondition,
+      sourceItem?.WeatherCondition,
+      sourceItem?.weatherCondition,
       '--',
     ),
     recommendations: pickText(
-      englishDetail?.recommendations,
-      englishDetail?.Recommendations,
+      resolved?.recommendations,
+      resolved?.Recommendations,
+      sourceItem?.recommendations,
+      sourceItem?.Recommendations,
       '--',
     ),
     Recommendations: pickText(
-      englishDetail?.Recommendations,
-      englishDetail?.recommendations,
+      resolved?.Recommendations,
+      resolved?.recommendations,
+      sourceItem?.Recommendations,
+      sourceItem?.recommendations,
       '--',
     ),
     briefText: pickText(
-      englishDetail?.briefText,
-      englishDetail?.BriefText,
+      resolved?.briefText,
+      resolved?.BriefText,
+      sourceItem?.briefText,
+      sourceItem?.BriefText,
       '--',
     ),
     BriefText: pickText(
-      englishDetail?.BriefText,
-      englishDetail?.briefText,
+      resolved?.BriefText,
+      resolved?.briefText,
+      sourceItem?.BriefText,
+      sourceItem?.briefText,
       '--',
     ),
     agroAdvisoryDetails: pickText(
-      englishDetail?.agroAdvisoryDetails,
-      englishDetail?.AgroAdvisoryDetails,
+      resolved?.agroAdvisoryDetails,
+      resolved?.AgroAdvisoryDetails,
+      sourceItem?.agroAdvisoryDetails,
+      sourceItem?.AgroAdvisoryDetails,
       '--',
     ),
     AgroAdvisoryDetails: pickText(
-      englishDetail?.AgroAdvisoryDetails,
-      englishDetail?.agroAdvisoryDetails,
+      resolved?.AgroAdvisoryDetails,
+      resolved?.agroAdvisoryDetails,
+      sourceItem?.AgroAdvisoryDetails,
+      sourceItem?.agroAdvisoryDetails,
       '--',
     ),
     weatherConditionRegional: pickText(
+      resolved?.weatherConditionRegional,
+      resolved?.WeatherConditionRegional,
       sourceItem?.weatherConditionRegional,
       sourceItem?.WeatherConditionRegional,
-      regionalDetail?.weatherConditionRegional,
-      regionalDetail?.WeatherConditionRegional,
       '--',
     ),
     WeatherConditionRegional: pickText(
+      resolved?.WeatherConditionRegional,
+      resolved?.weatherConditionRegional,
       sourceItem?.WeatherConditionRegional,
       sourceItem?.weatherConditionRegional,
-      regionalDetail?.WeatherConditionRegional,
-      regionalDetail?.weatherConditionRegional,
       '--',
     ),
     recommendationsRegional: pickText(
+      resolved?.recommendationsRegional,
+      resolved?.RecommendationsRegional,
       sourceItem?.recommendationsRegional,
       sourceItem?.RecommendationsRegional,
-      regionalDetail?.recommendationsRegional,
-      regionalDetail?.RecommendationsRegional,
       '--',
     ),
     RecommendationsRegional: pickText(
+      resolved?.RecommendationsRegional,
+      resolved?.recommendationsRegional,
       sourceItem?.RecommendationsRegional,
       sourceItem?.recommendationsRegional,
-      regionalDetail?.RecommendationsRegional,
-      regionalDetail?.recommendationsRegional,
       '--',
     ),
     briefTextRegional: pickText(
+      resolved?.briefTextRegional,
+      resolved?.BriefTextRegional,
       sourceItem?.briefTextRegional,
       sourceItem?.BriefTextRegional,
-      regionalDetail?.briefTextRegional,
-      regionalDetail?.BriefTextRegional,
       '--',
     ),
     BriefTextRegional: pickText(
+      resolved?.BriefTextRegional,
+      resolved?.briefTextRegional,
       sourceItem?.BriefTextRegional,
       sourceItem?.briefTextRegional,
-      regionalDetail?.BriefTextRegional,
-      regionalDetail?.briefTextRegional,
       '--',
     ),
     agroAdvisoryDetailsRegional: pickText(
+      resolved?.agroAdvisoryDetailsRegional,
+      resolved?.AgroAdvisoryDetailsRegional,
       sourceItem?.agroAdvisoryDetailsRegional,
       sourceItem?.AgroAdvisoryDetailsRegional,
-      regionalDetail?.agroAdvisoryDetailsRegional,
-      regionalDetail?.AgroAdvisoryDetailsRegional,
       '--',
     ),
     AgroAdvisoryDetailsRegional: pickText(
+      resolved?.AgroAdvisoryDetailsRegional,
+      resolved?.agroAdvisoryDetailsRegional,
       sourceItem?.AgroAdvisoryDetailsRegional,
       sourceItem?.agroAdvisoryDetailsRegional,
-      regionalDetail?.AgroAdvisoryDetailsRegional,
-      regionalDetail?.agroAdvisoryDetailsRegional,
       '--',
     ),
   };
@@ -344,8 +296,21 @@ export const CropAdvisoryScreen = () => {
   const [smsOpen, setSmsOpen] = useState(true);
   const [recommendationOpen, setRecommendationOpen] = useState(true);
   const [attachmentsOpen, setAttachmentsOpen] = useState(false);
+  const detailCacheRef = useRef<Record<string, any>>({});
+  const attachmentCacheRef = useRef<Record<string, { images: any[]; audios: any[] }>>({});
 
   const current = items[index] || {};
+
+  const showErrorMessage = useCallback(
+    (message?: string) => {
+      setTimeout(() => {
+        Alert.alert('', message || t('common.error'), [
+          { text: t('common.ok') },
+        ]);
+      }, 50);
+    },
+    [t]
+  );
 
   const advisoryId = useMemo(
     () => pickNum(current.cropAdvisoryID, current.CropAdvisoryID),
@@ -451,6 +416,8 @@ export const CropAdvisoryScreen = () => {
             : -1;
         setIndex(matchedIndex >= 0 ? matchedIndex : 0);
       }
+    } catch (error: any) {
+      showErrorMessage(error?.message);
     } finally {
       setLoading(false);
     }
@@ -460,6 +427,13 @@ export const CropAdvisoryScreen = () => {
     if (!cropId) {
       setImages([]);
       setAudios([]);
+      return;
+    }
+    const cacheKey = `${cropId}:${languageLabel}`;
+    const cached = attachmentCacheRef.current[cacheKey];
+    if (cached) {
+      setImages(cached.images);
+      setAudios(cached.audios);
       return;
     }
 
@@ -485,17 +459,22 @@ export const CropAdvisoryScreen = () => {
       'ObjCropAdvisoryImageList',
     ]);
 
+    attachmentCacheRef.current[cacheKey] = {
+      images: imageList,
+      audios: audioList,
+    };
     setImages(imageList);
     setAudios(audioList);
   };
 
-  const fetchAdvisoryDetail = async (
-    targetAdvisoryId: number,
-    requestedLanguageLabel: string,
-  ) => {
+  const fetchAdvisoryDetail = async (targetAdvisoryId: number) => {
+    const cacheKey = `${targetAdvisoryId}:${languageLabel}`;
+    if (detailCacheRef.current[cacheKey]) {
+      return detailCacheRef.current[cacheKey];
+    }
     const response = await cropService.getAdvisoryById({
       CropAdvisoryID: targetAdvisoryId,
-      LanguageType: requestedLanguageLabel,
+      LanguageType: languageLabel,
       RefreshDateTime: API_REFRESH_DATES.current(),
     });
 
@@ -504,26 +483,20 @@ export const CropAdvisoryScreen = () => {
       'objCropAdvisoryDetailsList',
       'ObjCropAdvisoryDetailsList',
     ]) as any[];
-    return details[0] || null;
+    const detail = details[0] || null;
+    detailCacheRef.current[cacheKey] = detail;
+    return detail;
   };
 
   const loadAdvisoryDetail = async (targetAdvisoryId: number) => {
     if (!targetAdvisoryId) return;
-    const englishDetail = await fetchAdvisoryDetail(
-      targetAdvisoryId,
-      ENGLISH_LANGUAGE_LABEL,
-    );
-    const regionalDetail =
-      languageLabel === ENGLISH_LANGUAGE_LABEL
-        ? null
-        : await fetchAdvisoryDetail(targetAdvisoryId, languageLabel);
+    const detail = await fetchAdvisoryDetail(targetAdvisoryId);
     setItems((prev) =>
       prev.map((item, itemIndex) =>
         itemIndex === index ||
         pickNum(item.cropAdvisoryID, item.CropAdvisoryID) === targetAdvisoryId
           ? {
-              ...item,
-              ...normalizeAdvisoryDetail(item, englishDetail, regionalDetail),
+              ...normalizeAdvisoryDetail(item, detail),
             }
           : item,
       ),
@@ -538,20 +511,21 @@ export const CropAdvisoryScreen = () => {
 
   useEffect(() => {
     if (advisoryId) {
-      loadAttachments(advisoryId).catch(() => {
+      loadAttachments(advisoryId).catch((error: any) => {
         setImages([]);
         setAudios([]);
+        showErrorMessage(error?.message);
       });
     }
-  }, [advisoryId, languageLabel]);
+  }, [advisoryId, languageLabel, showErrorMessage]);
 
   useEffect(() => {
     if (advisoryId) {
-      loadAdvisoryDetail(advisoryId).catch(() => {
-        // Keep current list item if detail fetch fails.
+      loadAdvisoryDetail(advisoryId).catch((error: any) => {
+        showErrorMessage(error?.message);
       });
     }
-  }, [advisoryId, languageLabel]);
+  }, [advisoryId, languageLabel, index, showErrorMessage]);
 
   const toggleFavourite = async () => {
     if (!advisoryId || !userProfileId || isFavourite || favouriteBusy) return;
