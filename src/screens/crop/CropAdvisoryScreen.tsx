@@ -964,7 +964,6 @@ export const CropAdvisoryScreen = () => {
           <Text style={styles.periodText}>
             {t('crop.period')}: {pickText(current.periodStartDate, current.PeriodStartDate, '-')} {t('crop.to')} {pickText(current.periodEndDate, current.PeriodEndDate, '-')}
           </Text>
-          <Text style={styles.periodText}>{t('crop.variety')}: {pickText(current.varietyName, current.VarietyName, '--')}</Text>
           <Pressable onPress={openFeedback}>
             <Text style={styles.feedbackLink}>{t('crop.feedbackRating')}</Text>
           </Pressable>

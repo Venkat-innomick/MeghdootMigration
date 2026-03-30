@@ -603,7 +603,7 @@ const styles = StyleSheet.create({
   locationText: {
     color: colors.primary,
     fontFamily: 'RobotoRegular',
-    fontSize: 14,
+    fontSize: 15,
     maxWidth: '85%',
   },
   dropDownIcon: { width: 21, height: 11 },
@@ -631,14 +631,14 @@ const styles = StyleSheet.create({
   dayText: {
     color: '#fff',
     fontFamily: 'RobotoRegular',
-    fontSize: 12,
+    fontSize: 13,
     lineHeight: 16,
     textAlign: 'center',
   },
   dayDateText: {
     color: '#fff',
     fontFamily: 'RobotoRegular',
-    fontSize: 11,
+    fontSize: 12,
     lineHeight: 14,
     textAlign: 'center',
     minHeight: 30,
@@ -672,7 +672,7 @@ const styles = StyleSheet.create({
   heroDate: {
     color: '#024764',
     fontFamily: 'RobotoRegular',
-    fontSize: 16,
+    fontSize: 17,
   },
   heroDivider: {
     height: 1,
@@ -683,7 +683,7 @@ const styles = StyleSheet.create({
   heroType: {
     color: '#024764',
     fontFamily: 'RobotoMedium',
-    fontSize: 18,
+    fontSize: 19,
     marginLeft: 10,
     marginBottom: 10,
   },
@@ -708,19 +708,19 @@ const styles = StyleSheet.create({
   metricLabel: {
     color: '#024764',
     fontFamily: 'RobotoRegular',
-    fontSize: 16,
+    fontSize: 17,
   },
   metricValue: {
     color: '#024764',
     fontFamily: 'RobotoMedium',
-    fontSize: 16,
+    fontSize: 17,
     marginTop: 2,
   },
   emptyText: {
     textAlign: 'center',
     color: '#fff',
     fontFamily: 'RobotoRegular',
-    fontSize: 12,
+    fontSize: 13,
   },
   modalBackdrop: {
     flex: 1,
@@ -742,6 +742,6 @@ const styles = StyleSheet.create({
   modalItemText: {
     color: colors.text,
     fontFamily: 'RobotoRegular',
-    fontSize: 14,
+    fontSize: 15,
   },
 });

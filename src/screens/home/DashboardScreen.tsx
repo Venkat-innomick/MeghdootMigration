@@ -598,7 +598,7 @@ export const DashboardScreen = () => {
   const currentLocation = useMemo(() => {
     if (!carouselLocations.length) return null;
     if (!selectedLocation) return carouselLocations[0] as any;
-    const match = carouselLocations.find((item: any) => {
+    const exactMatch = carouselLocations.find((item: any) => {
       const districtID = toNum(item.districtID, item.DistrictID);
       const blockID = toNum(item.blockID, item.BlockID);
       const asdID = toNum(item.asdID, item.AsdID);
@@ -608,8 +608,18 @@ export const DashboardScreen = () => {
         asdID === selectedLocation.asdID
       );
     });
-    return (match || carouselLocations[0]) as any;
-  }, [carouselLocations, selectedLocation]);
+    if (exactMatch) return exactMatch as any;
+
+    if (activeTab === "district") {
+      const districtMatch = carouselLocations.find((item: any) => {
+        const districtID = toNum(item.districtID, item.DistrictID);
+        return districtID === selectedLocation.districtID;
+      });
+      if (districtMatch) return districtMatch as any;
+    }
+
+    return carouselLocations[0] as any;
+  }, [activeTab, carouselLocations, selectedLocation]);
 
   const currentLocationIndex = useMemo(() => {
     if (!carouselLocations.length) return 0;
@@ -630,8 +640,20 @@ export const DashboardScreen = () => {
           toNum((currentLocation as any).asdID, (currentLocation as any).AsdID)
       );
     });
-    return idx >= 0 ? idx : 0;
-  }, [carouselLocations, currentLocation]);
+    if (idx >= 0) return idx;
+
+    if (activeTab === "district" && selectedLocation) {
+      const districtIdx = carouselLocations.findIndex((item: any) => {
+        return (
+          toNum(item.districtID, item.DistrictID) ===
+          selectedLocation.districtID
+        );
+      });
+      if (districtIdx >= 0) return districtIdx;
+    }
+
+    return 0;
+  }, [activeTab, carouselLocations, currentLocation, selectedLocation]);
 
   const canUseBlockTab = useMemo(() => {
     if (!locations.length) return false;
