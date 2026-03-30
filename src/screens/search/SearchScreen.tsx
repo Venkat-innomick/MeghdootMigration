@@ -214,7 +214,11 @@ export const SearchScreen = () => {
       );
       setStates(unique);
     } catch (e: any) {
-      Alert.alert(t("common.error"), e.message || t("home.unableLoadStates"));
+      setTimeout(() => {
+        Alert.alert("", e.message || t("home.unableLoadStates"), [
+          { text: t("common.ok") },
+        ]);
+      }, 50);
     } finally {
       setLoading(false);
     }
@@ -251,10 +255,11 @@ export const SearchScreen = () => {
       );
       setDistricts(unique);
     } catch (e: any) {
-      Alert.alert(
-        t("common.error"),
-        e.message || t("register.unableLoadDistricts"),
-      );
+      setTimeout(() => {
+        Alert.alert("", e.message || t("register.unableLoadDistricts"), [
+          { text: t("common.ok") },
+        ]);
+      }, 50);
     } finally {
       setLoading(false);
     }
@@ -306,10 +311,11 @@ export const SearchScreen = () => {
       const withFav = await refreshFavouriteFlags(unique);
       setBlocks(withFav);
     } catch (e: any) {
-      Alert.alert(
-        t("common.error"),
-        e.message || t("register.unableLoadBlocks"),
-      );
+      setTimeout(() => {
+        Alert.alert("", e.message || t("register.unableLoadBlocks"), [
+          { text: t("common.ok") },
+        ]);
+      }, 50);
     } finally {
       setLoading(false);
     }
@@ -317,7 +323,9 @@ export const SearchScreen = () => {
 
   const addLocation = async (item: SearchBlockItem) => {
     if (!userId) {
-      Alert.alert(t("home.failed"), t("home.userNotFoundPleaseLoginAgain"));
+      Alert.alert("", t("home.userNotFoundPleaseLoginAgain"), [
+        { text: t("common.ok") },
+      ]);
       return;
     }
     try {
@@ -335,10 +343,11 @@ export const SearchScreen = () => {
       const response: any = await userService.saveLocation(payload);
       if (!isApiSuccess(response)) {
         Alert.alert(
-          t("home.failed"),
+          "",
           response?.errorMessage ||
             response?.ErrorMessage ||
             t("home.unableAddLocation"),
+          [{ text: t("common.ok") }],
         );
         return;
       }
@@ -354,18 +363,26 @@ export const SearchScreen = () => {
       );
       setAppLocations(parseLocationWeatherList(refreshedWeather) as any[]);
     } catch (e: any) {
-      Alert.alert(t("home.failed"), e.message || t("home.unableAddLocation"));
+      setTimeout(() => {
+        Alert.alert("", e.message || t("home.unableAddLocation"), [
+          { text: t("common.ok") },
+        ]);
+      }, 50);
     }
   };
 
   const removeLocation = async (item: SearchBlockItem) => {
     if (!userId) {
-      Alert.alert(t("home.failed"), t("home.userNotFoundPleaseLoginAgain"));
+      Alert.alert("", t("home.userNotFoundPleaseLoginAgain"), [
+        { text: t("common.ok") },
+      ]);
       return;
     }
     try {
       if ((appLocations?.length || 0) <= 1) {
-        Alert.alert(t("home.info"), t("search.cannotDeleteOnlySavedLocation"));
+        Alert.alert("", t("search.cannotDeleteOnlySavedLocation"), [
+          { text: t("common.ok") },
+        ]);
         return;
       }
       const payload: Record<string, unknown> = {
@@ -378,10 +395,11 @@ export const SearchScreen = () => {
       const response: any = await userService.deleteLocation(payload);
       if (!isApiSuccess(response)) {
         Alert.alert(
-          t("home.failed"),
+          "",
           response?.errorMessage ||
             response?.ErrorMessage ||
             t("home.unableDeleteLocation"),
+          [{ text: t("common.ok") }],
         );
         return;
       }
@@ -408,10 +426,11 @@ export const SearchScreen = () => {
         }),
       );
     } catch (e: any) {
-      Alert.alert(
-        t("home.failed"),
-        e.message || t("home.unableDeleteLocation"),
-      );
+      setTimeout(() => {
+        Alert.alert("", e.message || t("home.unableDeleteLocation"), [
+          { text: t("common.ok") },
+        ]);
+      }, 50);
     }
   };
 
@@ -426,16 +445,19 @@ export const SearchScreen = () => {
 
       const result = await loadSelectedLocationData(item);
       if (!result.locations.length && !result.advisories.length) {
-        Alert.alert(t("home.info"), t("search.noDataForSelectedLocation"));
+        Alert.alert("", t("search.noDataForSelectedLocation"), [
+          { text: t("common.ok") },
+        ]);
         return;
       }
       setTemporarySearchData(result);
       await moveToHomeForItem(item);
     } catch (e: any) {
-      Alert.alert(
-        t("home.failed"),
-        e?.message || t("search.unableOpenSelectedLocation"),
-      );
+      setTimeout(() => {
+        Alert.alert("", e?.message || t("search.unableOpenSelectedLocation"), [
+          { text: t("common.ok") },
+        ]);
+      }, 50);
     } finally {
       setLoading(false);
     }
@@ -443,7 +465,9 @@ export const SearchScreen = () => {
 
   const chooseCurrentLocation = async () => {
     if (!userId) {
-      Alert.alert(t("home.failed"), t("home.userNotFoundPleaseLoginAgain"));
+      Alert.alert("", t("home.userNotFoundPleaseLoginAgain"), [
+        { text: t("common.ok") },
+      ]);
       return;
     }
 
@@ -451,10 +475,9 @@ export const SearchScreen = () => {
     try {
       const permission = await Location.requestForegroundPermissionsAsync();
       if (permission.status !== "granted") {
-        Alert.alert(
-          t("search.permission"),
-          t("search.locationPermissionRequired"),
-        );
+        Alert.alert("", t("search.locationPermissionRequired"), [
+          { text: t("common.ok") },
+        ]);
         return;
       }
 
@@ -476,10 +499,11 @@ export const SearchScreen = () => {
           params: { screen: "Home" },
         });
     } catch (e: any) {
-      Alert.alert(
-        t("home.failed"),
-        e.message || t("search.unableGetCurrentLocation"),
-      );
+      setTimeout(() => {
+        Alert.alert("", e.message || t("search.unableGetCurrentLocation"), [
+          { text: t("common.ok") },
+        ]);
+      }, 50);
     } finally {
       setLoading(false);
     }

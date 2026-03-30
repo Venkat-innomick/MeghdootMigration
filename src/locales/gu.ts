@@ -13,6 +13,8 @@ export default {
     error: 'ભૂલ',
     success: 'સફળતા',
     validation: 'ચકાસણી',
+    connectToInternet:
+      'તમારું ઇન્ટરનેટ કનેક્શન સારું નથી. કૃપા કરીને કનેક્શન સુધારો, નહીં તો તમને કોઈ ડેટા દેખાશે નહીં.',
   },
   auth: {
     ...en.auth,

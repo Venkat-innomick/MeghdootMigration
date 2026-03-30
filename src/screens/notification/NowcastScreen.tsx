@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   StyleSheet,
   Text,
@@ -52,9 +53,16 @@ export const NowcastScreen = () => {
       }
     };
 
-    load().catch(() => setItems([]));
+    load().catch((error: any) => {
+      setItems([]);
+      setTimeout(() => {
+        Alert.alert("", error?.message || t("common.error"), [
+          { text: t("common.ok") },
+        ]);
+      }, 50);
+    });
     return undefined;
-  }, [userId])
+  }, [t, userId])
   );
 
   const content = useMemo(() => {

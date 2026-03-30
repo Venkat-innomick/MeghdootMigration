@@ -10,6 +10,8 @@ export default {
     error: 'Error',
     success: 'Success',
     validation: 'Validation',
+    connectToInternet:
+      'Your internet connection is not good. Please improve the connection, otherwise you may not be able to see any data.',
   },
   auth: {
     loginTitle: 'Login to Meghdoot',

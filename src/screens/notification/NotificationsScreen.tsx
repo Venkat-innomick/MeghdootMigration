@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Pressable,
   StyleSheet,
@@ -56,9 +57,16 @@ export const NotificationsScreen = () => {
 
   useFocusEffect(
     React.useCallback(() => {
-      load().catch(() => setItems([]));
+      load().catch((error: any) => {
+        setItems([]);
+        setTimeout(() => {
+          Alert.alert("", error?.message || t("common.error"), [
+            { text: t("common.ok") },
+          ]);
+        }, 50);
+      });
       return undefined;
-    }, [load]),
+    }, [load, t]),
   );
 
   const clearAll = useCallback(async () => {

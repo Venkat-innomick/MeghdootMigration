@@ -201,11 +201,20 @@ export const RegistrationScreen = ({ navigation, route }: Props) => {
     message: string,
     onOk?: () => void,
   ) => {
-    if (Platform.OS === "android" && !onOk) {
+    if (Platform.OS === "android") {
       ToastAndroid.show(message, ToastAndroid.SHORT);
+      if (onOk) {
+        setTimeout(() => {
+          onOk();
+        }, 1000);
+      }
       return;
     }
-    Alert.alert(title, message, onOk ? [{ text: t("common.ok"), onPress: onOk }] : undefined);
+    Alert.alert(
+      "",
+      message,
+      onOk ? [{ text: t("common.ok"), onPress: onOk }] : [{ text: t("common.ok") }],
+    );
   };
 
   useEffect(() => {
@@ -256,7 +265,9 @@ export const RegistrationScreen = ({ navigation, route }: Props) => {
           );
 
         const validStateIDs = new Set(
-          mappedDistricts.map((district: DistrictMasterItem) => district.stateID),
+          mappedDistricts.map(
+            (district: DistrictMasterItem) => district.stateID,
+          ),
         );
 
         setGenderOptions(mappedGenders);
@@ -266,7 +277,7 @@ export const RegistrationScreen = ({ navigation, route }: Props) => {
           ),
         );
       } catch (error: any) {
-        Alert.alert(
+        showRegisterMessage(
           t("common.error"),
           error.message || t("register.unableLoadMasterData"),
         );
@@ -316,7 +327,7 @@ export const RegistrationScreen = ({ navigation, route }: Props) => {
         ),
       );
     } catch (error: any) {
-      Alert.alert(
+      showRegisterMessage(
         t("common.error"),
         error.message || t("register.unableLoadDistricts"),
       );
@@ -361,7 +372,7 @@ export const RegistrationScreen = ({ navigation, route }: Props) => {
         setBlockOptions(mapped);
       }
     } catch (error: any) {
-      Alert.alert(
+      showRegisterMessage(
         t("common.error"),
         error.message || t("register.unableLoadBlocks"),
       );
@@ -436,9 +447,9 @@ export const RegistrationScreen = ({ navigation, route }: Props) => {
       const responseRoot = response?.result ?? response?.data ?? response;
       const ok = Boolean(
         responseRoot?.isSuccessful ??
-          responseRoot?.IsSuccessful ??
-          response?.isSuccessful ??
-          response?.IsSuccessful,
+        responseRoot?.IsSuccessful ??
+        response?.isSuccessful ??
+        response?.IsSuccessful,
       );
       if (!ok) {
         showRegisterMessage(
@@ -492,7 +503,9 @@ export const RegistrationScreen = ({ navigation, route }: Props) => {
           </View>
 
           <View style={styles.fieldWrap}>
-            <Text style={styles.floatLabel}>{t("register.enterMobileNumber")}</Text>
+            <Text style={styles.floatLabel}>
+              {t("register.enterMobileNumber")}
+            </Text>
             <TextInput
               style={styles.input}
               value={mobile}
@@ -505,7 +518,9 @@ export const RegistrationScreen = ({ navigation, route }: Props) => {
           </View>
 
           <View style={styles.fieldWrap}>
-            <Text style={styles.floatLabel}>{t("register.selectLanguageMandatory")}</Text>
+            <Text style={styles.floatLabel}>
+              {t("register.selectLanguageMandatory")}
+            </Text>
             <Selector
               title={t("register.selectLanguage")}
               value={languageLabel}
@@ -535,7 +550,9 @@ export const RegistrationScreen = ({ navigation, route }: Props) => {
           </View>
 
           <View style={styles.fieldWrap}>
-            <Text style={styles.floatLabel}>{t("register.selectStateMandatory")}</Text>
+            <Text style={styles.floatLabel}>
+              {t("register.selectStateMandatory")}
+            </Text>
             <Selector
               title={t("register.selectStateMandatory")}
               value={selectedState?.stateName || ""}
@@ -552,7 +569,9 @@ export const RegistrationScreen = ({ navigation, route }: Props) => {
 
           {shouldShowDistrict ? (
             <View style={styles.fieldWrap}>
-              <Text style={styles.floatLabel}>{t("register.selectDistrictMandatory")}</Text>
+              <Text style={styles.floatLabel}>
+                {t("register.selectDistrictMandatory")}
+              </Text>
               <Selector
                 title={t("register.selectDistrictMandatory")}
                 value={selectedDistrict?.districtName || ""}
@@ -635,7 +654,9 @@ export const RegistrationScreen = ({ navigation, route }: Props) => {
           </View>
 
           <Pressable style={styles.registerButton} onPress={register}>
-            <Text style={styles.registerButtonText}>{t("register.registerButton")}</Text>
+            <Text style={styles.registerButtonText}>
+              {t("register.registerButton")}
+            </Text>
           </Pressable>
 
           <Pressable

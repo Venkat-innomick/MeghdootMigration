@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
   Pressable,
@@ -90,6 +91,8 @@ export const AllCropsScreen = () => {
   const navigation = useNavigation<any>();
   const user = useAppStore((s) => s.user);
   const language = useAppStore((s) => s.language);
+  const selectedLocation = useAppStore((s) => s.selectedLocation);
+  const locations = useAppStore((s) => s.locations);
   const userId = useMemo(() => getUserProfileId(user), [user]);
   const languageLabel = useMemo(() => getLanguageLabel(language), [language]);
 
@@ -103,6 +106,20 @@ export const AllCropsScreen = () => {
     const root = parent?.getParent?.() || parent || navigation;
     root.navigate("CropAdvisory", params);
   };
+
+  const advisoryLocation = useMemo(() => {
+    if (selectedLocation) {
+      return selectedLocation;
+    }
+    const firstLocation = locations[0];
+    if (!firstLocation) return null;
+    return {
+      districtID: pickNum(firstLocation.districtID),
+      blockID: pickNum(firstLocation.blockID),
+      asdID: pickNum(firstLocation.asdID),
+      stateID: pickNum(firstLocation.stateID),
+    };
+  }, [locations, selectedLocation]);
 
   const load = React.useCallback(async () => {
     if (!userId) {
@@ -140,12 +157,17 @@ export const AllCropsScreen = () => {
 
       setItems(unique);
       hasLoadedRef.current = true;
-    } catch {
+    } catch (error: any) {
+      setTimeout(() => {
+        Alert.alert("", error?.message || t("common.error"), [
+          { text: t("common.ok") },
+        ]);
+      }, 50);
       setItems([]);
     } finally {
       setLoading(false);
     }
-  }, [languageLabel, userId]);
+  }, [languageLabel, t, userId]);
 
   useEffect(() => {
     if (lastLanguageRef.current !== languageLabel) {
@@ -222,6 +244,30 @@ export const AllCropsScreen = () => {
                   cropId,
                   cropCategoryId,
                   cropName: name || "--",
+                  stateID: pickNum(
+                    item.stateID,
+                    item.StateID,
+                    item.stateId,
+                    (advisoryLocation as any)?.stateID,
+                  ),
+                  districtID: pickNum(
+                    item.districtID,
+                    item.DistrictID,
+                    item.districtId,
+                    (advisoryLocation as any)?.districtID,
+                  ),
+                  blockID: pickNum(
+                    item.blockID,
+                    item.BlockID,
+                    item.blockId,
+                    (advisoryLocation as any)?.blockID,
+                  ),
+                  asdID: pickNum(
+                    item.asdID,
+                    item.AsdID,
+                    item.asdId,
+                    (advisoryLocation as any)?.asdID,
+                  ),
                 })
               }
             >

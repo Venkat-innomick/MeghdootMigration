@@ -1,6 +1,8 @@
 import React from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CommonActions } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { STORAGE_KEYS } from '../../constants/storageKeys';
 import { OnboardingStackParamList } from '../../navigation/types';
 import { useAppStore } from '../../store/appStore';
 import { OnboardingScreen } from './OnboardingScreen';
@@ -9,8 +11,9 @@ type Props = NativeStackScreenProps<OnboardingStackParamList, 'OnboardingThree'>
 
 export const OnboardingThreeScreen = ({ navigation }: Props) => {
   const completeOnboarding = useAppStore((s) => s.completeOnboarding);
-  const finishOnboarding = () => {
+  const finishOnboarding = async () => {
     completeOnboarding();
+    await AsyncStorage.setItem(STORAGE_KEYS.onboardingDone, 'true');
     navigation.getParent()?.dispatch(
       CommonActions.reset({
         index: 0,

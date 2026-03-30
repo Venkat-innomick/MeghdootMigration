@@ -7,6 +7,7 @@ import React, {
 } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList as RNFlatList,
   FlatList,
   Image,
@@ -256,6 +257,90 @@ const isBlockLevelRow = (item: any) =>
 
 const isDistrictOnlyRow = (item: any) => !isBlockLevelRow(item);
 
+const getAdvisoryScope = (item: any) => ({
+  stateId: toNum(item?.stateID, item?.StateID),
+  districtId: toNum(item?.districtID, item?.DistrictID),
+  blockId: toNum(item?.blockID, item?.BlockID),
+  asdId: toNum(item?.asdID, item?.AsdID),
+  blockName: pickText(item?.block, item?.Block, item?.blockName, item?.BlockName),
+  asdName: pickText(item?.asdName, item?.AsdName),
+});
+
+const isDistrictAdvisoryForLocation = (row: any, location: any) => {
+  const rowScope = getAdvisoryScope(row);
+  const targetScope = getAdvisoryScope(location);
+  return (
+    rowScope.stateId === targetScope.stateId &&
+    rowScope.districtId === targetScope.districtId &&
+    rowScope.blockId === 0 &&
+    rowScope.asdId === 0 &&
+    !rowScope.blockName &&
+    !rowScope.asdName
+  );
+};
+
+const isExactBlockAdvisoryForLocation = (row: any, location: any) => {
+  const rowScope = getAdvisoryScope(row);
+  const targetScope = getAdvisoryScope(location);
+
+  if (
+    rowScope.stateId !== targetScope.stateId ||
+    rowScope.districtId !== targetScope.districtId
+  ) {
+    return false;
+  }
+
+  if (targetScope.asdId > 0) {
+    return (
+      rowScope.asdId === targetScope.asdId &&
+      rowScope.blockId === 0 &&
+      !!rowScope.asdName
+    );
+  }
+
+  if (targetScope.blockId > 0) {
+    return (
+      rowScope.blockId === targetScope.blockId &&
+      rowScope.asdId === 0 &&
+      !!rowScope.blockName
+    );
+  }
+
+  return false;
+};
+
+const enrichDashboardLocationsWithCrops = (
+  rows: DashboardLocation[],
+  advisories: CropAdvisoryItem[],
+) => {
+  return rows.map((item: any) => {
+    const districtCrops = advisories.filter((row: any) =>
+      isDistrictAdvisoryForLocation(row, item),
+    );
+    const blockCrops = advisories.filter((row: any) =>
+      isExactBlockAdvisoryForLocation(row, item),
+    );
+    const hasBlockScope = isBlockLevelRow(item);
+    const crops = hasBlockScope ? blockCrops : districtCrops;
+
+    return {
+      ...item,
+      districtCrops,
+      DistrictCrops: districtCrops,
+      blockCrops,
+      BlockCrops: blockCrops,
+      crops,
+      Crops: crops,
+      isDistrictDataAvailable:
+        hasBlockScope && !blockCrops.length && districtCrops.length > 0,
+      IsDistrictDataAvailable:
+        hasBlockScope && !blockCrops.length && districtCrops.length > 0,
+      isNoCropVisible: crops.length === 0 && districtCrops.length === 0,
+      IsNoCropVisible: crops.length === 0 && districtCrops.length === 0,
+    };
+  });
+};
+
 const shapeHomeLocations = (rows: any[]) => {
   const districtRows = rows.filter((item) => isDistrictOnlyRow(item));
   const blockRows = rows.filter((item) => !isDistrictOnlyRow(item));
@@ -415,8 +500,16 @@ export const DashboardScreen = () => {
         normalizedLocations,
       ) as DashboardLocation[];
       const currentSelected = useAppStore.getState().selectedLocation;
-      const nextLocations = orderLocationsBySelected(
+      const nextAdvisories = mergeAdvisories(
+        temporarySearchAdvisories,
+        parseAdvisoryList(crop),
+      ) as CropAdvisoryItem[];
+      const enrichedLocations = enrichDashboardLocationsWithCrops(
         shapedLocations,
+        nextAdvisories,
+      ) as DashboardLocation[];
+      const nextLocations = orderLocationsBySelected(
+        enrichedLocations,
         currentSelected,
       );
       setLocations(nextLocations);
@@ -451,15 +544,11 @@ export const DashboardScreen = () => {
           setSelectedLocation(nextSelected);
         }
       }
-      const nextAdvisories = mergeAdvisories(
-        temporarySearchAdvisories,
-        parseAdvisoryList(crop),
-      ) as CropAdvisoryItem[];
       setAdvisories(nextAdvisories);
       if (temporarySearchLocations.length || temporarySearchAdvisories.length) {
         clearTemporarySearchData();
       }
-    } catch {
+    } catch (error: any) {
       // Keep previously available local/store data on transient API failures.
       if (!useAppStore.getState().locations?.length) {
         const fallback = useAppStore.getState().locations || [];
@@ -472,6 +561,11 @@ export const DashboardScreen = () => {
           ) as DashboardLocation[],
         );
       }
+      setTimeout(() => {
+        Alert.alert("", error?.message || t("common.error"), [
+          { text: t("common.ok") },
+        ]);
+      }, 50);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -484,6 +578,7 @@ export const DashboardScreen = () => {
     setSelectedLocation,
     temporarySearchAdvisories,
     temporarySearchLocations,
+    t,
     userId,
   ]);
 
@@ -649,57 +744,39 @@ export const DashboardScreen = () => {
 
   const advisoryRows = useMemo(() => {
     if (!currentLocation) return [];
-    const districtId = toNum(
-      (currentLocation as any).districtID,
-      (currentLocation as any).DistrictID,
+    const current: any = currentLocation;
+    return (
+      (activeTab === "district"
+        ? current?.districtCrops || current?.DistrictCrops
+        : current?.blockCrops || current?.BlockCrops) || []
     );
-    const blockId = toNum(
-      (currentLocation as any).blockID,
-      (currentLocation as any).BlockID,
-    );
-    const asdId = toNum(
-      (currentLocation as any).asdID,
-      (currentLocation as any).AsdID,
-    );
-
-    return advisories.filter((row: any) => {
-      const rowDistrict = toNum(row.districtID, row.DistrictID);
-      const rowBlock = toNum(row.blockID, row.BlockID);
-      const rowAsd = toNum(row.asdID, row.AsdID);
-
-      // Old Xamarin binds exact crop collections for each tab level.
-      // Generic rows without location IDs should not leak into block/district tabs.
-      if (!rowDistrict && !rowBlock && !rowAsd) return false;
-
-      if (activeTab === "district") {
-        return rowDistrict === districtId && rowBlock === 0 && rowAsd === 0;
-      }
-
-      // Block tab should show data only when selected location is truly block/asd level.
-      if (blockId <= 0 && asdId <= 0) {
-        return false;
-      }
-
-      if (asdId > 0) {
-        return rowDistrict === districtId && rowAsd === asdId && rowBlock === 0;
-      }
-      return rowDistrict === districtId && rowBlock === blockId && rowAsd === 0;
-    });
-  }, [activeTab, advisories, currentLocation]);
+  }, [activeTab, currentLocation]);
 
   const hasDistrictAdvisories = useMemo(() => {
     if (!currentLocation) return false;
-    const districtId = toNum(
-      (currentLocation as any).districtID,
-      (currentLocation as any).DistrictID,
+    const current: any = currentLocation;
+    const districtRows =
+      current?.districtCrops || current?.DistrictCrops || [];
+    return districtRows.length > 0;
+  }, [currentLocation]);
+
+  const shouldShowDistrictFallback = useMemo(() => {
+    if (activeTab !== "block" || !currentLocation) return false;
+    const current: any = currentLocation;
+    return !!(
+      current?.isDistrictDataAvailable ||
+      current?.IsDistrictDataAvailable ||
+      hasDistrictAdvisories
     );
-    return advisories.some((row: any) => {
-      const rowDistrict = toNum(row.districtID, row.DistrictID);
-      const rowBlock = toNum(row.blockID, row.BlockID);
-      const rowAsd = toNum(row.asdID, row.AsdID);
-      return rowDistrict === districtId && rowBlock === 0 && rowAsd === 0;
-    });
-  }, [advisories, currentLocation]);
+  }, [activeTab, currentLocation, hasDistrictAdvisories]);
+
+  const recentCropHeaderSource = useMemo(() => {
+    if (!currentLocation) return currentWeatherLocation;
+    if (activeTab === "district") {
+      return (currentLocation as any)?.districtWiseWeatherData || currentWeatherLocation;
+    }
+    return currentWeatherLocation;
+  }, [activeTab, currentLocation, currentWeatherLocation]);
 
   const cardWidth = Math.max(width, 280);
 
@@ -1124,8 +1201,8 @@ export const DashboardScreen = () => {
 
             <Text style={styles.recentTitle}>
               {`${t("home.recentCropAdvisories")}${pickText(
-                (currentWeatherLocation as any)?.recCropName,
-                (currentWeatherLocation as any)?.RecCropName,
+                (recentCropHeaderSource as any)?.recCropName,
+                (recentCropHeaderSource as any)?.RecCropName,
                 "",
               )}`}
             </Text>
@@ -1161,8 +1238,8 @@ export const DashboardScreen = () => {
           return (
             <Pressable
               style={styles.advisoryCard}
-              onPress={() =>
-                openCropAdvisory({
+              onPress={() => {
+                const advisoryParams = {
                   advisoryId: toNum(row.cropAdvisoryID, row.CropAdvisoryID),
                   cropId: toNum(row.cropID, row.CropID),
                   cropCategoryId: toNum(row.cropCategoryID, row.CropCategoryID),
@@ -1173,8 +1250,13 @@ export const DashboardScreen = () => {
                     row.Title,
                     t("home.cropAdvisory"),
                   ),
-                })
-              }
+                  stateID: toNum(row.stateID, row.StateID),
+                  districtID: toNum(row.districtID, row.DistrictID),
+                  blockID: toNum(row.blockID, row.BlockID),
+                  asdID: toNum(row.asdID, row.AsdID),
+                };
+                openCropAdvisory(advisoryParams);
+              }}
             >
               <Image
                 source={
@@ -1214,9 +1296,13 @@ export const DashboardScreen = () => {
         }}
         ListEmptyComponent={
           <Text style={styles.noData}>
-            {activeTab === "block" && hasDistrictAdvisories
+            {shouldShowDistrictFallback
               ? t("home.districtAdvisoriesAvailable")
-              : t("home.noAdvisoryData")}
+              : pickText(
+                    (currentLocation as any)?.isNoCropVisible ? t("home.noAdvisoryData") : "",
+                    (currentLocation as any)?.IsNoCropVisible ? t("home.noAdvisoryData") : "",
+                    t("home.noAdvisoryData"),
+                  )}
           </Text>
         }
       />

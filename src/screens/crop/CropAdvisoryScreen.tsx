@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -36,6 +36,19 @@ const pickNum = (...values: any[]) => {
   for (const value of values) {
     if (typeof value === 'number') return value;
     if (typeof value === 'string' && value.trim() && !Number.isNaN(Number(value))) return Number(value);
+  }
+  return 0;
+};
+
+const pickPositiveNum = (...values: any[]) => {
+  for (const value of values) {
+    const num =
+      typeof value === 'number'
+        ? value
+        : typeof value === 'string' && value.trim() && !Number.isNaN(Number(value))
+          ? Number(value)
+          : 0;
+    if (num > 0) return num;
   }
   return 0;
 };
@@ -80,6 +93,8 @@ const pickImageDataUri = (...values: any[]) => {
   return '';
 };
 
+const CROP_SHARE_BASE_URL = 'https://www.tropmet.res.in/';
+
 const pickList = (payload: any, keys: string[]) => {
   if (!payload) return [];
   if (Array.isArray(payload)) return payload;
@@ -87,6 +102,300 @@ const pickList = (payload: any, keys: string[]) => {
     if (Array.isArray(payload?.[key])) return payload[key];
   }
   return [];
+};
+
+const normalizeAdvisoryDetail = (sourceItem: any, detail: any) => {
+  const resolved = detail || {};
+  return {
+    ...sourceItem,
+    ...resolved,
+    stateID: pickPositiveNum(resolved?.stateID, resolved?.StateID, sourceItem?.stateID, sourceItem?.StateID, sourceItem?.stateId),
+    StateID: pickPositiveNum(resolved?.StateID, resolved?.stateID, sourceItem?.StateID, sourceItem?.stateID, sourceItem?.stateId),
+    districtID: pickPositiveNum(
+      resolved?.districtID,
+      resolved?.DistrictID,
+      sourceItem?.districtID,
+      sourceItem?.DistrictID,
+      sourceItem?.districtId,
+    ),
+    DistrictID: pickPositiveNum(
+      resolved?.DistrictID,
+      resolved?.districtID,
+      sourceItem?.DistrictID,
+      sourceItem?.districtID,
+      sourceItem?.districtId,
+    ),
+    blockID: pickPositiveNum(
+      resolved?.blockID,
+      resolved?.BlockID,
+      sourceItem?.blockID,
+      sourceItem?.BlockID,
+      sourceItem?.blockId,
+    ),
+    BlockID: pickPositiveNum(
+      resolved?.BlockID,
+      resolved?.blockID,
+      sourceItem?.BlockID,
+      sourceItem?.blockID,
+      sourceItem?.blockId,
+    ),
+    asdID: pickPositiveNum(
+      resolved?.asdID,
+      resolved?.AsdID,
+      sourceItem?.asdID,
+      sourceItem?.AsdID,
+      sourceItem?.asdId,
+    ),
+    AsdID: pickPositiveNum(
+      resolved?.AsdID,
+      resolved?.asdID,
+      sourceItem?.AsdID,
+      sourceItem?.asdID,
+      sourceItem?.asdId,
+    ),
+    location: pickText(resolved?.location, resolved?.Location, sourceItem?.location, sourceItem?.Location, '--'),
+    Location: pickText(resolved?.Location, resolved?.location, sourceItem?.Location, sourceItem?.location, '--'),
+    periodStartDate: pickText(
+      resolved?.periodStartDate,
+      resolved?.PeriodStartDate,
+      sourceItem?.periodStartDate,
+      sourceItem?.PeriodStartDate,
+      '--',
+    ),
+    PeriodStartDate: pickText(
+      resolved?.PeriodStartDate,
+      resolved?.periodStartDate,
+      sourceItem?.PeriodStartDate,
+      sourceItem?.periodStartDate,
+      '--',
+    ),
+    periodEndDate: pickText(
+      resolved?.periodEndDate,
+      resolved?.PeriodEndDate,
+      sourceItem?.periodEndDate,
+      sourceItem?.PeriodEndDate,
+      '--',
+    ),
+    PeriodEndDate: pickText(
+      resolved?.PeriodEndDate,
+      resolved?.periodEndDate,
+      sourceItem?.PeriodEndDate,
+      sourceItem?.periodEndDate,
+      '--',
+    ),
+    weatherCondition: pickText(
+      resolved?.weatherCondition,
+      resolved?.WeatherCondition,
+      sourceItem?.weatherCondition,
+      sourceItem?.WeatherCondition,
+      '--',
+    ),
+    WeatherCondition: pickText(
+      resolved?.WeatherCondition,
+      resolved?.weatherCondition,
+      sourceItem?.WeatherCondition,
+      sourceItem?.weatherCondition,
+      '--',
+    ),
+    recommendations: pickText(
+      resolved?.recommendations,
+      resolved?.Recommendations,
+      sourceItem?.recommendations,
+      sourceItem?.Recommendations,
+      '--',
+    ),
+    Recommendations: pickText(
+      resolved?.Recommendations,
+      resolved?.recommendations,
+      sourceItem?.Recommendations,
+      sourceItem?.recommendations,
+      '--',
+    ),
+    briefText: pickText(
+      resolved?.briefText,
+      resolved?.BriefText,
+      sourceItem?.briefText,
+      sourceItem?.BriefText,
+      '--',
+    ),
+    BriefText: pickText(
+      resolved?.BriefText,
+      resolved?.briefText,
+      sourceItem?.BriefText,
+      sourceItem?.briefText,
+      '--',
+    ),
+    agroAdvisoryDetails: pickText(
+      resolved?.agroAdvisoryDetails,
+      resolved?.AgroAdvisoryDetails,
+      sourceItem?.agroAdvisoryDetails,
+      sourceItem?.AgroAdvisoryDetails,
+      '--',
+    ),
+    AgroAdvisoryDetails: pickText(
+      resolved?.AgroAdvisoryDetails,
+      resolved?.agroAdvisoryDetails,
+      sourceItem?.AgroAdvisoryDetails,
+      sourceItem?.agroAdvisoryDetails,
+      '--',
+    ),
+    weatherConditionRegional: pickText(
+      resolved?.weatherConditionRegional,
+      resolved?.WeatherConditionRegional,
+      sourceItem?.weatherConditionRegional,
+      sourceItem?.WeatherConditionRegional,
+      '--',
+    ),
+    WeatherConditionRegional: pickText(
+      resolved?.WeatherConditionRegional,
+      resolved?.weatherConditionRegional,
+      sourceItem?.WeatherConditionRegional,
+      sourceItem?.weatherConditionRegional,
+      '--',
+    ),
+    recommendationsRegional: pickText(
+      resolved?.recommendationsRegional,
+      resolved?.RecommendationsRegional,
+      sourceItem?.recommendationsRegional,
+      sourceItem?.RecommendationsRegional,
+      '--',
+    ),
+    RecommendationsRegional: pickText(
+      resolved?.RecommendationsRegional,
+      resolved?.recommendationsRegional,
+      sourceItem?.RecommendationsRegional,
+      sourceItem?.recommendationsRegional,
+      '--',
+    ),
+    briefTextRegional: pickText(
+      resolved?.briefTextRegional,
+      resolved?.BriefTextRegional,
+      sourceItem?.briefTextRegional,
+      sourceItem?.BriefTextRegional,
+      '--',
+    ),
+    BriefTextRegional: pickText(
+      resolved?.BriefTextRegional,
+      resolved?.briefTextRegional,
+      sourceItem?.BriefTextRegional,
+      sourceItem?.briefTextRegional,
+      '--',
+    ),
+    agroAdvisoryDetailsRegional: pickText(
+      resolved?.agroAdvisoryDetailsRegional,
+      resolved?.AgroAdvisoryDetailsRegional,
+      sourceItem?.agroAdvisoryDetailsRegional,
+      sourceItem?.AgroAdvisoryDetailsRegional,
+      '--',
+    ),
+    AgroAdvisoryDetailsRegional: pickText(
+      resolved?.AgroAdvisoryDetailsRegional,
+      resolved?.agroAdvisoryDetailsRegional,
+      sourceItem?.AgroAdvisoryDetailsRegional,
+      sourceItem?.agroAdvisoryDetailsRegional,
+      '--',
+    ),
+  };
+};
+
+const applyLocationContext = (item: any, context: any) => {
+  if (!context) return item;
+  return {
+    ...item,
+    stateID: pickPositiveNum(item?.stateID, item?.StateID, item?.stateId, context?.stateID),
+    StateID: pickPositiveNum(item?.StateID, item?.stateID, item?.stateId, context?.stateID),
+    districtID: pickPositiveNum(
+      item?.districtID,
+      item?.DistrictID,
+      item?.districtId,
+      context?.districtID,
+    ),
+    DistrictID: pickPositiveNum(
+      item?.DistrictID,
+      item?.districtID,
+      item?.districtId,
+      context?.districtID,
+    ),
+    blockID: pickPositiveNum(item?.blockID, item?.BlockID, item?.blockId, context?.blockID),
+    BlockID: pickPositiveNum(item?.BlockID, item?.blockID, item?.blockId, context?.blockID),
+    asdID: pickPositiveNum(item?.asdID, item?.AsdID, item?.asdId, context?.asdID),
+    AsdID: pickPositiveNum(item?.AsdID, item?.asdID, item?.asdId, context?.asdID),
+  };
+};
+
+const matchesLocationContext = (item: any, context: any) => {
+  if (!context?.districtID) return true;
+  const itemDistrictID = pickPositiveNum(item?.districtID, item?.DistrictID, item?.districtId);
+  if (itemDistrictID !== context.districtID) return false;
+
+  const itemAsdID = pickPositiveNum(item?.asdID, item?.AsdID, item?.asdId);
+  const itemBlockID = pickPositiveNum(item?.blockID, item?.BlockID, item?.blockId);
+  if (context.asdID > 0) return itemAsdID === context.asdID;
+  if (context.blockID > 0) return itemBlockID === context.blockID;
+  return true;
+};
+
+const withEnglishFieldOverrides = (detail: any, englishDetail: any) => {
+  if (!englishDetail) return detail;
+  return {
+    ...detail,
+    weatherCondition: pickText(
+      englishDetail?.weatherCondition,
+      englishDetail?.WeatherCondition,
+      detail?.weatherCondition,
+      detail?.WeatherCondition,
+      '--',
+    ),
+    WeatherCondition: pickText(
+      englishDetail?.WeatherCondition,
+      englishDetail?.weatherCondition,
+      detail?.WeatherCondition,
+      detail?.weatherCondition,
+      '--',
+    ),
+    recommendations: pickText(
+      englishDetail?.recommendations,
+      englishDetail?.Recommendations,
+      detail?.recommendations,
+      detail?.Recommendations,
+      '--',
+    ),
+    Recommendations: pickText(
+      englishDetail?.Recommendations,
+      englishDetail?.recommendations,
+      detail?.Recommendations,
+      detail?.recommendations,
+      '--',
+    ),
+    briefText: pickText(
+      englishDetail?.briefText,
+      englishDetail?.BriefText,
+      detail?.briefText,
+      detail?.BriefText,
+      '--',
+    ),
+    BriefText: pickText(
+      englishDetail?.BriefText,
+      englishDetail?.briefText,
+      detail?.BriefText,
+      detail?.briefText,
+      '--',
+    ),
+    agroAdvisoryDetails: pickText(
+      englishDetail?.agroAdvisoryDetails,
+      englishDetail?.AgroAdvisoryDetails,
+      detail?.agroAdvisoryDetails,
+      detail?.AgroAdvisoryDetails,
+      '--',
+    ),
+    AgroAdvisoryDetails: pickText(
+      englishDetail?.AgroAdvisoryDetails,
+      englishDetail?.agroAdvisoryDetails,
+      detail?.AgroAdvisoryDetails,
+      detail?.agroAdvisoryDetails,
+      '--',
+    ),
+  };
 };
 
 type AdvisorySectionProps = {
@@ -122,6 +431,15 @@ export const CropAdvisoryScreen = () => {
   const requestedAdvisoryId = pickNum(route?.params?.advisoryId, route?.params?.CropAdvisoryID);
   const requestedCropId = pickNum(route?.params?.cropId, route?.params?.CropID);
   const requestedCropCategoryId = pickNum(route?.params?.cropCategoryId, route?.params?.CropCategoryID);
+  const requestedLocation = useMemo(
+    () => ({
+      stateID: pickPositiveNum(route?.params?.stateID, route?.params?.StateID, route?.params?.stateId),
+      districtID: pickPositiveNum(route?.params?.districtID, route?.params?.DistrictID, route?.params?.districtId),
+      blockID: pickPositiveNum(route?.params?.blockID, route?.params?.BlockID, route?.params?.blockId),
+      asdID: pickPositiveNum(route?.params?.asdID, route?.params?.AsdID, route?.params?.asdId),
+    }),
+    [route?.params]
+  );
 
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<any[]>([]);
@@ -133,11 +451,24 @@ export const CropAdvisoryScreen = () => {
 
   const [weatherOpen, setWeatherOpen] = useState(true);
   const [agroOpen, setAgroOpen] = useState(false);
-  const [smsOpen, setSmsOpen] = useState(false);
+  const [smsOpen, setSmsOpen] = useState(true);
   const [recommendationOpen, setRecommendationOpen] = useState(true);
   const [attachmentsOpen, setAttachmentsOpen] = useState(false);
+  const detailCacheRef = useRef<Record<string, any>>({});
+  const attachmentCacheRef = useRef<Record<string, { images: any[]; audios: any[] }>>({});
 
   const current = items[index] || {};
+
+  const showErrorMessage = useCallback(
+    (message?: string) => {
+      setTimeout(() => {
+        Alert.alert('', message || t('common.error'), [
+          { text: t('common.ok') },
+        ]);
+      }, 50);
+    },
+    [t]
+  );
 
   const advisoryId = useMemo(
     () => pickNum(current.cropAdvisoryID, current.CropAdvisoryID),
@@ -164,19 +495,19 @@ export const CropAdvisoryScreen = () => {
 
   const weatherText = isEnglish
     ? pickText(current.weatherCondition, current.WeatherCondition, '--')
-    : pickText(current.weatherConditionRegional, current.WeatherConditionRegional, current.weatherCondition, current.WeatherCondition, '--');
+    : pickText(current.weatherConditionRegional, current.WeatherConditionRegional, '--');
 
   const agroText = isEnglish
     ? pickText(current.agroAdvisoryDetails, current.AgroAdvisoryDetails, '--')
-    : pickText(current.agroAdvisoryDetailsRegional, current.AgroAdvisoryDetailsRegional, current.agroAdvisoryDetails, current.AgroAdvisoryDetails, '--');
+    : pickText(current.agroAdvisoryDetailsRegional, current.AgroAdvisoryDetailsRegional, '--');
 
   const briefText = isEnglish
     ? pickText(current.briefText, current.BriefText, '--')
-    : pickText(current.briefTextRegional, current.BriefTextRegional, current.briefText, current.BriefText, '--');
+    : pickText(current.briefTextRegional, current.BriefTextRegional, '--');
 
   const recommendationText = isEnglish
     ? pickText(current.recommendations, current.Recommendations, '--')
-    : pickText(current.recommendationsRegional, current.RecommendationsRegional, current.recommendations, current.Recommendations, '--');
+    : pickText(current.recommendationsRegional, current.RecommendationsRegional, '--');
 
   const hasWeatherSection = !!pickText(current.weatherCondition, current.WeatherCondition);
   const hasRecommendationSection = !!pickText(current.recommendations, current.Recommendations);
@@ -214,21 +545,26 @@ export const CropAdvisoryScreen = () => {
         'objCropAdvisoryFavouriteRatingList',
         'ObjCropAdvisoryFavouriteRatingList',
       ]) as any[];
-      setItems(list);
-      if (list.length) {
+      const contextList = list.map((item) => applyLocationContext(item, requestedLocation));
+      const scopedList = requestedLocation.districtID
+        ? contextList.filter((item) => matchesLocationContext(item, requestedLocation))
+        : contextList;
+      const nextList = scopedList.length ? scopedList : contextList;
+      setItems(nextList);
+      if (nextList.length) {
         const matchedByAdvisory = requestedAdvisoryId
-          ? list.findIndex(
+          ? nextList.findIndex(
               (item) => pickNum(item.cropAdvisoryID, item.CropAdvisoryID) === requestedAdvisoryId
             )
           : -1;
         const matchedByCrop = matchedByAdvisory >= 0
           ? -1
           : requestedCropId
-          ? list.findIndex(
+          ? nextList.findIndex(
               (item) => pickNum(item.cropID, item.CropID) === requestedCropId
             )
           : requestedCropCategoryId
-            ? list.findIndex(
+            ? nextList.findIndex(
                 (item) =>
                   pickNum(item.cropCategoryID, item.CropCategoryID) ===
                   requestedCropCategoryId
@@ -239,10 +575,12 @@ export const CropAdvisoryScreen = () => {
           : matchedByCrop >= 0
             ? matchedByCrop
           : activeId
-            ? list.findIndex((item) => pickNum(item.cropAdvisoryID, item.CropAdvisoryID) === activeId)
+            ? nextList.findIndex((item) => pickNum(item.cropAdvisoryID, item.CropAdvisoryID) === activeId)
             : -1;
         setIndex(matchedIndex >= 0 ? matchedIndex : 0);
       }
+    } catch (error: any) {
+      showErrorMessage(error?.message);
     } finally {
       setLoading(false);
     }
@@ -252,6 +590,13 @@ export const CropAdvisoryScreen = () => {
     if (!cropId) {
       setImages([]);
       setAudios([]);
+      return;
+    }
+    const cacheKey = `${cropId}:${languageLabel}`;
+    const cached = attachmentCacheRef.current[cacheKey];
+    if (cached) {
+      setImages(cached.images);
+      setAudios(cached.audios);
       return;
     }
 
@@ -277,24 +622,79 @@ export const CropAdvisoryScreen = () => {
       'ObjCropAdvisoryImageList',
     ]);
 
+    attachmentCacheRef.current[cacheKey] = {
+      images: imageList,
+      audios: audioList,
+    };
     setImages(imageList);
     setAudios(audioList);
+  };
+
+  const fetchAdvisoryDetail = async (targetAdvisoryId: number, detailLanguage = languageLabel) => {
+    const cacheKey = `${targetAdvisoryId}:${detailLanguage}`;
+    if (detailCacheRef.current[cacheKey]) {
+      return detailCacheRef.current[cacheKey];
+    }
+    const response = await cropService.getAdvisoryById({
+      CropAdvisoryID: targetAdvisoryId,
+      LanguageType: detailLanguage,
+      RefreshDateTime: API_REFRESH_DATES.current(),
+    });
+
+    const base = response?.result || response?.data || response;
+    const details = pickList(base, [
+      'objCropAdvisoryDetailsList',
+      'ObjCropAdvisoryDetailsList',
+    ]) as any[];
+    const detail = details[0] || null;
+    detailCacheRef.current[cacheKey] = detail;
+    return detail;
+  };
+
+  const loadAdvisoryDetail = async (targetAdvisoryId: number) => {
+    if (!targetAdvisoryId) return;
+    const detail = await fetchAdvisoryDetail(targetAdvisoryId);
+    const englishDetail =
+      languageLabel.toLowerCase() === 'english'
+        ? detail
+        : await fetchAdvisoryDetail(targetAdvisoryId, 'English');
+    const mergedDetail = withEnglishFieldOverrides(detail, englishDetail);
+    setItems((prev) =>
+      prev.map((item, itemIndex) =>
+        itemIndex === index ||
+        pickNum(item.cropAdvisoryID, item.CropAdvisoryID) === targetAdvisoryId
+          ? applyLocationContext(
+              normalizeAdvisoryDetail(item, mergedDetail),
+              requestedLocation,
+            )
+          : item,
+      ),
+    );
   };
 
   useFocusEffect(
     useCallback(() => {
       loadAdvisories();
-    }, [userProfileId, languageLabel, requestedAdvisoryId, requestedCropCategoryId, requestedCropId])
+  }, [userProfileId, languageLabel, requestedAdvisoryId, requestedCropCategoryId, requestedCropId, requestedLocation])
   );
 
   useEffect(() => {
     if (advisoryId) {
-      loadAttachments(advisoryId).catch(() => {
+      loadAttachments(advisoryId).catch((error: any) => {
         setImages([]);
         setAudios([]);
+        showErrorMessage(error?.message);
       });
     }
-  }, [advisoryId, languageLabel]);
+  }, [advisoryId, languageLabel, showErrorMessage]);
+
+  useEffect(() => {
+    if (advisoryId) {
+      loadAdvisoryDetail(advisoryId).catch((error: any) => {
+        showErrorMessage(error?.message);
+      });
+    }
+  }, [advisoryId, languageLabel, index, showErrorMessage]);
 
   const toggleFavourite = async () => {
     if (!advisoryId || !userProfileId || isFavourite || favouriteBusy) return;
@@ -344,22 +744,61 @@ export const CropAdvisoryScreen = () => {
     ]);
   };
 
-  const shareCurrent = async () => {
-    const stateID = pickNum(current.stateID, current.StateID);
-    const districtID = pickNum(current.districtID, current.DistrictID);
-    const blockID = pickNum(current.blockID, current.BlockID);
-    const asdID = pickNum(current.asdID, current.AsdID);
-    if (!stateID || !districtID) return;
+  const shareCurrent = useCallback(async () => {
+    const stateID = pickPositiveNum(
+      current.stateID,
+      current.StateID,
+      current.stateId,
+      requestedLocation.stateID,
+    );
+    const districtID = pickPositiveNum(
+      current.districtID,
+      current.DistrictID,
+      current.districtId,
+      requestedLocation.districtID,
+    );
+    const blockID = pickPositiveNum(
+      current.blockID,
+      current.BlockID,
+      current.blockId,
+      requestedLocation.blockID,
+    );
+    const asdID = pickPositiveNum(
+      current.asdID,
+      current.AsdID,
+      current.asdId,
+      requestedLocation.asdID,
+    );
+    if (!stateID || !districtID) {
+      return;
+    }
+
     const isAsdState = stateID === 28 || stateID === 36;
-    const levelPart = isAsdState ? `ASDID=${asdID}` : `BlockID=${blockID}`;
-    const shareUrl = `https://www.tropmet.res.in/StateID=${stateID}/DistrictID=${districtID}/${levelPart}`;
+    const levelPart = isAsdState
+      ? `ASDID=${asdID || 0}`
+      : `BlockID=${blockID || 0}`;
+    const shareUrl = `${CROP_SHARE_BASE_URL}StateID=${stateID}/DistrictID=${districtID}/${levelPart}`;
 
     await Share.share({
       title: 'MEGHDOOT',
       message: `${t('crop.checkoutAdvisory')}\n${shareUrl}`,
       url: shareUrl,
     });
-  };
+  }, [current, requestedLocation, t]);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <Pressable onPress={shareCurrent} style={{ marginRight: 8 }} hitSlop={8}>
+          <Image
+            source={require('../../../assets/images/share_wh.png')}
+            style={{ width: 24, height: 24 }}
+            resizeMode="contain"
+          />
+        </Pressable>
+      ),
+    });
+  }, [navigation, shareCurrent]);
 
   const openUrl = async (url: string) => {
     if (!url) return;
@@ -456,7 +895,9 @@ export const CropAdvisoryScreen = () => {
             {pickText(current.youTubeLink, current.YouTubeLink) ? (
               <Pressable style={styles.actionItem} onPress={() => openUrl(pickText(current.youTubeLink, current.YouTubeLink))}>
                 <Image source={require('../../../assets/images/ic_video.png')} style={styles.actionIcon} resizeMode="contain" />
-                <Text style={styles.actionText}>{t('crop.video')}</Text>
+                <Text style={styles.actionText} numberOfLines={1} ellipsizeMode="tail">
+                  {t('crop.video')}
+                </Text>
               </Pressable>
             ) : null}
 
@@ -481,7 +922,9 @@ export const CropAdvisoryScreen = () => {
                 }
               >
                 <Image source={require('../../../assets/images/ic_audio.png')} style={styles.actionIcon} resizeMode="contain" />
-                <Text style={styles.actionText}>{t('crop.audio')}</Text>
+                <Text style={styles.actionText} numberOfLines={1} ellipsizeMode="tail">
+                  {t('crop.audio')}
+                </Text>
               </Pressable>
             ) : null}
 
@@ -491,17 +934,11 @@ export const CropAdvisoryScreen = () => {
                 style={styles.actionIcon}
                 resizeMode="contain"
               />
-              <Text style={styles.actionText}>
+              <Text style={styles.actionText} numberOfLines={1} ellipsizeMode="tail">
                 {favouriteBusy ? t('crop.saving') : isFavourite ? t('crop.addedFav') : t('crop.addFav')}
               </Text>
             </Pressable>
 
-            <Pressable style={styles.actionItem} onPress={shareCurrent}>
-              <View style={styles.shareIconWrap}>
-                <Image source={require('../../../assets/images/share_wh.png')} style={styles.shareIconGlyph} resizeMode="contain" />
-              </View>
-              <Text style={styles.actionText}>{t('crop.share')}</Text>
-            </Pressable>
           </View>
         </View>
 
@@ -680,24 +1117,6 @@ const styles = StyleSheet.create({
   actionIcon: {
     width: 50,
     height: 50,
-  },
-  shareIconWrap: {
-    width: 45,
-    height: 45,
-    borderRadius: 25,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  shareIconGlyph: {
-    width: 35,
-    height: 35,
-    tintColor: colors.darkGreen,
   },
   actionText: {
     marginTop: 2,

@@ -13,6 +13,8 @@ export default {
     error: 'ত্রুটি',
     success: 'সফলতা',
     validation: 'যাচাই',
+    connectToInternet:
+      'আপনার ইন্টারনেট সংযোগ ভালো নয়। অনুগ্রহ করে সংযোগটি উন্নত করুন, নইলে আপনি কোনো ডেটা দেখতে নাও পারেন।',
   },
   auth: {
     ...en.auth,

@@ -4,6 +4,7 @@ import { CommonActions, NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createDrawerNavigator, DrawerContentScrollView, DrawerItem } from '@react-navigation/drawer';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as NavigationBar from 'expo-navigation-bar';
 import Constants from 'expo-constants';
@@ -11,6 +12,7 @@ import { RootStackParamList, AuthStackParamList, OnboardingStackParamList } from
 import { useAppStore } from '../store/appStore';
 import { colors } from '../theme/colors';
 import { API_BASE_URL } from '../constants/api';
+import { STORAGE_KEYS } from '../constants/storageKeys';
 import i18n from '../locales/i18n';
 import { LANGUAGES } from '../constants/languages';
 
@@ -233,6 +235,7 @@ const MenuContent = (props: any) => {
               0
           );
           await unregisterPushTokenForUser(userProfileId);
+          await AsyncStorage.removeItem(STORAGE_KEYS.loggedInUser);
           logout();
           setAndroidNavBar(colors.background, 'dark');
           props.navigation.closeDrawer();

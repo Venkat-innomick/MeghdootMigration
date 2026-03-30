@@ -74,11 +74,13 @@ export const CropFeedbackScreen = ({ navigation, route }: Props) => {
 
   const submit = () => {
     if (!selectedValue) {
-      Alert.alert(t('crop.alert'), t('crop.selectRatingPrompt'));
+      Alert.alert('', t('crop.selectRatingPrompt'), [
+        { text: t('common.ok') },
+      ]);
       return;
     }
 
-    Alert.alert(t('crop.feedback'), t('crop.submitFeedbackPrompt'), [
+    Alert.alert('', t('crop.submitFeedbackPrompt'), [
       { text: t('crop.no'), style: 'cancel' },
       {
         text: t('crop.yes'),
@@ -102,18 +104,22 @@ export const CropFeedbackScreen = ({ navigation, route }: Props) => {
 
             const response = await cropService.saveFeedback(payload);
             if (response?.isSuccessful === false) {
-              Alert.alert(t('crop.fail'), String(response?.errorMessage || t('crop.failedToSaveFeedback')));
+              Alert.alert('', String(response?.errorMessage || t('crop.failedToSaveFeedback')), [
+                { text: t('common.ok') },
+              ]);
               return;
             }
 
-            Alert.alert(t('common.success'), t('crop.feedbackSubmittedSuccessfully'), [
+            Alert.alert('', t('crop.feedbackSubmittedSuccessfully'), [
               {
                 text: t('common.ok'),
                 onPress: () => navigation.goBack(),
               },
             ]);
           } catch {
-            Alert.alert(t('crop.fail'), t('crop.failedToSaveFeedback'));
+            Alert.alert('', t('crop.failedToSaveFeedback'), [
+              { text: t('common.ok') },
+            ]);
           } finally {
             setSubmitting(false);
           }

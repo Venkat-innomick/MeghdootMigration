@@ -141,26 +141,21 @@ export const ProfileScreen = () => {
             []) as any[];
           const data = Array.isArray(users) ? users[0] : users;
           if (!data) return;
-          const apiImagePath = data.ImagePath || data.imagePath || "";
-          const cachedImagePath = apiImagePath
-            ? ""
-            : (await AsyncStorage.getItem(
-                `${STORAGE_KEYS.profileImageCache}:${mobile}`,
-              )) || "";
           const effectiveImagePath =
-            apiImagePath || cachedImagePath || user?.imagePath;
+            data.ImagePath || data.imagePath || user?.imagePath;
 
           const typeOfRole = Number(
-            data?.TypeOfRole ??
-              data?.typeOfRole ??
-              data?.UserProfileID ??
+            data?.TypeOfRole ?? data?.typeOfRole ?? user?.typeOfRole ?? 0,
+          );
+          const userProfileId = Number(
+            data?.UserProfileID ??
               data?.userProfileId ??
               user?.userProfileId ??
               0,
           );
 
           setUser({
-            userProfileId: typeOfRole || user?.userProfileId || 0,
+            userProfileId,
             firstName:
               data.FirstName || data.firstName || user?.firstName || "",
             lastName: data.LastName || data.lastName || user?.lastName || "",
@@ -234,56 +229,100 @@ export const ProfileScreen = () => {
 
   const persistProfileImage = useCallback(
     async (base64Image: string) => {
-      const userProfileId = Number(
+      let uploadUserId = Number(
         user?.typeOfRole ??
           user?.TypeOfRole ??
           user?.userProfileId ??
           user?.UserProfileID ??
           0,
       );
-      if (!userProfileId) {
-        Alert.alert(i18n.t("profile.title"), i18n.t("profile.loginAgain"));
+      if (!uploadUserId) {
+        const mobile = String(
+          user?.mobileNumber || user?.LogInId || user?.MobileNumber || "",
+        ).trim();
+        if (mobile) {
+          try {
+            const response: any = await userService.login({
+              LogInId: mobile,
+              LogInPassword: "1234",
+              LanguageType: languageLabel,
+              Refreshdatetime: "2016-01-01",
+            });
+            const root = response || {};
+            const users = (root.ObjUserList ||
+              root.objUserList ||
+              root.result ||
+              root.data ||
+              []) as any[];
+            const data = Array.isArray(users) ? users[0] : users;
+            const recoveredTypeOfRole = Number(
+              data?.TypeOfRole ?? data?.typeOfRole ?? 0,
+            );
+            const recoveredUserProfileId = Number(
+              data?.UserProfileID ?? data?.userProfileId ?? 0,
+            );
+            uploadUserId = recoveredTypeOfRole || recoveredUserProfileId;
+            if (uploadUserId) {
+              setUser({
+                ...(user || {}),
+                ...(recoveredUserProfileId
+                  ? { userProfileId: recoveredUserProfileId }
+                  : {}),
+                ...(recoveredTypeOfRole
+                  ? { typeOfRole: recoveredTypeOfRole }
+                  : {}),
+              });
+            }
+          } catch {
+            // Keep the existing login-again message below.
+          }
+        }
+      }
+      if (!uploadUserId) {
+        Alert.alert("", i18n.t("profile.loginAgain"), [
+          { text: i18n.t("common.ok") },
+        ]);
         return;
       }
 
       setUpdatingImage(true);
       try {
-        try {
-          const response: any = await userService.saveProfile({
-            UserProfileID: userProfileId,
-            UserProfileImage: base64Image,
-          });
-          const ok = Boolean(
-            response?.isSuccessful ?? response?.IsSuccessful ?? true,
+        const response: any = await userService.saveProfile({
+          UserProfileID: uploadUserId,
+          UserProfileImage: base64Image,
+        });
+        const ok = Boolean(
+          response?.isSuccessful ??
+            response?.IsSuccessful ??
+            response?.result?.isSuccessful ??
+            response?.result?.IsSuccessful ??
+            false,
+        );
+        if (!ok) {
+          throw new Error(
+            response?.errorMessage ??
+              response?.ErrorMessage ??
+              response?.result?.errorMessage ??
+              response?.result?.ErrorMessage ??
+              i18n.t("profile.unableUpdateImage"),
           );
-          if (!ok) {
-            // Keep local persistence behavior same as old Xamarin flow.
-            console.log(
-              "[ProfileImage] API save returned unsuccessful, keeping local image",
-            );
-          }
-        } catch {
-          // Old Xamarin app also persisted locally even when upload path was not active.
         }
 
         setUser({
           ...(user || {}),
           imagePath: base64Image,
         });
-        const mobile = String(
-          user?.mobileNumber || user?.LogInId || user?.MobileNumber || "",
-        ).trim();
-        if (mobile) {
-          await AsyncStorage.setItem(
-            `${STORAGE_KEYS.profileImageCache}:${mobile}`,
-            base64Image,
-          );
-        }
         if (Platform.OS === "android") {
           ToastAndroid.show(i18n.t("profile.imageUpdated"), ToastAndroid.SHORT);
         } else {
-          Alert.alert(i18n.t("profile.title"), i18n.t("profile.imageUpdated"));
+          Alert.alert("", i18n.t("profile.imageUpdated"), [
+            { text: i18n.t("common.ok") },
+          ]);
         }
+      } catch (error: any) {
+        Alert.alert("", error?.message || i18n.t("profile.unableUpdateImage"), [
+          { text: i18n.t("common.ok") },
+        ]);
       } finally {
         setUpdatingImage(false);
       }
@@ -297,10 +336,9 @@ export const ProfileScreen = () => {
       try {
         ImagePicker = require("expo-image-picker");
       } catch {
-        Alert.alert(
-          i18n.t("profile.title"),
-          i18n.t("profile.installImagePicker"),
-        );
+        Alert.alert("", i18n.t("profile.installImagePicker"), [
+          { text: i18n.t("common.ok") },
+        ]);
         return;
       }
 
@@ -313,17 +351,18 @@ export const ProfileScreen = () => {
           cameraPermission?.status !== "granted" ||
           libraryPermission?.status !== "granted"
         ) {
-          Alert.alert(
-            i18n.t("profile.title"),
-            i18n.t("profile.cameraPhotosDenied"),
-          );
+          Alert.alert("", i18n.t("profile.cameraPhotosDenied"), [
+            { text: i18n.t("common.ok") },
+          ]);
           return;
         }
       } else {
         const libraryPermission =
           await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (libraryPermission?.status !== "granted") {
-          Alert.alert(i18n.t("profile.title"), i18n.t("profile.photosDenied"));
+          Alert.alert("", i18n.t("profile.photosDenied"), [
+            { text: i18n.t("common.ok") },
+          ]);
           return;
         }
       }
@@ -332,7 +371,7 @@ export const ProfileScreen = () => {
         ImagePicker?.MediaType?.Images ?? ["images"];
       const commonOptions = {
         mediaTypes: mediaType,
-        allowsEditing: true,
+        allowsEditing: false,
         quality: 0.6,
         base64: true,
       };
@@ -346,7 +385,9 @@ export const ProfileScreen = () => {
       const asset = result?.assets?.[0];
       const base64Image = asset?.base64 as string | undefined;
       if (!base64Image) {
-        Alert.alert(i18n.t("profile.title"), i18n.t("profile.unableReadImage"));
+        Alert.alert("", i18n.t("profile.unableReadImage"), [
+          { text: i18n.t("common.ok") },
+        ]);
         return;
       }
       await persistProfileImage(base64Image);

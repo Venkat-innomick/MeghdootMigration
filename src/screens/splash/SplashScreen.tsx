@@ -1,6 +1,9 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { CommonActions } from "@react-navigation/native";
 import React, { useEffect } from "react";
 import { Image, StyleSheet, View } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { STORAGE_KEYS } from "../../constants/storageKeys";
 import { RootStackParamList } from "../../navigation/types";
 import { useAppStore } from "../../store/appStore";
 import { colors } from "../../theme/colors";
@@ -8,31 +11,66 @@ import { colors } from "../../theme/colors";
 type Props = NativeStackScreenProps<RootStackParamList, "Splash">;
 
 export const SplashScreen = ({ navigation }: Props) => {
-  const isHydrated = useAppStore((s) => s.isHydrated);
-  const onboardingDone = useAppStore((s) => s.onboardingDone);
-  const user = useAppStore((s) => s.user);
-
   useEffect(() => {
-    if (!isHydrated) {
-      return;
-    }
+    let mounted = true;
 
-    const timeoutId = setTimeout(() => {
-      if (!onboardingDone) {
-        navigation.replace("Onboarding");
+    const restoreAndRoute = async () => {
+      let storedUser: any = null;
+      let directOnboardingDone = false;
+      const persistApi = (useAppStore as any).persist;
+
+      try {
+        const directUser = await AsyncStorage.getItem(STORAGE_KEYS.loggedInUser);
+        storedUser = directUser ? JSON.parse(directUser) : null;
+      } catch {
+        storedUser = null;
+      }
+
+      try {
+        directOnboardingDone =
+          (await AsyncStorage.getItem(STORAGE_KEYS.onboardingDone)) === "true";
+      } catch {
+        directOnboardingDone = false;
+      }
+
+      try {
+        await persistApi?.rehydrate?.();
+      } catch {
+        // ignore; startup will use whatever store state is available
+      }
+
+      if (!mounted) {
         return;
       }
 
-      if (!user) {
-        navigation.replace("Auth");
-        return;
+      const state = useAppStore.getState();
+      if (storedUser && !state.user) {
+        useAppStore.setState({
+          isHydrated: true,
+          user: storedUser,
+        });
       }
 
-      navigation.replace("Main");
-    }, 3000);
+      const nextRoute = storedUser || state.user
+        ? "Main"
+        : !directOnboardingDone && !state.onboardingDone
+        ? "Onboarding"
+        : "Auth";
 
-    return () => clearTimeout(timeoutId);
-  }, [isHydrated, navigation, onboardingDone, user]);
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 0,
+          routes: [{ name: nextRoute }],
+        }),
+      );
+    };
+
+    restoreAndRoute();
+
+    return () => {
+      mounted = false;
+    };
+  }, [navigation]);
 
   return (
     <View style={styles.container}>

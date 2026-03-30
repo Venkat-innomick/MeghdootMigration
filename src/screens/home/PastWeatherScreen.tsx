@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
   ImageBackground,
@@ -324,29 +325,37 @@ export const PastWeatherScreen = () => {
 
   const loadLocations = async () => {
     if (!userId) return;
-    const payload = buildByLocationPayload(userId, languageLabel);
-    const response = await weatherService.getByLocation(payload);
-    const rawList = parseLocationWeatherList(response) as DashboardLocation[];
-    const list = dedupePastWeatherLocations(rawList as any[]) as DashboardLocation[];
-    setLocations(list);
-    if (list.length) {
-      const selectedIndex = selectedLocationRef
-        ? list.findIndex((loc: any) => {
-            const districtID = pickNum(
-              loc?.districtID,
-              loc?.DistrictID,
-              loc?.tempDistrictID,
-              loc?.TempDistrictID,
-            );
-            return districtID === selectedLocationRef.districtID;
-          })
-        : -1;
-      const indexToUse = selectedIndex >= 0 ? selectedIndex : 0;
-      const target = list[indexToUse] as any;
-      setSelectedLocationIndex(indexToUse);
-      await loadWeatherForLocation(target);
-    } else {
-      setDays([]);
+    try {
+      const payload = buildByLocationPayload(userId, languageLabel);
+      const response = await weatherService.getByLocation(payload);
+      const rawList = parseLocationWeatherList(response) as DashboardLocation[];
+      const list = dedupePastWeatherLocations(rawList as any[]) as DashboardLocation[];
+      setLocations(list);
+      if (list.length) {
+        const selectedIndex = selectedLocationRef
+          ? list.findIndex((loc: any) => {
+              const districtID = pickNum(
+                loc?.districtID,
+                loc?.DistrictID,
+                loc?.tempDistrictID,
+                loc?.TempDistrictID,
+              );
+              return districtID === selectedLocationRef.districtID;
+            })
+          : -1;
+        const indexToUse = selectedIndex >= 0 ? selectedIndex : 0;
+        const target = list[indexToUse] as any;
+        setSelectedLocationIndex(indexToUse);
+        await loadWeatherForLocation(target);
+      } else {
+        setDays([]);
+      }
+    } catch (error: any) {
+      setTimeout(() => {
+        Alert.alert("", error?.message || t("common.error"), [
+          { text: t("common.ok") },
+        ]);
+      }, 50);
     }
   };
 
@@ -375,6 +384,12 @@ export const PastWeatherScreen = () => {
       const list = getPastWeatherRows(rawPayload).map(normalizeWeatherItem);
       setDays(list as WeatherForecastItem[]);
       setSelectedDayIndex(0);
+    } catch (error: any) {
+      setTimeout(() => {
+        Alert.alert("", error?.message || t("common.error"), [
+          { text: t("common.ok") },
+        ]);
+      }, 50);
     } finally {
       setLoading(false);
     }
@@ -412,7 +427,7 @@ export const PastWeatherScreen = () => {
         return;
       }
       loadLocations();
-    }, [languageLabel, userId, selectedLocationRef]);
+    }, [languageLabel, selectedLocationRef, t, userId]);
 
   useFocusEffect(
     useCallback(() => {
