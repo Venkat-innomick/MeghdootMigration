@@ -48,8 +48,20 @@ const looksLikeBase64 = (value: string) => {
   return /^[A-Za-z0-9+/=\r\n]+$/.test(trimmed);
 };
 
+const appendCacheBust = (uri: string, cacheBust?: string | number) => {
+  if (
+    !cacheBust ||
+    (!uri.startsWith("http://") && !uri.startsWith("https://"))
+  ) {
+    return uri;
+  }
+  const separator = uri.includes("?") ? "&" : "?";
+  return `${uri}${separator}cb=${encodeURIComponent(String(cacheBust))}`;
+};
+
 const resolveProfileImage = (
   rawPath: string | undefined,
+  cacheBust?: string | number,
 ): ImageSourcePropType => {
   if (!rawPath || !rawPath.trim())
     return require("../../../assets/images/ic_defaultProfile.png");
@@ -65,14 +77,52 @@ const resolveProfileImage = (
     value.startsWith("https://") ||
     value.startsWith("file://")
   )
-    return { uri: value };
+    return { uri: appendCacheBust(value, cacheBust) };
 
   const base = (
     (Constants.expoConfig?.extra?.apiBaseUrl as string | undefined) ||
     API_BASE_URL
   ).replace(/\/+$/, "");
   const path = value.startsWith("/") ? value : `/${value}`;
-  return { uri: `${base}${path}` };
+  return { uri: appendCacheBust(`${base}${path}`, cacheBust) };
+};
+
+const buildStoredUser = (data: any, fallbackUser?: any, imageVersion?: number) => {
+  const effectiveImagePath =
+    data?.ImagePath || data?.imagePath || fallbackUser?.imagePath;
+  const typeOfRole = Number(
+    data?.TypeOfRole ?? data?.typeOfRole ?? fallbackUser?.typeOfRole ?? 0,
+  );
+  const userProfileId = Number(
+    data?.UserProfileID ??
+      data?.userProfileId ??
+      fallbackUser?.userProfileId ??
+      0,
+  );
+
+  return {
+    userProfileId,
+    firstName:
+      data?.FirstName || data?.firstName || fallbackUser?.firstName || "",
+    lastName: data?.LastName || data?.lastName || fallbackUser?.lastName || "",
+    mobileNumber:
+      data?.LogInId || data?.mobileNumber || fallbackUser?.mobileNumber || "",
+    imagePath: effectiveImagePath,
+    imageVersion: imageVersion ?? fallbackUser?.imageVersion,
+    isLogout: false,
+    typeOfRole: typeOfRole || fallbackUser?.typeOfRole,
+    ...(data?.StateID ? { stateID: data.StateID } : {}),
+    ...(data?.DistrictID ? { districtID: data.DistrictID } : {}),
+    ...(data?.BlockID ? { blockID: data.BlockID } : {}),
+    ...(data?.AsdID ? { asdID: data.AsdID } : {}),
+    ...(data?.StateName ? { stateName: data.StateName } : {}),
+    ...(data?.DistrictName ? { districtName: data.DistrictName } : {}),
+    ...(data?.BlockName ? { blockName: data.BlockName } : {}),
+    ...(data?.AsdName ? { asdName: data.AsdName } : {}),
+    ...(data?.VillageName ? { villageName: data.VillageName } : {}),
+    ...(data?.PanchayatName ? { panchayatName: data.PanchayatName } : {}),
+    ...(data?.LanguageName ? { languageName: data.LanguageName } : {}),
+  };
 };
 
 const InfoField = ({
@@ -110,6 +160,51 @@ export const ProfileScreen = () => {
     [languageCode, t],
   );
 
+  const refreshProfile = useCallback(
+    async (mobileOverride?: string, imageVersion?: number) => {
+      const mobile = String(
+        mobileOverride ||
+          user?.mobileNumber ||
+          user?.LogInId ||
+          user?.MobileNumber ||
+          "",
+      ).trim();
+      if (!mobile) return null;
+
+      const response: any = await userService.login({
+        LogInId: mobile,
+        LogInPassword: "1234",
+        LanguageType: languageLabel,
+        Refreshdatetime: "2016-01-01",
+      });
+      const root = response || {};
+      const users = (root.ObjUserList ||
+        root.objUserList ||
+        root.result ||
+        root.data ||
+        []) as any[];
+      const data = Array.isArray(users) ? users[0] : users;
+      if (!data) return null;
+
+      const nextUser = buildStoredUser(data, user, imageVersion);
+      setUser(nextUser as any);
+      return nextUser;
+    },
+    [
+      languageLabel,
+      setUser,
+      user?.LogInId,
+      user?.MobileNumber,
+      user?.firstName,
+      user?.imagePath,
+      user?.imageVersion,
+      user?.lastName,
+      user?.mobileNumber,
+      user?.typeOfRole,
+      user?.userProfileId,
+    ],
+  );
+
   useFocusEffect(
     useCallback(() => {
       const loadProfile = async () => {
@@ -127,57 +222,7 @@ export const ProfileScreen = () => {
 
         setLoading(true);
         try {
-          const response: any = await userService.login({
-            LogInId: mobile,
-            LogInPassword: "1234",
-            LanguageType: languageLabel,
-            Refreshdatetime: "2016-01-01",
-          });
-          const root = response || {};
-          const users = (root.ObjUserList ||
-            root.objUserList ||
-            root.result ||
-            root.data ||
-            []) as any[];
-          const data = Array.isArray(users) ? users[0] : users;
-          if (!data) return;
-          const effectiveImagePath =
-            data.ImagePath || data.imagePath || user?.imagePath;
-
-          const typeOfRole = Number(
-            data?.TypeOfRole ?? data?.typeOfRole ?? user?.typeOfRole ?? 0,
-          );
-          const userProfileId = Number(
-            data?.UserProfileID ??
-              data?.userProfileId ??
-              user?.userProfileId ??
-              0,
-          );
-
-          setUser({
-            userProfileId,
-            firstName:
-              data.FirstName || data.firstName || user?.firstName || "",
-            lastName: data.LastName || data.lastName || user?.lastName || "",
-            mobileNumber:
-              data.LogInId || data.mobileNumber || user?.mobileNumber || "",
-            imagePath: effectiveImagePath,
-            isLogout: false,
-            typeOfRole: typeOfRole || user?.typeOfRole,
-            ...(data.StateID ? { stateID: data.StateID } : {}),
-            ...(data.DistrictID ? { districtID: data.DistrictID } : {}),
-            ...(data.BlockID ? { blockID: data.BlockID } : {}),
-            ...(data.AsdID ? { asdID: data.AsdID } : {}),
-            ...(data.StateName ? { stateName: data.StateName } : {}),
-            ...(data.DistrictName ? { districtName: data.DistrictName } : {}),
-            ...(data.BlockName ? { blockName: data.BlockName } : {}),
-            ...(data.AsdName ? { asdName: data.AsdName } : {}),
-            ...(data.VillageName ? { villageName: data.VillageName } : {}),
-            ...(data.PanchayatName
-              ? { panchayatName: data.PanchayatName }
-              : {}),
-            ...(data.LanguageName ? { languageName: data.LanguageName } : {}),
-          } as any);
+          await refreshProfile(mobile);
           hasLoadedProfileRef.current = true;
         } finally {
           setLoading(false);
@@ -186,8 +231,7 @@ export const ProfileScreen = () => {
 
       loadProfile().catch(() => setLoading(false));
     }, [
-      languageLabel,
-      setUser,
+      refreshProfile,
       user?.LogInId,
       user?.MobileNumber,
       user?.mobileNumber,
@@ -195,13 +239,14 @@ export const ProfileScreen = () => {
   );
 
   const profileImageRaw = user?.imagePath || user?.ImagePath;
+  const profileImageVersion = user?.imageVersion;
   const profileImage = imageLoadFailed
     ? require("../../../assets/images/ic_defaultProfile.png")
-    : resolveProfileImage(profileImageRaw);
+    : resolveProfileImage(profileImageRaw, profileImageVersion);
 
   useEffect(() => {
     setImageLoadFailed(false);
-  }, [profileImageRaw]);
+  }, [profileImageRaw, profileImageVersion]);
 
   const stateName = pickText(user?.stateName, user?.StateName);
   const districtName = pickText(user?.districtName, user?.DistrictName);
@@ -308,10 +353,7 @@ export const ProfileScreen = () => {
           );
         }
 
-        setUser({
-          ...(user || {}),
-          imagePath: base64Image,
-        });
+        await refreshProfile(undefined, Date.now());
         if (Platform.OS === "android") {
           ToastAndroid.show(i18n.t("profile.imageUpdated"), ToastAndroid.SHORT);
         } else {
@@ -327,7 +369,7 @@ export const ProfileScreen = () => {
         setUpdatingImage(false);
       }
     },
-    [setUser, user],
+    [languageLabel, refreshProfile, setUser, user],
   );
 
   const pickAndSaveImage = useCallback(

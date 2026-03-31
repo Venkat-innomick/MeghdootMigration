@@ -75,7 +75,18 @@ const looksLikeBase64 = (value: string) => {
   return /^[A-Za-z0-9+/=\r\n]+$/.test(trimmed);
 };
 
-const resolveProfileImage = (rawPath: string | undefined): ImageSourcePropType => {
+const appendCacheBust = (uri: string, cacheBust?: string | number) => {
+  if (!cacheBust || (!uri.startsWith('http://') && !uri.startsWith('https://'))) {
+    return uri;
+  }
+  const separator = uri.includes('?') ? '&' : '?';
+  return `${uri}${separator}cb=${encodeURIComponent(String(cacheBust))}`;
+};
+
+const resolveProfileImage = (
+  rawPath: string | undefined,
+  cacheBust?: string | number,
+): ImageSourcePropType => {
   if (!rawPath || !rawPath.trim()) return require('../../assets/images/ic_defaultProfile.png');
 
   const value = rawPath.trim();
@@ -85,12 +96,12 @@ const resolveProfileImage = (rawPath: string | undefined): ImageSourcePropType =
   if (value.startsWith('data:image/')) return { uri: value };
   if (looksLikeBase64(value)) return { uri: `data:image/jpeg;base64,${value}` };
   if (value.startsWith('http://') || value.startsWith('https://') || value.startsWith('file://')) {
-    return { uri: value };
+    return { uri: appendCacheBust(value, cacheBust) };
   }
 
   const base = ((Constants.expoConfig?.extra?.apiBaseUrl as string | undefined) || API_BASE_URL).replace(/\/+$/, '');
   const path = value.startsWith('/') ? value : `/${value}`;
-  return { uri: `${base}${path}` };
+  return { uri: appendCacheBust(`${base}${path}`, cacheBust) };
 };
 
 const MainHeader = ({ navigation, title }: any) => ({
@@ -205,13 +216,14 @@ const MenuContent = (props: any) => {
   const user: any = useAppStore((s) => s.user);
   const [languageModalOpen, setLanguageModalOpen] = useState(false);
   const profileImageRaw = user?.imagePath || user?.ImagePath;
+  const profileImageVersion = user?.imageVersion;
   const [imageLoadFailed, setImageLoadFailed] = useState(false);
   const profileImage = imageLoadFailed
     ? require('../../assets/images/ic_defaultProfile.png')
-    : resolveProfileImage(profileImageRaw);
+    : resolveProfileImage(profileImageRaw, profileImageVersion);
   useEffect(() => {
     setImageLoadFailed(false);
-  }, [profileImageRaw]);
+  }, [profileImageRaw, profileImageVersion]);
   const fullName =
     pickText(user?.firstName, user?.FirstName) || pickText(user?.lastName, user?.LastName)
       ? `${pickText(user?.firstName, user?.FirstName)} ${pickText(user?.lastName, user?.LastName)}`.trim()

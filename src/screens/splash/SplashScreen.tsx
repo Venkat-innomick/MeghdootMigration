@@ -15,12 +15,15 @@ export const SplashScreen = ({ navigation }: Props) => {
     let mounted = true;
 
     const restoreAndRoute = async () => {
+      const startedAt = Date.now();
       let storedUser: any = null;
       let directOnboardingDone = false;
       const persistApi = (useAppStore as any).persist;
 
       try {
-        const directUser = await AsyncStorage.getItem(STORAGE_KEYS.loggedInUser);
+        const directUser = await AsyncStorage.getItem(
+          STORAGE_KEYS.loggedInUser,
+        );
         storedUser = directUser ? JSON.parse(directUser) : null;
       } catch {
         storedUser = null;
@@ -51,11 +54,21 @@ export const SplashScreen = ({ navigation }: Props) => {
         });
       }
 
-      const nextRoute = storedUser || state.user
-        ? "Main"
-        : !directOnboardingDone && !state.onboardingDone
-        ? "Onboarding"
-        : "Auth";
+      const remainingDelay = Math.max(0, 4000 - (Date.now() - startedAt));
+      if (remainingDelay > 0) {
+        await new Promise((resolve) => setTimeout(resolve, remainingDelay));
+      }
+
+      if (!mounted) {
+        return;
+      }
+
+      const nextRoute =
+        storedUser || state.user
+          ? "Main"
+          : !directOnboardingDone && !state.onboardingDone
+            ? "Onboarding"
+            : "Auth";
 
       navigation.dispatch(
         CommonActions.reset({

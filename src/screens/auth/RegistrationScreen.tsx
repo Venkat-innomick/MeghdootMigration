@@ -389,11 +389,6 @@ export const RegistrationScreen = ({ navigation, route }: Props) => {
     if (!selectedLanguageID) return t("register.validationSelectLanguage");
     if (!selectedState) return t("register.validationSelectState");
     if (!selectedDistrict) return t("register.validationSelectDistrict");
-    if (!selectedBlock)
-      return selectedState &&
-        (selectedState.stateID === 28 || selectedState.stateID === 36)
-        ? t("register.validationSelectAsd")
-        : t("register.validationSelectBlock");
     if (village.trim().length >= 50)
       return t("register.validationVillageLength");
     if (panchayat.trim().length >= 50)
@@ -409,7 +404,7 @@ export const RegistrationScreen = ({ navigation, route }: Props) => {
       return;
     }
 
-    if (!selectedState || !selectedDistrict || !selectedBlock) return;
+    if (!selectedState || !selectedDistrict) return;
 
     const payload: Record<string, unknown> = {
       TitleId: 0,
@@ -434,11 +429,11 @@ export const RegistrationScreen = ({ navigation, route }: Props) => {
     };
 
     if (isAsdState) {
-      payload.AsdID = selectedBlock.id;
-      payload.AsdName = selectedBlock.label;
+      payload.AsdID = selectedBlock?.id || 0;
+      payload.AsdName = selectedBlock?.label || "";
     } else {
-      payload.BlockID = selectedBlock.id;
-      payload.BlockName = selectedBlock.label;
+      payload.BlockID = selectedBlock?.id || 0;
+      payload.BlockName = selectedBlock?.label || "";
     }
 
     setLoading(true);
@@ -592,16 +587,14 @@ export const RegistrationScreen = ({ navigation, route }: Props) => {
           {shouldShowBlock ? (
             <View style={styles.fieldWrap}>
               <Text style={styles.floatLabel}>
-                {isAsdState
-                  ? t("register.selectAsdMandatory")
-                  : t("register.selectBlockMandatory")}
+                {t("home.selectLabel", {
+                  label: isAsdState ? t("home.asd") : t("home.block"),
+                })}
               </Text>
               <Selector
-                title={
-                  isAsdState
-                    ? t("register.selectAsdMandatory")
-                    : t("register.selectBlockMandatory")
-                }
+                title={t("home.selectLabel", {
+                  label: isAsdState ? t("home.asd") : t("home.block"),
+                })}
                 value={selectedBlock?.label || ""}
                 options={blockOptions}
                 onSelect={(item) => setSelectedBlock(item)}
