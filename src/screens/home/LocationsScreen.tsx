@@ -169,7 +169,7 @@ export const LocationsScreen = () => {
   const userId = useMemo(() => getUserProfileId(user), [user]);
   const languageLabel = useMemo(() => getLanguageLabel(language), [language]);
   const canSubmitAddLocation = Boolean(
-    selectedState && selectedDistrict && selectedBlock,
+    selectedState && selectedDistrict,
   );
 
   const mapRawLocations = React.useCallback((list: any[]): LocationRow[] => {
@@ -406,17 +406,6 @@ export const LocationsScreen = () => {
       ]);
       return;
     }
-    if (!selectedBlock) {
-      Alert.alert(
-        '',
-        usesAsdMasters(selectedState.stateID)
-          ? t('register.validationSelectAsd')
-          : t('register.validationSelectBlock'),
-        [{ text: t('common.ok') }]
-      );
-      return;
-    }
-
     const payload: Record<string, unknown> = {
       UALID: 0,
       UserProfileID: userId,
@@ -425,8 +414,8 @@ export const LocationsScreen = () => {
       Createdby: userId,
       Updatedby: userId,
     };
-    if (usesAsdMasters(selectedState.stateID)) payload.AsdID = selectedBlock.id;
-    else payload.BlockID = selectedBlock.id;
+    if (usesAsdMasters(selectedState.stateID)) payload.AsdID = selectedBlock?.id || 0;
+    else payload.BlockID = selectedBlock?.id || 0;
 
     setAddLoading(true);
     try {
@@ -441,22 +430,22 @@ export const LocationsScreen = () => {
       const optimistic: LocationRow = {
         stateID: selectedState.stateID,
         districtID: selectedDistrict.districtID,
-        blockID: usesAsdMasters(selectedState.stateID) ? 0 : selectedBlock.id,
-        asdID: usesAsdMasters(selectedState.stateID) ? selectedBlock.id : 0,
+        blockID: usesAsdMasters(selectedState.stateID) ? 0 : selectedBlock?.id || 0,
+        asdID: usesAsdMasters(selectedState.stateID) ? selectedBlock?.id || 0 : 0,
         tempStateID: selectedState.stateID,
         tempDistrictID: selectedDistrict.districtID,
-        tempBlockID: usesAsdMasters(selectedState.stateID) ? 0 : selectedBlock.id,
-        tempAsdID: usesAsdMasters(selectedState.stateID) ? selectedBlock.id : 0,
+        tempBlockID: usesAsdMasters(selectedState.stateID) ? 0 : selectedBlock?.id || 0,
+        tempAsdID: usesAsdMasters(selectedState.stateID) ? selectedBlock?.id || 0 : 0,
         stateName: selectedState.stateName,
-        cityName: selectedBlock.label,
+        cityName: selectedBlock?.label || selectedDistrict.districtName,
         colorCode: '#FFFFFF',
         cloudImage: '',
         cloudCover: -1,
         weatherType: '',
         isCurrentLocation: false,
         districtName: selectedDistrict.districtName,
-        blockName: usesAsdMasters(selectedState.stateID) ? '' : selectedBlock.label,
-        asdName: usesAsdMasters(selectedState.stateID) ? selectedBlock.label : '',
+        blockName: usesAsdMasters(selectedState.stateID) ? '' : selectedBlock?.label || '',
+        asdName: usesAsdMasters(selectedState.stateID) ? selectedBlock?.label || '' : '',
       };
       setAddOpen(false);
       Alert.alert('', t('home.locationAddedSuccessfully'), [
@@ -709,11 +698,9 @@ export const LocationsScreen = () => {
             >
               <Text style={[styles.selectorText, !selectedBlock && styles.selectorPlaceholder]}>
                 {selectedBlock?.label ||
-                  (selectedState
-                    ? usesAsdMasters(selectedState.stateID)
-                      ? t('register.selectAsdMandatory')
-                      : t('register.selectBlockMandatory')
-                    : t('register.selectBlockMandatory'))}
+                  t('home.selectLabel', {
+                    label: getSubLocationLabel(selectedState?.stateID || 0, t),
+                  })}
               </Text>
               <Image source={require('../../../assets/images/dropdown.png')} style={styles.dropdownIcon} resizeMode="contain" />
             </Pressable>
