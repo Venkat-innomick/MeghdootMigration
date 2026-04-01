@@ -251,6 +251,7 @@ export const ForecastScreen = () => {
   const user = useAppStore((s) => s.user);
   const language = useAppStore((s) => s.language);
   const selectedLocationRef = useAppStore((s) => s.selectedLocation);
+  const currentLocationOverride = useAppStore((s) => s.currentLocationOverride);
   const userId = getUserProfileId(user);
   const languageLabel = getLanguageLabel(language);
 
@@ -347,13 +348,23 @@ export const ForecastScreen = () => {
   const loadLocations = async () => {
     if (!userId) return;
     try {
-      const payload = buildByLocationPayload(userId, languageLabel);
+      const payload = buildByLocationPayload(
+        userId,
+        languageLabel,
+        currentLocationOverride,
+      );
       const response = await weatherService.getByLocation(payload);
       const rawList = parseLocationWeatherList(response) as DashboardLocation[];
       const list = dedupeForecastLocations(rawList as any[]) as DashboardLocation[];
       setLocations(list);
       if (list.length) {
-        const selectedIndex = findForecastLocationIndex(list as any[], selectedLocationRef);
+        const currentIndex = currentLocationOverride
+          ? list.findIndex((loc: any) => Boolean(loc?.isCurrentLocation || loc?.IsCurrentLocation))
+          : -1;
+        const selectedIndex =
+          currentIndex >= 0
+            ? currentIndex
+            : findForecastLocationIndex(list as any[], selectedLocationRef);
         const indexToUse = selectedIndex >= 0 ? selectedIndex : 0;
         const target = list[indexToUse] as any;
         setSelectedLocationIndex(indexToUse);
@@ -397,6 +408,11 @@ export const ForecastScreen = () => {
         return;
       }
 
+      if (currentLocationOverride) {
+        loadLocations();
+        return;
+      }
+
       const cachedLocations = useAppStore.getState().locations;
       if (cachedLocations?.length) {
         const list = dedupeForecastLocations(cachedLocations as any[]) as DashboardLocation[];
@@ -413,7 +429,7 @@ export const ForecastScreen = () => {
         return;
       }
       loadLocations();
-    }, [languageLabel, selectedLocationRef, t, userId]);
+    }, [currentLocationOverride, languageLabel, selectedLocationRef, t, userId]);
 
   useFocusEffect(
     useCallback(() => {

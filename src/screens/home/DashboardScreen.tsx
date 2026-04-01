@@ -508,7 +508,24 @@ export const DashboardScreen = () => {
         shapedLocations,
         nextAdvisories,
       ) as DashboardLocation[];
-      const orderingTarget = promotedLocation || currentSelected;
+      const currentLocationRow: any = currentLocationOverride
+        ? enrichedLocations.find((item: any) =>
+            Boolean(item?.isCurrentLocation || item?.IsCurrentLocation),
+          )
+        : null;
+      const orderingTarget = currentLocationRow
+        ? {
+            districtID: toNum(
+              currentLocationRow?.districtID,
+              currentLocationRow?.DistrictID,
+            ),
+            blockID: toNum(
+              currentLocationRow?.blockID,
+              currentLocationRow?.BlockID,
+            ),
+            asdID: toNum(currentLocationRow?.asdID, currentLocationRow?.AsdID),
+          }
+        : promotedLocation || currentSelected;
       const nextLocations = orderLocationsBySelected(
         enrichedLocations,
         orderingTarget,
@@ -530,7 +547,12 @@ export const DashboardScreen = () => {
               );
             })
           : null;
-        const target: any = match || (nextLocations[0] as any);
+        const currentMatch = currentLocationOverride
+          ? nextLocations.find((item: any) =>
+              Boolean(item?.isCurrentLocation || item?.IsCurrentLocation),
+            )
+          : null;
+        const target: any = currentMatch || match || (nextLocations[0] as any);
         const nextSelected = {
           districtID: toNum(target?.districtID, target?.DistrictID),
           blockID: toNum(target?.blockID, target?.BlockID),
@@ -596,6 +618,12 @@ export const DashboardScreen = () => {
 
   const currentLocation = useMemo(() => {
     if (!carouselLocations.length) return null;
+    if (currentLocationOverride) {
+      const currentMatch = carouselLocations.find((item: any) =>
+        Boolean(item?.isCurrentLocation || item?.IsCurrentLocation),
+      );
+      if (currentMatch) return currentMatch as any;
+    }
     if (!selectedLocation) return carouselLocations[0] as any;
     const exactMatch = carouselLocations.find((item: any) => {
       const districtID = toNum(item.districtID, item.DistrictID);
@@ -618,7 +646,7 @@ export const DashboardScreen = () => {
     }
 
     return carouselLocations[0] as any;
-  }, [activeTab, carouselLocations, selectedLocation]);
+  }, [activeTab, carouselLocations, currentLocationOverride, selectedLocation]);
 
   const currentLocationIndex = useMemo(() => {
     if (!carouselLocations.length) return 0;
@@ -641,6 +669,13 @@ export const DashboardScreen = () => {
     });
     if (idx >= 0) return idx;
 
+    if (currentLocationOverride) {
+      const currentIdx = carouselLocations.findIndex((item: any) =>
+        Boolean(item?.isCurrentLocation || item?.IsCurrentLocation),
+      );
+      if (currentIdx >= 0) return currentIdx;
+    }
+
     if (activeTab === "district" && selectedLocation) {
       const districtIdx = carouselLocations.findIndex((item: any) => {
         return (
@@ -652,7 +687,13 @@ export const DashboardScreen = () => {
     }
 
     return 0;
-  }, [activeTab, carouselLocations, currentLocation, selectedLocation]);
+  }, [
+    activeTab,
+    carouselLocations,
+    currentLocation,
+    currentLocationOverride,
+    selectedLocation,
+  ]);
 
   const canUseBlockTab = useMemo(() => {
     if (!locations.length) return false;

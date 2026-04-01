@@ -460,6 +460,7 @@ export const CropAdvisoryScreen = () => {
   const [audios, setAudios] = useState<any[]>([]);
   const [isEnglish, setIsEnglish] = useState(true);
   const [favouriteBusy, setFavouriteBusy] = useState(false);
+  const [favouriteOverrides, setFavouriteOverrides] = useState<Record<number, boolean>>({});
 
   const [weatherOpen, setWeatherOpen] = useState(true);
   const [agroOpen, setAgroOpen] = useState(false);
@@ -493,8 +494,11 @@ export const CropAdvisoryScreen = () => {
   );
 
   const isFavourite = useMemo(
-    () => fromFavourites || pickNum(current.favouriteID, current.FavouriteID) > 0,
-    [current, fromFavourites]
+    () =>
+      fromFavourites ||
+      (advisoryId > 0 && favouriteOverrides[advisoryId] === true) ||
+      pickNum(current.favouriteID, current.FavouriteID) > 0,
+    [advisoryId, current, favouriteOverrides, fromFavourites]
   );
   const feedbackId = useMemo(
     () => pickNum(current.feedbackID, current.FeedbackID),
@@ -774,15 +778,35 @@ export const CropAdvisoryScreen = () => {
             if (success !== true) return;
 
             setItems((prev) =>
-              prev.map((item, i) => {
-                if (i !== index) return item;
+              prev.map((item) => {
+                if (
+                  pickNum(item.cropAdvisoryID, item.CropAdvisoryID) !== advisoryId
+                ) {
+                  return item;
+                }
                 return {
                   ...item,
-                  favouriteID: 1,
-                  FavouriteID: 1,
+                  favouriteID: pickNum(
+                    response?.NewID,
+                    response?.newID,
+                    response?.result?.NewID,
+                    response?.result?.newID,
+                    1
+                  ),
+                  FavouriteID: pickNum(
+                    response?.NewID,
+                    response?.newID,
+                    response?.result?.NewID,
+                    response?.result?.newID,
+                    1
+                  ),
                 };
               })
             );
+            setFavouriteOverrides((prev) => ({
+              ...prev,
+              [advisoryId]: true,
+            }));
             if (Platform.OS === 'android') {
               ToastAndroid.show(t('crop.addedToFavourites'), ToastAndroid.SHORT);
             }

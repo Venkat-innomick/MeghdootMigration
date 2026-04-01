@@ -293,6 +293,7 @@ export const PastWeatherScreen = () => {
   const user = useAppStore((s) => s.user);
   const language = useAppStore((s) => s.language);
   const selectedLocationRef = useAppStore((s) => s.selectedLocation);
+  const currentLocationOverride = useAppStore((s) => s.currentLocationOverride);
   const userId = getUserProfileId(user);
   const languageLabel = getLanguageLabel(language);
 
@@ -344,23 +345,32 @@ export const PastWeatherScreen = () => {
   const loadLocations = async () => {
     if (!userId) return;
     try {
-      const payload = buildByLocationPayload(userId, languageLabel);
+      const payload = buildByLocationPayload(
+        userId,
+        languageLabel,
+        currentLocationOverride,
+      );
       const response = await weatherService.getByLocation(payload);
       const rawList = parseLocationWeatherList(response) as DashboardLocation[];
       const list = dedupePastWeatherLocations(rawList as any[]) as DashboardLocation[];
       setLocations(list);
       if (list.length) {
-        const selectedIndex = selectedLocationRef
-          ? list.findIndex((loc: any) => {
-              const districtID = pickNum(
-                loc?.districtID,
-                loc?.DistrictID,
-                loc?.tempDistrictID,
-                loc?.TempDistrictID,
-              );
-              return districtID === selectedLocationRef.districtID;
-            })
+        const currentIndex = currentLocationOverride
+          ? list.findIndex((loc: any) => Boolean(loc?.isCurrentLocation || loc?.IsCurrentLocation))
           : -1;
+        const selectedIndex = currentIndex >= 0
+          ? currentIndex
+          : selectedLocationRef
+            ? list.findIndex((loc: any) => {
+                const districtID = pickNum(
+                  loc?.districtID,
+                  loc?.DistrictID,
+                  loc?.tempDistrictID,
+                  loc?.TempDistrictID,
+                );
+                return districtID === selectedLocationRef.districtID;
+              })
+            : -1;
         const indexToUse = selectedIndex >= 0 ? selectedIndex : 0;
         const target = list[indexToUse] as any;
         setSelectedLocationIndex(indexToUse);
@@ -404,6 +414,11 @@ export const PastWeatherScreen = () => {
         return;
       }
 
+      if (currentLocationOverride) {
+        loadLocations();
+        return;
+      }
+
       const cachedLocations = useAppStore.getState().locations;
       if (cachedLocations?.length) {
         const list = dedupePastWeatherLocations(cachedLocations as any[]) as DashboardLocation[];
@@ -430,7 +445,7 @@ export const PastWeatherScreen = () => {
         return;
       }
       loadLocations();
-    }, [languageLabel, selectedLocationRef, t, userId]);
+    }, [currentLocationOverride, languageLabel, selectedLocationRef, t, userId]);
 
   useFocusEffect(
     useCallback(() => {

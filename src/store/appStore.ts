@@ -61,7 +61,13 @@ export const useAppStore = create<AppState>()(
       setHydrated: (ready) => set({ isHydrated: ready }),
       beginOnboarding: () => set({ onboardingStarted: true }),
       completeOnboarding: () => set({ onboardingDone: true, onboardingStarted: true }),
-      setLanguage: (language) => set({ language }),
+      setLanguage: (language) =>
+        set({
+          language,
+          temporarySearchLocations: [],
+          temporarySearchAdvisories: [],
+          promotedLocation: null,
+        }),
       setUser: (user) => set({ user }),
       setLocations: (locations) => set({ locations }),
       setSelectedLocation: (selectedLocation) => set({ selectedLocation }),
