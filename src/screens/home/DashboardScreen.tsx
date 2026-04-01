@@ -440,16 +440,15 @@ export const DashboardScreen = () => {
   const language = useAppStore((s) => s.language);
   const setAppLocations = useAppStore((s) => s.setLocations);
   const selectedLocation = useAppStore((s) => s.selectedLocation);
+  const promotedLocation = useAppStore((s) => s.promotedLocation);
   const setSelectedLocation = useAppStore((s) => s.setSelectedLocation);
+  const setPromotedLocation = useAppStore((s) => s.setPromotedLocation);
   const currentLocationOverride = useAppStore((s) => s.currentLocationOverride);
   const temporarySearchLocations = useAppStore(
     (s) => s.temporarySearchLocations,
   );
   const temporarySearchAdvisories = useAppStore(
     (s) => s.temporarySearchAdvisories,
-  );
-  const clearTemporarySearchData = useAppStore(
-    (s) => s.clearTemporarySearchData,
   );
   const userId = useMemo(() => getUserProfileId(user), [user]);
   const languageLabel = useMemo(() => getLanguageLabel(language), [language]);
@@ -459,6 +458,7 @@ export const DashboardScreen = () => {
   const [advisories, setAdvisories] = useState<CropAdvisoryItem[]>([]);
   const [activeTab, setActiveTab] = useState<"block" | "district">("block");
   const carouselRef = useRef<RNFlatList<any> | null>(null);
+  const userDraggingCarouselRef = useRef(false);
 
   const openCropAdvisory = (params: Record<string, unknown>) => {
     const parent = navigation.getParent?.();
@@ -490,8 +490,8 @@ export const DashboardScreen = () => {
       const crop = await cropService.getAdvisoryTop(cropPayload);
 
       const mergedLocations = mergeLocations(
-        temporarySearchLocations,
         locationList,
+        temporarySearchLocations,
       );
       const normalizedLocations = mergedLocations.map((item: any) =>
         normalizeDashboardWeatherRow(item),
@@ -508,9 +508,10 @@ export const DashboardScreen = () => {
         shapedLocations,
         nextAdvisories,
       ) as DashboardLocation[];
+      const orderingTarget = promotedLocation || currentSelected;
       const nextLocations = orderLocationsBySelected(
         enrichedLocations,
-        currentSelected,
+        orderingTarget,
       );
       setLocations(nextLocations);
       // Keep shared locations aligned with the rendered Home carousel list
@@ -545,9 +546,6 @@ export const DashboardScreen = () => {
         }
       }
       setAdvisories(nextAdvisories);
-      if (temporarySearchLocations.length || temporarySearchAdvisories.length) {
-        clearTemporarySearchData();
-      }
     } catch (error: any) {
       // Keep previously available local/store data on transient API failures.
       if (!useAppStore.getState().locations?.length) {
@@ -573,8 +571,9 @@ export const DashboardScreen = () => {
   }, [
     languageLabel,
     currentLocationOverride,
+    promotedLocation,
     setAppLocations,
-    clearTemporarySearchData,
+    setPromotedLocation,
     setSelectedLocation,
     temporarySearchAdvisories,
     temporarySearchLocations,
@@ -888,6 +887,9 @@ export const DashboardScreen = () => {
                   offset: cardWidth * index,
                   index,
                 })}
+                onScrollBeginDrag={() => {
+                  userDraggingCarouselRef.current = true;
+                }}
                 renderItem={({ item }) => {
                 const itemBlockId = toNum((item as any)?.blockID, (item as any)?.BlockID);
                 const itemAsdId = toNum((item as any)?.asdID, (item as any)?.AsdID);
@@ -1152,6 +1154,10 @@ export const DashboardScreen = () => {
                 );
                 }}
                 onMomentumScrollEnd={(e) => {
+                  if (!userDraggingCarouselRef.current) {
+                    return;
+                  }
+                  userDraggingCarouselRef.current = false;
                   const x = e.nativeEvent.contentOffset.x;
                   const index = Math.round(x / cardWidth);
                   const item: any = carouselLocations[index];
@@ -1168,6 +1174,7 @@ export const DashboardScreen = () => {
                     blockID: toNum(selectedSource?.blockID, selectedSource?.BlockID),
                     asdID: toNum(selectedSource?.asdID, selectedSource?.AsdID),
                   });
+                  setPromotedLocation(null);
                 }}
               />
             ) : (
@@ -1230,8 +1237,13 @@ export const DashboardScreen = () => {
             </Text>
           </View>
         }
-        renderItem={({ item }) => {
+        renderItem={({ item, index }) => {
           const row: any = item;
+          const rowIndex = advisoryRows.findIndex(
+            (candidate: any) =>
+              toNum(candidate?.cropAdvisoryID, candidate?.CropAdvisoryID) ===
+              toNum(row?.cropAdvisoryID, row?.CropAdvisoryID),
+          );
           const title = pickText(
             row.title,
             row.Title,
@@ -1276,6 +1288,8 @@ export const DashboardScreen = () => {
                   districtID: toNum(row.districtID, row.DistrictID),
                   blockID: toNum(row.blockID, row.BlockID),
                   asdID: toNum(row.asdID, row.AsdID),
+                  items: advisoryRows,
+                  initialIndex: rowIndex >= 0 ? rowIndex : index,
                 };
                 openCropAdvisory(advisoryParams);
               }}

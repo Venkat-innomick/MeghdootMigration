@@ -223,7 +223,7 @@ export const FavouritesScreen = () => {
           String(pickNum(item.cropAdvisoryID, item.CropAdvisoryID, index))
         }
         contentContainerStyle={styles.listContent}
-        renderItem={({ item }) => {
+        renderItem={({ item, index }) => {
           const title = pickText(item.title, item.Title, "--");
           const location = pickText(item.location, item.Location, "-");
           const category = pickText(item.category, item.Category, "-");
@@ -282,6 +282,9 @@ export const FavouritesScreen = () => {
                       ),
                       blockID: pickNum(item.blockID, item.BlockID, item.blockId),
                       asdID: pickNum(item.asdID, item.AsdID, item.asdId),
+                      items,
+                      initialIndex: index,
+                      fromFavourites: true,
                     })
                   }
                 >

@@ -59,6 +59,7 @@ export const SearchScreen = () => {
   const appLocations = useAppStore((s) => s.locations);
   const setAppLocations = useAppStore((s) => s.setLocations);
   const setSelectedLocation = useAppStore((s) => s.setSelectedLocation);
+  const setPromotedLocation = useAppStore((s) => s.setPromotedLocation);
   const setCurrentLocationOverride = useAppStore(
     (s) => s.setCurrentLocationOverride,
   );
@@ -97,6 +98,12 @@ export const SearchScreen = () => {
   };
 
   const moveToHomeForItem = async (item: SearchBlockItem) => {
+    setPromotedLocation({
+      districtID: item.districtID,
+      blockID: item.isAsd ? 0 : item.blockID,
+      asdID: item.isAsd ? item.blockID : 0,
+    });
+    setCurrentLocationOverride(null);
     setSelectedLocation({
       districtID: item.districtID,
       blockID: item.isAsd ? 0 : item.blockID,
@@ -143,6 +150,51 @@ export const SearchScreen = () => {
     return [...exactRows, ...districtRows];
   };
 
+  const ensureSelectedWeatherCard = (item: SearchBlockItem, rows: any[]) => {
+    const exactExists = rows.some((row: any) => {
+      const districtID = toNum(row?.districtID ?? row?.DistrictID);
+      const blockID = toNum(row?.blockID ?? row?.BlockID);
+      const asdID = toNum(row?.asdID ?? row?.AsdID);
+      return (
+        districtID === item.districtID &&
+        blockID === (item.isAsd ? 0 : item.blockID) &&
+        asdID === (item.isAsd ? item.blockID : 0)
+      );
+    });
+    if (exactExists) return rows;
+
+    const districtRow =
+      rows.find(
+        (row: any) =>
+          toNum(row?.districtID ?? row?.DistrictID) === item.districtID &&
+          toNum(row?.blockID ?? row?.BlockID) === 0 &&
+          toNum(row?.asdID ?? row?.AsdID) === 0,
+      ) || rows[0];
+
+    if (!districtRow) return rows;
+
+    const syntheticRow = {
+      ...districtRow,
+      stateID: item.stateID,
+      StateID: item.stateID,
+      districtID: item.districtID,
+      DistrictID: item.districtID,
+      blockID: item.isAsd ? 0 : item.blockID,
+      BlockID: item.isAsd ? 0 : item.blockID,
+      asdID: item.isAsd ? item.blockID : 0,
+      AsdID: item.isAsd ? item.blockID : 0,
+      blockName: item.isAsd ? "" : item.blockName,
+      BlockName: item.isAsd ? "" : item.blockName,
+      asdName: item.isAsd ? item.blockName : "",
+      AsdName: item.isAsd ? item.blockName : "",
+      placeName: item.blockName,
+      PlaceName: item.blockName,
+      districtWiseWeatherData: districtRow,
+    };
+
+    return [syntheticRow, ...rows];
+  };
+
   const shapeSelectedAdvisoryRows = (item: SearchBlockItem, rows: any[]) =>
     rows.filter((row: any) => {
       const districtID = toNum(row?.districtID ?? row?.DistrictID);
@@ -184,11 +236,13 @@ export const SearchScreen = () => {
       cropService.getGpsAdvisoryTop(cropPayload),
     ]);
 
+    const shapedWeatherRows = shapeSelectedWeatherRows(
+      item,
+      parseLocationWeatherList(weather) as any[],
+    );
+
     return {
-      locations: shapeSelectedWeatherRows(
-        item,
-        parseLocationWeatherList(weather) as any[],
-      ),
+      locations: ensureSelectedWeatherCard(item, shapedWeatherRows),
       advisories: shapeSelectedAdvisoryRows(
         item,
         parseSelectedAdvisories(crop),
@@ -361,7 +415,75 @@ export const SearchScreen = () => {
       const refreshedWeather = await weatherService.getByLocation(
         buildByLocationPayload(userId, languageLabel),
       );
-      setAppLocations(parseLocationWeatherList(refreshedWeather) as any[]);
+      const refreshedLocations = parseLocationWeatherList(
+        refreshedWeather,
+      ) as any[];
+      const savedExists = refreshedLocations.some((loc) =>
+        sameLocation(loc, {
+          districtID: item.districtID,
+          blockID: item.isAsd ? 0 : item.blockID,
+          asdID: item.isAsd ? item.blockID : 0,
+        }),
+      );
+
+      if (savedExists) {
+        setCurrentLocationOverride(null);
+        setSelectedLocation({
+          districtID: item.districtID,
+          blockID: item.isAsd ? 0 : item.blockID,
+          asdID: item.isAsd ? item.blockID : 0,
+        });
+        setPromotedLocation({
+          districtID: item.districtID,
+          blockID: item.isAsd ? 0 : item.blockID,
+          asdID: item.isAsd ? item.blockID : 0,
+        });
+        setAppLocations(refreshedLocations);
+        return;
+      }
+
+      const result = await loadSelectedLocationData(item);
+      const nextLocations = [...refreshedLocations];
+      result.locations.forEach((row) => {
+        const exists = nextLocations.some((loc) =>
+          sameLocation(loc, {
+            districtID: toNum((row as any)?.districtID ?? (row as any)?.DistrictID),
+            blockID: toNum((row as any)?.blockID ?? (row as any)?.BlockID),
+            asdID: toNum((row as any)?.asdID ?? (row as any)?.AsdID),
+          }),
+        );
+        if (!exists) nextLocations.push(row as any);
+      });
+
+      setAppLocations(nextLocations as any[]);
+      setCurrentLocationOverride(null);
+      setSelectedLocation({
+        districtID: item.districtID,
+        blockID: item.isAsd ? 0 : item.blockID,
+        asdID: item.isAsd ? item.blockID : 0,
+      });
+      setPromotedLocation({
+        districtID: item.districtID,
+        blockID: item.isAsd ? 0 : item.blockID,
+        asdID: item.isAsd ? item.blockID : 0,
+      });
+
+      const store = useAppStore.getState();
+      setTemporarySearchData({
+        locations: [...store.temporarySearchLocations, ...result.locations].filter(
+          (row, index, arr) =>
+            arr.findIndex((candidate) =>
+              sameLocation(candidate, {
+                districtID: toNum(
+                  (row as any)?.districtID ?? (row as any)?.DistrictID,
+                ),
+                blockID: toNum((row as any)?.blockID ?? (row as any)?.BlockID),
+                asdID: toNum((row as any)?.asdID ?? (row as any)?.AsdID),
+              }),
+            ) === index,
+        ) as any[],
+        advisories: store.temporarySearchAdvisories,
+      });
     } catch (e: any) {
       setTimeout(() => {
         Alert.alert("", e.message || t("home.unableAddLocation"), [
@@ -450,6 +572,7 @@ export const SearchScreen = () => {
         ]);
         return;
       }
+      setAppLocations(result.locations as any[]);
       setTemporarySearchData(result);
       await moveToHomeForItem(item);
     } catch (e: any) {
@@ -488,6 +611,7 @@ export const SearchScreen = () => {
         latitude: current.coords.latitude,
         longitude: current.coords.longitude,
       });
+      setPromotedLocation(null);
       setTemporarySearchData({ locations: [], advisories: [] });
       setAppLocations([]);
       setSelectedLocation(null);

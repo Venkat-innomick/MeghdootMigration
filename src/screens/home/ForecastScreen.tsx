@@ -187,6 +187,24 @@ const getLocationIds = (location: any) => ({
   asdID: pickNum(location?.tempAsdID, location?.TempAsdID, location?.asdID, location?.AsdID),
 });
 
+const buildWeatherPayload = (location: any, languageLabel: string) => {
+  const ids = getLocationIds(location);
+  const payload: Record<string, unknown> = {
+    StateID: ids.stateID,
+    DistrictID: ids.districtID,
+    LanguageType: languageLabel,
+    RefreshDateTime: API_REFRESH_DATES.current(),
+  };
+
+  if (ids.stateID === 28 || ids.stateID === 36) {
+    payload.AsdID = ids.asdID;
+  } else {
+    payload.BlockID = ids.blockID;
+  }
+
+  return payload;
+};
+
 const dedupeForecastLocations = (items: any[]) => {
   const seen = new Set<string>();
   return items.filter((item) => {
@@ -355,22 +373,7 @@ export const ForecastScreen = () => {
   const loadWeatherForLocation = async (location: any) => {
     setLoading(true);
     try {
-      const ids = getLocationIds(location);
-      const stateID = ids.stateID;
-      const districtID = ids.districtID;
-      const blockID = ids.blockID;
-      const asdID = ids.asdID;
-
-      const payload: Record<string, unknown> = {
-        StateID: stateID,
-        DistrictID: districtID,
-        LanguageType: languageLabel,
-        languageType: languageLabel,
-        RefreshDateTime: API_REFRESH_DATES.current(),
-      };
-
-      if (stateID === 28 || stateID === 36) payload.AsdID = asdID || blockID;
-      else payload.BlockID = blockID || asdID;
+      const payload = buildWeatherPayload(location, languageLabel);
 
       const response = await weatherService.getForecast(payload);
       const rawPayload = response.result || response.data || response;

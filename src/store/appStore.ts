@@ -23,6 +23,7 @@ interface AppState {
   user: UserProfile | null;
   locations: DashboardLocation[];
   selectedLocation: SelectedLocationRef | null;
+  promotedLocation: SelectedLocationRef | null;
   currentLocationOverride: CurrentLocationOverride | null;
   temporarySearchLocations: DashboardLocation[];
   temporarySearchAdvisories: any[];
@@ -33,6 +34,7 @@ interface AppState {
   setUser: (user: UserProfile | null) => void;
   setLocations: (locations: DashboardLocation[]) => void;
   setSelectedLocation: (location: SelectedLocationRef | null) => void;
+  setPromotedLocation: (location: SelectedLocationRef | null) => void;
   setCurrentLocationOverride: (location: CurrentLocationOverride | null) => void;
   setTemporarySearchData: (payload: {
     locations: DashboardLocation[];
@@ -52,6 +54,7 @@ export const useAppStore = create<AppState>()(
       user: null,
       locations: [],
       selectedLocation: null,
+      promotedLocation: null,
       currentLocationOverride: null,
       temporarySearchLocations: [],
       temporarySearchAdvisories: [],
@@ -62,6 +65,7 @@ export const useAppStore = create<AppState>()(
       setUser: (user) => set({ user }),
       setLocations: (locations) => set({ locations }),
       setSelectedLocation: (selectedLocation) => set({ selectedLocation }),
+      setPromotedLocation: (promotedLocation) => set({ promotedLocation }),
       setCurrentLocationOverride: (currentLocationOverride) =>
         set({ currentLocationOverride }),
       setTemporarySearchData: ({ locations, advisories }) =>
@@ -75,6 +79,7 @@ export const useAppStore = create<AppState>()(
         set({
           user: null,
           selectedLocation: null,
+          promotedLocation: null,
           currentLocationOverride: null,
           locations: [],
           temporarySearchLocations: [],
@@ -83,15 +88,13 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: STORAGE_KEYS.auth,
-      version: 4,
+      version: 5,
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (state) => ({
         onboardingDone: state.onboardingDone,
         onboardingStarted: state.onboardingStarted,
         language: state.language,
         user: state.user,
-        locations: state.locations,
-        selectedLocation: state.selectedLocation,
       }),
       migrate: (persistedState: any, version) => {
         // Force onboarding to show once after migration from older app state.
@@ -113,6 +116,15 @@ export const useAppStore = create<AppState>()(
               persistedState.onboardingStarted ??
                 (persistedState.onboardingDone ? true : persistedState.language)
             ),
+            locations: [],
+            selectedLocation: null,
+          };
+        }
+        if (version < 5 && persistedState) {
+          return {
+            ...persistedState,
+            locations: [],
+            selectedLocation: null,
           };
         }
         return persistedState as AppState;
