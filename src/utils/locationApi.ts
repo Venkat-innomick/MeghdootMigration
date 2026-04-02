@@ -86,6 +86,12 @@ export const parseLocationWeatherList = (response: any) =>
     ],
   );
 
+export const parseUserLocationsList = (response: any) =>
+  pickList<any>((response as any)?.result || (response as any)?.data || response, [
+    "objUserLocationsList",
+    "ObjUserLocationsList",
+  ]);
+
 export const isApiSuccess = (response: any) => {
   const value = response?.isSuccessful ?? response?.IsSuccessful;
   if (typeof value === "boolean") return value;

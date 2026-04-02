@@ -25,7 +25,7 @@ import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { Screen } from "../../components/Screen";
 import { colors } from "../../theme/colors";
 import { spacing } from "../../theme/spacing";
-import { cropService, weatherService } from "../../api/services";
+import { cropService, userService, weatherService } from "../../api/services";
 import { CropAdvisoryItem, DashboardLocation } from "../../types/domain";
 import { useAppStore } from "../../store/appStore";
 import {
@@ -33,6 +33,7 @@ import {
   getLanguageLabel,
   getUserProfileId,
   parseLocationWeatherList,
+  parseUserLocationsList,
 } from "../../utils/locationApi";
 import { API_REFRESH_DATES } from "../../utils/apiDates";
 import { useAndroidNavigationBar } from "../../hooks/useAndroidNavigationBar";
@@ -256,6 +257,90 @@ const isBlockLevelRow = (item: any) =>
   toNum(item?.asdID, item?.AsdID) > 0;
 
 const isDistrictOnlyRow = (item: any) => !isBlockLevelRow(item);
+
+const sameSavedLocationRef = (item: any, target: any) => {
+  const itemStateID = toNum(item?.stateID, item?.StateID);
+  const itemDistrictID = toNum(item?.districtID, item?.DistrictID);
+  const itemBlockID = toNum(item?.blockID, item?.BlockID);
+  const itemAsdID = toNum(item?.asdID, item?.AsdID);
+  const targetStateID = toNum(target?.stateID, target?.StateID);
+  const targetDistrictID = toNum(target?.districtID, target?.DistrictID);
+  const targetBlockID = toNum(target?.blockID, target?.BlockID);
+  const targetAsdID = toNum(target?.asdID, target?.AsdID);
+
+  if (itemStateID !== targetStateID || itemDistrictID !== targetDistrictID) {
+    return false;
+  }
+
+  if (targetAsdID > 0) return itemAsdID === targetAsdID;
+  return itemBlockID === targetBlockID;
+};
+
+const buildMissingWeatherRow = (saved: any) => {
+  const stateID = toNum(saved?.stateID, saved?.StateID);
+  const districtID = toNum(saved?.districtID, saved?.DistrictID);
+  const blockID = toNum(saved?.blockID, saved?.BlockID);
+  const asdID = toNum(saved?.asdID, saved?.AsdID);
+  const districtName = pickText(saved?.districtName, saved?.DistrictName, "--");
+  const blockName = pickText(saved?.blockName, saved?.BlockName, "");
+  const asdName = pickText(saved?.asdName, saved?.AsdName, "");
+
+  return normalizeDashboardWeatherRow({
+    stateID,
+    districtID,
+    blockID,
+    asdID,
+    stateName: pickText(saved?.stateName, saved?.StateName, "--"),
+    districtName,
+    blockName,
+    asdName,
+    placeName: blockName || asdName || districtName,
+    colorCode: "#FFFFFF",
+    cloudCover: -1,
+    cloudImage: "",
+    WeatherType: "NA",
+    RainFall: "NA",
+    WindSpeed: "NA",
+    Humidity: "NA",
+    WindDirection: "NA",
+    MinTemp: "NA",
+    MaxTemp: "NA",
+    Date: pickText(saved?.refreshDateTime, saved?.RefreshDateTime, "NA"),
+    isCurrentLocation: false,
+  });
+};
+
+const buildDashboardBaseRows = (weatherRows: any[], savedLocations: any[]) => {
+  const normalizedWeather = weatherRows.map((item: any) =>
+    normalizeDashboardWeatherRow(item),
+  );
+
+  if (!savedLocations.length) return normalizedWeather;
+
+  const savedBlockRows = savedLocations.map((saved: any) => {
+    const exactWeather = normalizedWeather.find((item: any) =>
+      sameSavedLocationRef(item, saved),
+    );
+    return exactWeather || buildMissingWeatherRow(saved);
+  });
+
+  const districtRows = normalizedWeather.filter((item: any) => {
+    if (!isDistrictOnlyRow(item)) return false;
+    return savedLocations.some(
+      (saved: any) =>
+        toNum(saved?.stateID, saved?.StateID) ===
+          toNum(item?.stateID, item?.StateID) &&
+        toNum(saved?.districtID, saved?.DistrictID) ===
+          toNum(item?.districtID, item?.DistrictID),
+    );
+  });
+
+  const currentLocationRows = normalizedWeather.filter((item: any) =>
+    Boolean(item?.isCurrentLocation || item?.IsCurrentLocation),
+  );
+
+  return mergeLocations(savedBlockRows, mergeLocations(districtRows, currentLocationRows));
+};
 
 const getAdvisoryScope = (item: any) => ({
   stateId: toNum(item?.stateID, item?.StateID),
@@ -481,10 +566,16 @@ export const DashboardScreen = () => {
         languageLabel,
         currentLocationOverride,
       );
-      const weather = await weatherService.getByLocation(payload);
-      const locationList = parseLocationWeatherList(
-        weather,
-      ) as DashboardLocation[];
+      const [weather, userLocationsResponse] = await Promise.all([
+        weatherService.getByLocation(payload),
+        userService.getUserLocations({
+          UserProfileID: userId,
+          LanguageType: languageLabel,
+          RefreshDateTime: API_REFRESH_DATES.current(),
+        }),
+      ]);
+      const locationList = parseLocationWeatherList(weather) as DashboardLocation[];
+      const savedLocations = parseUserLocationsList(userLocationsResponse);
       const cropPayload = await buildHomeCropPayload(
         userId,
         languageLabel,
@@ -492,15 +583,10 @@ export const DashboardScreen = () => {
       );
       const crop = await cropService.getAdvisoryTop(cropPayload);
 
-      const mergedLocations = mergeLocations(
-        locationList,
-        temporarySearchLocations,
-      );
-      const normalizedLocations = mergedLocations.map((item: any) =>
-        normalizeDashboardWeatherRow(item),
-      );
+      const baseLocations = buildDashboardBaseRows(locationList, savedLocations);
+      const mergedLocations = mergeLocations(baseLocations, temporarySearchLocations);
       const shapedLocations = shapeHomeLocations(
-        normalizedLocations,
+        mergedLocations,
       ) as DashboardLocation[];
       const currentSelected = useAppStore.getState().selectedLocation;
       const nextAdvisories = mergeAdvisories(
@@ -534,9 +620,7 @@ export const DashboardScreen = () => {
         orderingTarget,
       );
       setLocations(nextLocations);
-      // Keep shared locations aligned with the rendered Home carousel list
-      // so Forecast/PastWeather read the same ordering/content as Home.
-      setAppLocations(nextLocations as DashboardLocation[]);
+      setAppLocations(savedLocations as DashboardLocation[]);
       if (locationList.length > 0) {
         const match = currentSelected
           ? nextLocations.find((item: any) => {

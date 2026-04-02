@@ -16,14 +16,13 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { Screen } from '../../components/Screen';
 import { colors } from '../../theme/colors';
-import { weatherService } from '../../api/services';
+import { userService, weatherService } from '../../api/services';
 import { DashboardLocation, WeatherForecastItem } from '../../types/domain';
 import { useAppStore } from '../../store/appStore';
 import {
-  buildByLocationPayload,
   getLanguageLabel,
   getUserProfileId,
-  parseLocationWeatherList,
+  parseUserLocationsList,
   toText as normalizeText,
 } from '../../utils/locationApi';
 import { API_REFRESH_DATES } from '../../utils/apiDates';
@@ -341,14 +340,32 @@ export const PastWeatherScreen = () => {
   const loadLocations = async () => {
     if (!userId) return;
     try {
-      const payload = buildByLocationPayload(
-        userId,
-        languageLabel,
-        currentLocationOverride,
-      );
-      const response = await weatherService.getByLocation(payload);
-      const rawList = parseLocationWeatherList(response) as DashboardLocation[];
-      const list = dedupePastWeatherLocations(rawList as any[]) as DashboardLocation[];
+      let list: DashboardLocation[] = [];
+      if (currentLocationOverride) {
+        const response = await weatherService.getByLocation({
+          Id: userId,
+          LanguageType: languageLabel,
+          RefreshDateTime: API_REFRESH_DATES.current(),
+          Latitude: currentLocationOverride.latitude,
+          Longitude: currentLocationOverride.longitude,
+        });
+        const rawList =
+          (((response as any)?.result || (response as any)?.data || response)
+            ?.ObjWeatherForecastNextList ||
+            ((response as any)?.result || (response as any)?.data || response)
+              ?.objWeatherForecastNextList ||
+            []) as DashboardLocation[];
+        list = dedupePastWeatherLocations(rawList as any[]) as DashboardLocation[];
+      } else {
+        const response = await userService.getUserLocations({
+          UserProfileID: userId,
+          LanguageType: languageLabel,
+          RefreshDateTime: API_REFRESH_DATES.current(),
+        });
+        const rawList = parseUserLocationsList(response) as DashboardLocation[];
+        list = dedupePastWeatherLocations(rawList as any[]) as DashboardLocation[];
+        useAppStore.getState().setLocations(list);
+      }
       setLocations(list);
       if (list.length) {
         const currentIndex = currentLocationOverride

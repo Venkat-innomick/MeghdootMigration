@@ -18,16 +18,15 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Screen } from '../../components/Screen';
 import { colors } from '../../theme/colors';
-import { mastersService, userService, weatherService } from '../../api/services';
+import { mastersService, userService } from '../../api/services';
 import { useAppStore } from '../../store/appStore';
 import { API_REFRESH_DATES } from '../../utils/apiDates';
 import { DistrictMasterItem, StateMasterItem } from '../../types/domain';
 import {
-  buildByLocationPayload,
   getLanguageLabel,
   getUserProfileId,
   isApiSuccess,
-  parseLocationWeatherList,
+  parseUserLocationsList,
   toNum,
   toText,
 } from '../../utils/locationApi';
@@ -243,9 +242,12 @@ export const LocationsScreen = () => {
     }
     setLoading(true);
     try {
-      const payload = buildByLocationPayload(userId, languageLabel);
-      const response = await weatherService.getByLocation(payload);
-      const list = parseLocationWeatherList(response);
+      const response = await userService.getUserLocations({
+        UserProfileID: userId,
+        LanguageType: languageLabel,
+        RefreshDateTime: API_REFRESH_DATES.current(),
+      });
+      const list = parseUserLocationsList(response);
       setAppLocations(list as any[]);
       const filtered = mapRawLocations(list as any[]);
       setLocations(filtered);
