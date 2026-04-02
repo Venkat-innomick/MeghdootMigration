@@ -136,6 +136,8 @@ const shapeLocationRows = (rows: LocationRow[]) => {
 };
 
 const usesAsdMasters = (stateID: number) => stateID === 28 || stateID === 36;
+const isAlreadyExistsMessage = (value: unknown) =>
+  typeof value === 'string' && /already\s+exist/i.test(value);
 const getSubLocationLabel = (stateID: number, t: (key: string) => string) =>
   usesAsdMasters(stateID) ? t('home.asd') : t('home.block');
 
@@ -426,9 +428,12 @@ export const LocationsScreen = () => {
           : typeof response?.ErrorMessage === 'string' && response.ErrorMessage.trim()
             ? response.ErrorMessage.trim()
             : '';
+      const localizedResponseMessage = isAlreadyExistsMessage(responseMessage)
+        ? t('home.locationAlreadyExists')
+        : responseMessage;
 
       if (!isApiSuccess(response) || responseMessage) {
-        Alert.alert('', responseMessage || t('home.unableAddLocation'), [
+        Alert.alert('', localizedResponseMessage || t('home.unableAddLocation'), [
           { text: t('common.ok') },
         ]);
         return;

@@ -110,6 +110,7 @@ export default {
     unableLoadStates: 'ਰਾਜ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ',
     userNotFoundPleaseLoginAgain: 'ਯੂਜ਼ਰ ਨਹੀਂ ਮਿਲਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਮੁੜ ਲਾਗਇਨ ਕਰੋ।',
     unableAddLocation: 'ਸਥਾਨ ਜੋੜਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ',
+    locationAlreadyExists: 'ਸਥਾਨ ਪਹਿਲਾਂ ਹੀ ਮੌਜੂਦ ਹੈ',
     locationAddedSuccessfully: 'ਸਥਾਨ ਸਫਲਤਾਪੂਰਵਕ ਜੋੜਿਆ ਗਿਆ',
     cannotDeleteOnlyLocation: 'ਇੱਕੋ ਇਕ ਸਥਾਨ ਮਿਟਾਇਆ ਨਹੀਂ ਜਾ ਸਕਦਾ ({{state}}, {{city}})।',
     currentLocationCannotBeDeleted: 'ਮੌਜੂਦਾ ਸਥਾਨ ਮਿਟਾਇਆ ਨਹੀਂ ਜਾ ਸਕਦਾ।',

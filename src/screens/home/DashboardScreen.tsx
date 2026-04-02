@@ -443,6 +443,9 @@ export const DashboardScreen = () => {
   const promotedLocation = useAppStore((s) => s.promotedLocation);
   const setSelectedLocation = useAppStore((s) => s.setSelectedLocation);
   const setPromotedLocation = useAppStore((s) => s.setPromotedLocation);
+  const setCurrentLocationOverride = useAppStore(
+    (s) => s.setCurrentLocationOverride,
+  );
   const currentLocationOverride = useAppStore((s) => s.currentLocationOverride);
   const temporarySearchLocations = useAppStore(
     (s) => s.temporarySearchLocations,
@@ -1215,6 +1218,7 @@ export const DashboardScreen = () => {
                     blockID: toNum(selectedSource?.blockID, selectedSource?.BlockID),
                     asdID: toNum(selectedSource?.asdID, selectedSource?.AsdID),
                   });
+                  setCurrentLocationOverride(null);
                   setPromotedLocation(null);
                 }}
               />

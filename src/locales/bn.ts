@@ -110,6 +110,7 @@ export default {
     unableLoadStates: 'রাজ্যগুলো লোড করা যায়নি',
     userNotFoundPleaseLoginAgain: 'ব্যবহারকারী পাওয়া যায়নি। অনুগ্রহ করে আবার লগইন করুন।',
     unableAddLocation: 'অবস্থান যোগ করা যায়নি',
+    locationAlreadyExists: 'অবস্থান ইতিমধ্যেই রয়েছে',
     locationAddedSuccessfully: 'অবস্থান সফলভাবে যোগ করা হয়েছে',
     cannotDeleteOnlyLocation: 'একমাত্র অবস্থান মুছে ফেলা যাবে না ({{state}}, {{city}})।',
     currentLocationCannotBeDeleted: 'বর্তমান অবস্থান মুছে ফেলা যাবে না।',

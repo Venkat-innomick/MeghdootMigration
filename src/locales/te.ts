@@ -110,6 +110,7 @@ export default {
     unableLoadStates: 'రాష్ట్రాలను లోడ్ చేయలేకపోయాం',
     userNotFoundPleaseLoginAgain: 'వినియోగదారు కనబడలేదు. దయచేసి మళ్లీ లాగిన్ అవండి.',
     unableAddLocation: 'స్థానాన్ని జోడించలేకపోయాం',
+    locationAlreadyExists: 'స్థానం ఇప్పటికే ఉంది',
     locationAddedSuccessfully: 'స్థానం విజయవంతంగా జోడించబడింది',
     cannotDeleteOnlyLocation: 'ఒక్క స్థానాన్ని మాత్రమే తొలగించలేరు ({{state}}, {{city}}).',
     currentLocationCannotBeDeleted: 'ప్రస్తుత స్థానాన్ని తొలగించలేరు.',

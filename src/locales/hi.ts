@@ -110,6 +110,7 @@ export default {
     unableLoadStates: 'राज्यों को लोड नहीं किया जा सका',
     userNotFoundPleaseLoginAgain: 'उपयोगकर्ता नहीं मिला। कृपया फिर से लॉगिन करें।',
     unableAddLocation: 'स्थान जोड़ना संभव नहीं हुआ',
+    locationAlreadyExists: 'स्थान पहले से मौजूद है',
     locationAddedSuccessfully: 'स्थान सफलतापूर्वक जोड़ा गया',
     cannotDeleteOnlyLocation: 'एकमात्र स्थान हटाया नहीं जा सकता ({{state}}, {{city}})।',
     currentLocationCannotBeDeleted: 'वर्तमान स्थान हटाया नहीं जा सकता।',

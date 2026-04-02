@@ -110,6 +110,7 @@ export default {
     unableLoadStates: 'மாநிலங்களை ஏற்ற முடியவில்லை',
     userNotFoundPleaseLoginAgain: 'பயனர் கிடைக்கவில்லை. தயவுசெய்து மீண்டும் உள்நுழைக.',
     unableAddLocation: 'இருப்பிடத்தை சேர்க்க முடியவில்லை',
+    locationAlreadyExists: 'இருப்பிடம் ஏற்கனவே உள்ளது',
     locationAddedSuccessfully: 'இருப்பிடம் வெற்றிகரமாக சேர்க்கப்பட்டது',
     cannotDeleteOnlyLocation: 'ஒரே இருப்பிடத்தை நீக்க முடியாது ({{state}}, {{city}}).',
     currentLocationCannotBeDeleted: 'தற்போதைய இருப்பிடத்தை நீக்க முடியாது.',

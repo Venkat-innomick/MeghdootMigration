@@ -273,14 +273,10 @@ const buildWeatherPayload = (location: any, languageLabel: string) => {
 };
 
 const dedupePastWeatherLocations = (items: any[]) => {
-  // Old Xamarin Past Weather dedupes only by state + district.
   const seen = new Set<string>();
   return items.filter((item) => {
-    const ids = {
-      stateID: pickNum(item?.stateID, item?.StateID, item?.tempStateID, item?.TempStateID),
-      districtID: pickNum(item?.districtID, item?.DistrictID, item?.tempDistrictID, item?.TempDistrictID),
-    };
-    const key = `${ids.stateID}-${ids.districtID}`;
+    const ids = getLocationIds(item);
+    const key = `${ids.stateID}-${ids.districtID}-${ids.blockID}-${ids.asdID}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;

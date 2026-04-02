@@ -104,6 +104,7 @@ export default {
     unableLoadStates: 'Unable to load states',
     userNotFoundPleaseLoginAgain: 'User not found. Please login again.',
     unableAddLocation: 'Unable to add location',
+    locationAlreadyExists: 'Location already exists',
     locationAddedSuccessfully: 'Location added successfully',
     cannotDeleteOnlyLocation: 'Cannot delete only location ({{state}}, {{city}}).',
     currentLocationCannotBeDeleted: 'Current location cannot be deleted.',
