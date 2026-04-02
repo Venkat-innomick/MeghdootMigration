@@ -110,6 +110,7 @@ export default {
     unableLoadStates: 'State-te load theih loh',
     userNotFoundPleaseLoginAgain: 'Hmangtu hmuh loh. Login leh rawh.',
     unableAddLocation: 'Hmun belh theih loh',
+    locationAlreadyExists: 'الموقع موجود بالفعل',
     locationAddedSuccessfully: 'Hmun hlawhtling takin belh a ni',
     cannotDeleteOnlyLocation: 'Hmun pakhat chauh paih theih a ni lo ({{state}}, {{city}}).',
     currentLocationCannotBeDeleted: 'Tunlai hmun hi paih theih a ni lo.',

@@ -110,6 +110,7 @@ export default {
     unableLoadStates: 'സംസ്ഥാനങ്ങൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല',
     userNotFoundPleaseLoginAgain: 'ഉപയോക്താവിനെ കണ്ടെത്താനായില്ല. ദയവായി വീണ്ടും ലോഗിൻ ചെയ്യുക.',
     unableAddLocation: 'സ്ഥലം ചേർക്കാൻ കഴിഞ്ഞില്ല',
+    locationAlreadyExists: 'സ്ഥലം ഇതിനകം നിലവിലുണ്ട്',
     locationAddedSuccessfully: 'സ്ഥലം വിജയകരമായി ചേർത്തു',
     cannotDeleteOnlyLocation: 'ഒറ്റ സ്ഥലം ഇല്ലാതാക്കാൻ കഴിയില്ല ({{state}}, {{city}}).',
     currentLocationCannotBeDeleted: 'നിലവിലെ സ്ഥലം ഇല്ലാതാക്കാൻ കഴിയില്ല.',

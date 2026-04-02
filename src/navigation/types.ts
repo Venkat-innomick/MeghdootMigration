@@ -13,6 +13,9 @@ export type RootStackParamList = {
         districtID?: number;
         blockID?: number;
         asdID?: number;
+        items?: any[];
+        initialIndex?: number;
+        fromFavourites?: boolean;
       }
     | undefined;
   CropFeedback: {

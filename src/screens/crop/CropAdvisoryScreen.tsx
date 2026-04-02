@@ -13,7 +13,7 @@ import {
   ToastAndroid,
   View,
 } from 'react-native';
-import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import Constants from 'expo-constants';
 import { Screen } from '../../components/Screen';
 import { colors } from '../../theme/colors';
@@ -425,20 +425,32 @@ export const CropAdvisoryScreen = () => {
   const { t } = useTranslation();
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
+  const routeParams = route?.params || {};
   const user = useAppStore((s) => s.user);
   const language = useAppStore((s) => s.language);
   const languageLabel = useMemo(() => getLanguageLabel(language), [language]);
-  const requestedAdvisoryId = pickNum(route?.params?.advisoryId, route?.params?.CropAdvisoryID);
-  const requestedCropId = pickNum(route?.params?.cropId, route?.params?.CropID);
-  const requestedCropCategoryId = pickNum(route?.params?.cropCategoryId, route?.params?.CropCategoryID);
+  const requestedAdvisoryId = pickNum(routeParams?.advisoryId, routeParams?.CropAdvisoryID);
+  const requestedCropId = pickNum(routeParams?.cropId, routeParams?.CropID);
+  const requestedCropCategoryId = pickNum(routeParams?.cropCategoryId, routeParams?.CropCategoryID);
+  const fromFavourites = Boolean(routeParams?.fromFavourites);
+  const routeItems = useMemo(
+    () => (Array.isArray(routeParams?.items) ? routeParams.items : []),
+    [routeParams?.items],
+  );
+  const hasRouteItems = routeItems.length > 0;
+  const requestedInitialIndex = pickNum(routeParams?.initialIndex, 0);
+  const requestedStateID = pickPositiveNum(routeParams?.stateID, routeParams?.StateID, routeParams?.stateId);
+  const requestedDistrictID = pickPositiveNum(routeParams?.districtID, routeParams?.DistrictID, routeParams?.districtId);
+  const requestedBlockID = pickPositiveNum(routeParams?.blockID, routeParams?.BlockID, routeParams?.blockId);
+  const requestedAsdID = pickPositiveNum(routeParams?.asdID, routeParams?.AsdID, routeParams?.asdId);
   const requestedLocation = useMemo(
     () => ({
-      stateID: pickPositiveNum(route?.params?.stateID, route?.params?.StateID, route?.params?.stateId),
-      districtID: pickPositiveNum(route?.params?.districtID, route?.params?.DistrictID, route?.params?.districtId),
-      blockID: pickPositiveNum(route?.params?.blockID, route?.params?.BlockID, route?.params?.blockId),
-      asdID: pickPositiveNum(route?.params?.asdID, route?.params?.AsdID, route?.params?.asdId),
+      stateID: requestedStateID,
+      districtID: requestedDistrictID,
+      blockID: requestedBlockID,
+      asdID: requestedAsdID,
     }),
-    [route?.params]
+    [requestedStateID, requestedDistrictID, requestedBlockID, requestedAsdID]
   );
 
   const [loading, setLoading] = useState(false);
@@ -448,6 +460,7 @@ export const CropAdvisoryScreen = () => {
   const [audios, setAudios] = useState<any[]>([]);
   const [isEnglish, setIsEnglish] = useState(true);
   const [favouriteBusy, setFavouriteBusy] = useState(false);
+  const [favouriteOverrides, setFavouriteOverrides] = useState<Record<number, boolean>>({});
 
   const [weatherOpen, setWeatherOpen] = useState(true);
   const [agroOpen, setAgroOpen] = useState(false);
@@ -481,8 +494,11 @@ export const CropAdvisoryScreen = () => {
   );
 
   const isFavourite = useMemo(
-    () => pickNum(current.favouriteID, current.FavouriteID) > 0,
-    [current]
+    () =>
+      fromFavourites ||
+      (advisoryId > 0 && favouriteOverrides[advisoryId] === true) ||
+      pickNum(current.favouriteID, current.FavouriteID) > 0,
+    [advisoryId, current, favouriteOverrides, fromFavourites]
   );
   const feedbackId = useMemo(
     () => pickNum(current.feedbackID, current.FeedbackID),
@@ -522,6 +538,32 @@ export const CropAdvisoryScreen = () => {
     const activeId = advisoryId;
     setLoading(true);
     try {
+      if (hasRouteItems) {
+        const rawList = routeItems as any[];
+        const scopedList = requestedLocation.districtID
+          ? rawList.filter((item: any) => matchesLocationContext(item, requestedLocation))
+          : rawList;
+        const nextList = (scopedList.length ? scopedList : rawList).map((item: any) =>
+          applyLocationContext(item, requestedLocation),
+        );
+        setItems(nextList);
+        if (nextList.length) {
+          const boundedIndex = Math.max(
+            0,
+            Math.min(requestedInitialIndex, nextList.length - 1),
+          );
+          const matchedByAdvisory = requestedAdvisoryId
+            ? nextList.findIndex(
+                (item: any) =>
+                  pickNum(item.cropAdvisoryID, item.CropAdvisoryID) ===
+                  requestedAdvisoryId,
+              )
+            : -1;
+          setIndex(matchedByAdvisory >= 0 ? matchedByAdvisory : boundedIndex);
+        }
+        return;
+      }
+
       const response = requestedCropId
         ? await cropService.getAdvisoryFavouriteRatingList({
             Id: userProfileId,
@@ -672,21 +714,35 @@ export const CropAdvisoryScreen = () => {
     );
   };
 
-  useFocusEffect(
-    useCallback(() => {
-      loadAdvisories();
-  }, [userProfileId, languageLabel, requestedAdvisoryId, requestedCropCategoryId, requestedCropId, requestedLocation])
-  );
+  useEffect(() => {
+    loadAdvisories();
+  }, [
+    hasRouteItems,
+    routeItems,
+    requestedInitialIndex,
+    userProfileId,
+    languageLabel,
+    requestedAdvisoryId,
+    requestedCropCategoryId,
+    requestedCropId,
+    requestedStateID,
+    requestedDistrictID,
+    requestedBlockID,
+    requestedAsdID,
+  ]);
 
   useEffect(() => {
-    if (advisoryId) {
+    if (attachmentsOpen && advisoryId) {
       loadAttachments(advisoryId).catch((error: any) => {
         setImages([]);
         setAudios([]);
         showErrorMessage(error?.message);
       });
+    } else if (!attachmentsOpen) {
+      setImages([]);
+      setAudios([]);
     }
-  }, [advisoryId, languageLabel, showErrorMessage]);
+  }, [advisoryId, attachmentsOpen, languageLabel, showErrorMessage]);
 
   useEffect(() => {
     if (advisoryId) {
@@ -694,7 +750,7 @@ export const CropAdvisoryScreen = () => {
         showErrorMessage(error?.message);
       });
     }
-  }, [advisoryId, languageLabel, index, showErrorMessage]);
+  }, [advisoryId, languageLabel, showErrorMessage]);
 
   const toggleFavourite = async () => {
     if (!advisoryId || !userProfileId || isFavourite || favouriteBusy) return;
@@ -722,15 +778,35 @@ export const CropAdvisoryScreen = () => {
             if (success !== true) return;
 
             setItems((prev) =>
-              prev.map((item, i) => {
-                if (i !== index) return item;
+              prev.map((item) => {
+                if (
+                  pickNum(item.cropAdvisoryID, item.CropAdvisoryID) !== advisoryId
+                ) {
+                  return item;
+                }
                 return {
                   ...item,
-                  favouriteID: 1,
-                  FavouriteID: 1,
+                  favouriteID: pickNum(
+                    response?.NewID,
+                    response?.newID,
+                    response?.result?.NewID,
+                    response?.result?.newID,
+                    1
+                  ),
+                  FavouriteID: pickNum(
+                    response?.NewID,
+                    response?.newID,
+                    response?.result?.NewID,
+                    response?.result?.newID,
+                    1
+                  ),
                 };
               })
             );
+            setFavouriteOverrides((prev) => ({
+              ...prev,
+              [advisoryId]: true,
+            }));
             if (Platform.OS === 'android') {
               ToastAndroid.show(t('crop.addedToFavourites'), ToastAndroid.SHORT);
             }
@@ -1049,7 +1125,7 @@ export const CropAdvisoryScreen = () => {
           </View>
         ) : null}
 
-        {items.length > 1 ? (
+        {!fromFavourites && items.length > 1 ? (
           <View style={styles.navArrowsRow}>
             {prevEnabled ? (
               <Pressable onPress={() => setIndex((v) => Math.max(0, v - 1))}>

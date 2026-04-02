@@ -110,6 +110,7 @@ export default {
     unableLoadStates: 'ৰাজ্যসমূহ ল’ড কৰিব নোৱাৰি',
     userNotFoundPleaseLoginAgain: 'ব্যৱহাৰকাৰী পোৱা নগ’ল। অনুগ্ৰহ কৰি আকৌ লগইন কৰক।',
     unableAddLocation: 'অৱস্থান যোগ কৰিব নোৱাৰি',
+    locationAlreadyExists: 'অৱস্থান ইতিমধ্যে আছে',
     locationAddedSuccessfully: 'অৱস্থান সফলভাৱে যোগ কৰা হৈছে',
     cannotDeleteOnlyLocation: 'একমাত্ৰ অৱস্থান মচি পেলাব নোৱাৰি ({{state}}, {{city}})।',
     currentLocationCannotBeDeleted: 'বৰ্তমান অৱস্থান মচি পেলাব নোৱাৰি।',

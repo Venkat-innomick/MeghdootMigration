@@ -136,6 +136,8 @@ const shapeLocationRows = (rows: LocationRow[]) => {
 };
 
 const usesAsdMasters = (stateID: number) => stateID === 28 || stateID === 36;
+const isAlreadyExistsMessage = (value: unknown) =>
+  typeof value === 'string' && /already\s+exist/i.test(value);
 const getSubLocationLabel = (stateID: number, t: (key: string) => string) =>
   usesAsdMasters(stateID) ? t('home.asd') : t('home.block');
 
@@ -420,8 +422,18 @@ export const LocationsScreen = () => {
     setAddLoading(true);
     try {
       const response: any = await userService.saveLocation(payload);
-      if (!isApiSuccess(response)) {
-        Alert.alert('', response?.errorMessage || response?.ErrorMessage || t('home.unableAddLocation'), [
+      const responseMessage =
+        typeof response?.errorMessage === 'string' && response.errorMessage.trim()
+          ? response.errorMessage.trim()
+          : typeof response?.ErrorMessage === 'string' && response.ErrorMessage.trim()
+            ? response.ErrorMessage.trim()
+            : '';
+      const localizedResponseMessage = isAlreadyExistsMessage(responseMessage)
+        ? t('home.locationAlreadyExists')
+        : responseMessage;
+
+      if (!isApiSuccess(response) || responseMessage) {
+        Alert.alert('', localizedResponseMessage || t('home.unableAddLocation'), [
           { text: t('common.ok') },
         ]);
         return;
@@ -636,8 +648,7 @@ export const LocationsScreen = () => {
     navigation.navigate('Home');
   };
 
-  const floatingBottom = insets.bottom + 72;
-  const listBottomPadding = floatingBottom + 86;
+  const listBottomPadding = insets.bottom + 24;
 
   return (
     <Screen>
@@ -650,7 +661,10 @@ export const LocationsScreen = () => {
           <FlatList
             data={addedLocations}
             keyExtractor={(item, index) => `${item.stateID}-${item.districtID}-${item.blockID}-${item.asdID}-${index}`}
-            contentContainerStyle={[styles.container, { paddingBottom: listBottomPadding }]}
+            contentContainerStyle={[
+              styles.container,
+              { paddingTop: 20, paddingBottom: listBottomPadding },
+            ]}
             ListHeaderComponent={
               <>
                 {currentLocation ? (
@@ -668,7 +682,7 @@ export const LocationsScreen = () => {
           />
         )}
 
-        <Pressable style={[styles.addButton, { bottom: floatingBottom }]} onPress={openAdd}>
+        <Pressable style={styles.addButton} onPress={openAdd}>
           <Text style={styles.addButtonText}>{t('home.addLocation')}</Text>
         </Pressable>
       </View>
@@ -873,13 +887,14 @@ const styles = StyleSheet.create({
   swipeDeleteText: { color: '#fff', fontFamily: 'RobotoRegular', fontSize: 12 },
   addButton: {
     position: 'absolute',
-    left: 5,
+    top: 8,
     right: 5,
-    bottom: 20,
     backgroundColor: colors.primary,
     borderRadius: 15,
+    paddingHorizontal: 16,
     paddingVertical: 12,
     alignItems: 'center',
+    zIndex: 1,
   },
   addButtonText: { color: '#fff', fontFamily: 'RobotoMedium', fontSize: 14 },
   empty: { marginTop: 20, textAlign: 'center', color: colors.muted, fontFamily: 'RobotoRegular' },

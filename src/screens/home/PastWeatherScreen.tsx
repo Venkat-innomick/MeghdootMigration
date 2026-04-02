@@ -254,15 +254,29 @@ const getLocationIds = (location: any) => ({
   asdID: pickNum(location?.tempAsdID, location?.TempAsdID, location?.asdID, location?.AsdID),
 });
 
+const buildWeatherPayload = (location: any, languageLabel: string) => {
+  const ids = getLocationIds(location);
+  const payload: Record<string, unknown> = {
+    StateID: ids.stateID,
+    DistrictID: ids.districtID,
+    LanguageType: languageLabel,
+    RefreshDateTime: API_REFRESH_DATES.current(),
+  };
+
+  if (ids.stateID === 28 || ids.stateID === 36) {
+    payload.AsdID = ids.asdID;
+  } else {
+    payload.BlockID = ids.blockID;
+  }
+
+  return payload;
+};
+
 const dedupePastWeatherLocations = (items: any[]) => {
-  // Old Xamarin Past Weather dedupes only by state + district.
   const seen = new Set<string>();
   return items.filter((item) => {
-    const ids = {
-      stateID: pickNum(item?.stateID, item?.StateID, item?.tempStateID, item?.TempStateID),
-      districtID: pickNum(item?.districtID, item?.DistrictID, item?.tempDistrictID, item?.TempDistrictID),
-    };
-    const key = `${ids.stateID}-${ids.districtID}`;
+    const ids = getLocationIds(item);
+    const key = `${ids.stateID}-${ids.districtID}-${ids.blockID}-${ids.asdID}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -275,6 +289,7 @@ export const PastWeatherScreen = () => {
   const user = useAppStore((s) => s.user);
   const language = useAppStore((s) => s.language);
   const selectedLocationRef = useAppStore((s) => s.selectedLocation);
+  const currentLocationOverride = useAppStore((s) => s.currentLocationOverride);
   const userId = getUserProfileId(user);
   const languageLabel = getLanguageLabel(language);
 
@@ -326,23 +341,32 @@ export const PastWeatherScreen = () => {
   const loadLocations = async () => {
     if (!userId) return;
     try {
-      const payload = buildByLocationPayload(userId, languageLabel);
+      const payload = buildByLocationPayload(
+        userId,
+        languageLabel,
+        currentLocationOverride,
+      );
       const response = await weatherService.getByLocation(payload);
       const rawList = parseLocationWeatherList(response) as DashboardLocation[];
       const list = dedupePastWeatherLocations(rawList as any[]) as DashboardLocation[];
       setLocations(list);
       if (list.length) {
-        const selectedIndex = selectedLocationRef
-          ? list.findIndex((loc: any) => {
-              const districtID = pickNum(
-                loc?.districtID,
-                loc?.DistrictID,
-                loc?.tempDistrictID,
-                loc?.TempDistrictID,
-              );
-              return districtID === selectedLocationRef.districtID;
-            })
+        const currentIndex = currentLocationOverride
+          ? list.findIndex((loc: any) => Boolean(loc?.isCurrentLocation || loc?.IsCurrentLocation))
           : -1;
+        const selectedIndex = currentIndex >= 0
+          ? currentIndex
+          : selectedLocationRef
+            ? list.findIndex((loc: any) => {
+                const districtID = pickNum(
+                  loc?.districtID,
+                  loc?.DistrictID,
+                  loc?.tempDistrictID,
+                  loc?.TempDistrictID,
+                );
+                return districtID === selectedLocationRef.districtID;
+              })
+            : -1;
         const indexToUse = selectedIndex >= 0 ? selectedIndex : 0;
         const target = list[indexToUse] as any;
         setSelectedLocationIndex(indexToUse);
@@ -362,22 +386,7 @@ export const PastWeatherScreen = () => {
   const loadWeatherForLocation = async (location: any) => {
     setLoading(true);
     try {
-      const ids = getLocationIds(location);
-      const stateID = ids.stateID;
-      const districtID = ids.districtID;
-      const blockID = ids.blockID;
-      const asdID = ids.asdID;
-
-      const payload: Record<string, unknown> = {
-        StateID: stateID,
-        DistrictID: districtID,
-        LanguageType: languageLabel,
-        languageType: languageLabel,
-        RefreshDateTime: API_REFRESH_DATES.current(),
-      };
-
-      if (stateID === 28 || stateID === 36) payload.AsdID = asdID || blockID;
-      else payload.BlockID = blockID || asdID;
+      const payload = buildWeatherPayload(location, languageLabel);
 
       const response = await weatherService.getObserved(payload);
       const rawPayload = response.result || response.data || response;
@@ -397,6 +406,11 @@ export const PastWeatherScreen = () => {
 
   const refreshScreenData = useCallback((forceLocationReload = false) => {
       if (forceLocationReload) {
+        loadLocations();
+        return;
+      }
+
+      if (currentLocationOverride) {
         loadLocations();
         return;
       }
@@ -427,7 +441,7 @@ export const PastWeatherScreen = () => {
         return;
       }
       loadLocations();
-    }, [languageLabel, selectedLocationRef, t, userId]);
+    }, [currentLocationOverride, languageLabel, selectedLocationRef, t, userId]);
 
   useFocusEffect(
     useCallback(() => {
