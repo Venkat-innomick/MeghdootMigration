@@ -244,6 +244,7 @@ export const AllCropsScreen = () => {
                   cropId,
                   cropCategoryId,
                   cropName: name || "--",
+                  fromFavourites: false,
                   stateID: pickNum(
                     item.stateID,
                     item.StateID,

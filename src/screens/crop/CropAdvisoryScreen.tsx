@@ -1125,7 +1125,7 @@ export const CropAdvisoryScreen = () => {
           </View>
         ) : null}
 
-        {items.length > 1 ? (
+        {!fromFavourites && items.length > 1 ? (
           <View style={styles.navArrowsRow}>
             {prevEnabled ? (
               <Pressable onPress={() => setIndex((v) => Math.max(0, v - 1))}>

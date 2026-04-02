@@ -640,6 +640,19 @@ export const DashboardScreen = () => {
     });
     if (exactMatch) return exactMatch as any;
 
+    if (activeTab === "block") {
+      const blockDistrictMatch = carouselLocations.find((item: any) => {
+        const districtID = toNum(item.districtID, item.DistrictID);
+        const blockID = toNum(item.blockID, item.BlockID);
+        const asdID = toNum(item.asdID, item.AsdID);
+        return (
+          districtID === selectedLocation.districtID &&
+          (blockID > 0 || asdID > 0)
+        );
+      });
+      if (blockDistrictMatch) return blockDistrictMatch as any;
+    }
+
     if (activeTab === "district") {
       const districtMatch = carouselLocations.find((item: any) => {
         const districtID = toNum(item.districtID, item.DistrictID);
@@ -1333,6 +1346,7 @@ export const DashboardScreen = () => {
                   districtID: toNum(row.districtID, row.DistrictID),
                   blockID: toNum(row.blockID, row.BlockID),
                   asdID: toNum(row.asdID, row.AsdID),
+                  fromFavourites: false,
                   items: advisoryRows,
                   initialIndex: rowIndex >= 0 ? rowIndex : index,
                 };
