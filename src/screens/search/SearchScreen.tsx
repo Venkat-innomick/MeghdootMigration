@@ -118,6 +118,17 @@ export const SearchScreen = () => {
     });
   };
 
+  const returnToPreviousScreen = () => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+    navigation.navigate("Main", {
+      screen: "MainTabs",
+      params: { screen: "Home" },
+    });
+  };
+
   const parseSelectedAdvisories = (payload: any) => {
     const base = payload?.result || payload?.data || payload;
     if (Array.isArray(base)) return base;
@@ -564,16 +575,7 @@ export const SearchScreen = () => {
         await moveToHomeForItem(item);
         return;
       }
-
-      const result = await loadSelectedLocationData(item);
-      if (!result.locations.length && !result.advisories.length) {
-        Alert.alert("", t("search.noDataForSelectedLocation"), [
-          { text: t("common.ok") },
-        ]);
-        return;
-      }
-      setTemporarySearchData(result);
-      await moveToHomeForItem(item);
+      returnToPreviousScreen();
     } catch (e: any) {
       setTimeout(() => {
         Alert.alert("", e?.message || t("search.unableOpenSelectedLocation"), [
@@ -613,13 +615,7 @@ export const SearchScreen = () => {
       setPromotedLocation(null);
       setTemporarySearchData({ locations: [], advisories: [] });
       setSelectedLocation(null);
-
-      if (navigation.canGoBack()) navigation.goBack();
-      else
-        navigation.navigate("Main", {
-          screen: "MainTabs",
-          params: { screen: "Home" },
-        });
+      returnToPreviousScreen();
     } catch (e: any) {
       setTimeout(() => {
         Alert.alert("", e.message || t("search.unableGetCurrentLocation"), [

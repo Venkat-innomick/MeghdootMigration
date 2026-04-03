@@ -29,7 +29,7 @@
     },
     "android": {
       "package": "com.aas.meghdoot",
-      "versionCode": 2,
+      "versionCode": 3,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/AppIconAdaptiveForeground.png",
         "backgroundColor": "#749C53"
