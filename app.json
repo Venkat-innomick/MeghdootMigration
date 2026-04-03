@@ -9,6 +9,8 @@
     "scheme": "meghdoot-app",
     "userInterfaceStyle": "light",
     "splash": {
+      "image": "./assets/images/AppIcon.png",
+      "resizeMode": "contain",
       "backgroundColor": "#749C53"
     },
     "androidStatusBar": {
@@ -46,6 +48,14 @@
     },
     "plugins": [
       "expo-location",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#749C53"
+        }
+      ],
       [
         "expo-image-picker",
         {
