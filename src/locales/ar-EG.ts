@@ -205,6 +205,9 @@ export default {
     unableUpdateImage: 'Profile image update theih loh',
     loginAgain: 'Image update theih loh. Login leh rawh.',
     imageUpdated: 'Profile image hlawhtling takin update a ni',
+    accountDeletionTitle: 'Account paihna',
+    accountDeletionMessage:
+      'I account paih dawn chuan a hnuaia email hmangin min rawn biak rawh. I account leh a kaihhnawih data zawng zawng hi ni 7 chhungin permanent-in paih a ni ang.',
   },
   menu: {
     ...en.menu,
