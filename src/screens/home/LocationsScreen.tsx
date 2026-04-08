@@ -182,6 +182,7 @@ export const LocationsScreen = () => {
   useAndroidNavigationBar(colors.darkGreen, 'light');
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
+  const bottomSafeInset = insets.bottom > 0 ? insets.bottom : 24;
   const navigation = useNavigation<any>();
   const user: any = useAppStore((s) => s.user);
   const language = useAppStore((s) => s.language);
@@ -798,9 +799,16 @@ export const LocationsScreen = () => {
         </Pressable>
       </View>
 
-      <Modal visible={addOpen} transparent animationType="slide" onRequestClose={() => setAddOpen(false)}>
+      <Modal
+        visible={addOpen}
+        transparent
+        animationType="slide"
+        statusBarTranslucent
+        navigationBarTranslucent
+        onRequestClose={() => setAddOpen(false)}
+      >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
+          <View style={[styles.modalSheet, { paddingBottom: bottomSafeInset + 24 }]}>
             <Text style={styles.modalTitle}>{t('home.addLocation')}</Text>
 
             <Pressable style={styles.selector} onPress={() => setStatePickerOpen(true)}>

@@ -100,7 +100,7 @@ export const getUserProfileMappedLocation = (user: any) => {
   const blockID = toNum(user?.blockID ?? user?.BlockID, 0);
   const asdID = toNum(user?.asdID ?? user?.AsdID, 0);
 
-  if (stateID <= 0 || districtID <= 0 || (blockID <= 0 && asdID <= 0)) {
+  if (stateID <= 0 || districtID <= 0) {
     return null;
   }
 

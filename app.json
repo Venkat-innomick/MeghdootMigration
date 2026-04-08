@@ -9,7 +9,7 @@
     "scheme": "meghdoot-app",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/images/AppIcon.png",
+      "image": "./assets/images/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#749C53"
     },
@@ -31,7 +31,7 @@
     },
     "android": {
       "package": "com.aas.meghdoot",
-      "versionCode": 7,
+      "versionCode": 8,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/AppIconAdaptiveForeground.png",
         "backgroundColor": "#749C53"

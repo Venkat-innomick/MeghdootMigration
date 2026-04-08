@@ -109,6 +109,42 @@ const normalizeAdvisoryDetail = (sourceItem: any, detail: any) => {
   return {
     ...sourceItem,
     ...resolved,
+    favouriteID: pickPositiveNum(
+      resolved?.favouriteID,
+      resolved?.FavouriteID,
+      sourceItem?.favouriteID,
+      sourceItem?.FavouriteID,
+    ),
+    FavouriteID: pickPositiveNum(
+      resolved?.FavouriteID,
+      resolved?.favouriteID,
+      sourceItem?.FavouriteID,
+      sourceItem?.favouriteID,
+    ),
+    feedbackID: pickPositiveNum(
+      resolved?.feedbackID,
+      resolved?.FeedbackID,
+      sourceItem?.feedbackID,
+      sourceItem?.FeedbackID,
+    ),
+    FeedbackID: pickPositiveNum(
+      resolved?.FeedbackID,
+      resolved?.feedbackID,
+      sourceItem?.FeedbackID,
+      sourceItem?.feedbackID,
+    ),
+    rating: pickPositiveNum(
+      resolved?.rating,
+      resolved?.Rating,
+      sourceItem?.rating,
+      sourceItem?.Rating,
+    ),
+    Rating: pickPositiveNum(
+      resolved?.Rating,
+      resolved?.rating,
+      sourceItem?.Rating,
+      sourceItem?.rating,
+    ),
     stateID: pickPositiveNum(resolved?.stateID, resolved?.StateID, sourceItem?.stateID, sourceItem?.StateID, sourceItem?.stateId),
     StateID: pickPositiveNum(resolved?.StateID, resolved?.stateID, sourceItem?.StateID, sourceItem?.stateID, sourceItem?.stateId),
     districtID: pickPositiveNum(
@@ -460,7 +496,6 @@ export const CropAdvisoryScreen = () => {
   const [audios, setAudios] = useState<any[]>([]);
   const [isEnglish, setIsEnglish] = useState(true);
   const [favouriteBusy, setFavouriteBusy] = useState(false);
-  const [favouriteOverrides, setFavouriteOverrides] = useState<Record<number, boolean>>({});
 
   const [weatherOpen, setWeatherOpen] = useState(true);
   const [agroOpen, setAgroOpen] = useState(false);
@@ -494,18 +529,15 @@ export const CropAdvisoryScreen = () => {
   );
 
   const isFavourite = useMemo(
-    () =>
-      fromFavourites ||
-      (advisoryId > 0 && favouriteOverrides[advisoryId] === true) ||
-      pickNum(current.favouriteID, current.FavouriteID) > 0,
-    [advisoryId, current, favouriteOverrides, fromFavourites]
+    () => fromFavourites || pickNum(current.favouriteID, current.FavouriteID) > 0,
+    [current, fromFavourites]
   );
   const feedbackId = useMemo(
     () => pickNum(current.feedbackID, current.FeedbackID),
     [current]
   );
-  const avgFeedback = useMemo(
-    () => pickNum(current.avgFeedback, current.AvgFeedback),
+  const userRating = useMemo(
+    () => pickNum(current.rating, current.Rating),
     [current]
   );
 
@@ -803,10 +835,6 @@ export const CropAdvisoryScreen = () => {
                 };
               })
             );
-            setFavouriteOverrides((prev) => ({
-              ...prev,
-              [advisoryId]: true,
-            }));
             if (Platform.OS === 'android') {
               ToastAndroid.show(t('crop.addedToFavourites'), ToastAndroid.SHORT);
             }
@@ -890,7 +918,29 @@ export const CropAdvisoryScreen = () => {
       advisoryId,
       userProfileId,
       feedbackId,
-      avgFeedback,
+      userRating,
+      onSubmitted: ({
+        feedbackId: nextFeedbackId,
+        userRating: nextUserRating,
+      }: {
+        feedbackId: number;
+        userRating: number;
+      }) => {
+        setItems((prev) =>
+          prev.map((item) => {
+            if (pickNum(item.cropAdvisoryID, item.CropAdvisoryID) !== advisoryId) {
+              return item;
+            }
+            return {
+              ...item,
+              feedbackID: nextFeedbackId,
+              FeedbackID: nextFeedbackId,
+              rating: nextUserRating,
+              Rating: nextUserRating,
+            };
+          })
+        );
+      },
     });
   };
 

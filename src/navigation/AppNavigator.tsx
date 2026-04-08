@@ -49,7 +49,6 @@ import { CropFeedbackScreen } from '../screens/crop/CropFeedbackScreen';
 import { CropAudioPlayerScreen } from '../screens/crop/CropAudioPlayerScreen';
 import { CropImagePreviewScreen } from '../screens/crop/CropImagePreviewScreen';
 import { SearchScreen } from '../screens/search/SearchScreen';
-import { SplashScreen } from '../screens/splash/SplashScreen';
 import { unregisterPushTokenForUser } from '../hooks/usePushNotifications';
 import { rootNavigationRef } from './navigationRef';
 
@@ -516,14 +515,22 @@ const MainDrawer = () => {
 
 export const AppNavigator = () => {
   const language = useAppStore((s) => s.language);
+  const user = useAppStore((s) => s.user);
+  const onboardingDone = useAppStore((s) => s.onboardingDone);
   const t = (key: string) => i18n.t(key, { lng: language });
   useEffect(() => {
     i18n.changeLanguage(language).catch(() => undefined);
   }, [language]);
+
+  const initialRouteName = user
+    ? 'Main'
+    : !onboardingDone
+      ? 'Onboarding'
+      : 'Auth';
+
   return (
     <NavigationContainer ref={rootNavigationRef}>
-      <RootStack.Navigator initialRouteName="Splash">
-        <RootStack.Screen name="Splash" component={SplashScreen} options={{ headerShown: false }} />
+      <RootStack.Navigator initialRouteName={initialRouteName}>
         <RootStack.Screen name="Onboarding" component={OnboardingNavigator} options={{ headerShown: false }} />
         <RootStack.Screen name="Auth" component={AuthNavigator} options={{ headerShown: false }} />
         <RootStack.Screen name="Main" component={MainDrawer} options={{ headerShown: false }} />
