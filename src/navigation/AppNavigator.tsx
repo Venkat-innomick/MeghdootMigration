@@ -13,8 +13,15 @@ import { useAppStore } from '../store/appStore';
 import { colors } from '../theme/colors';
 import { API_BASE_URL } from '../constants/api';
 import { STORAGE_KEYS } from '../constants/storageKeys';
+import { userService } from '../api/services';
 import i18n from '../locales/i18n';
 import { LANGUAGES } from '../constants/languages';
+import { API_REFRESH_DATES } from '../utils/apiDates';
+import {
+  getUserProfileId,
+  mergeUserProfileLocation,
+  parseUserLocationsList,
+} from '../utils/locationApi';
 
 import { LanguageSelectionScreen } from '../screens/onboarding/LanguageSelectionScreen';
 import { OnboardingOneScreen } from '../screens/onboarding/OnboardingOneScreen';
@@ -211,6 +218,8 @@ const OnboardingNavigator = () => {
 const MenuContent = (props: any) => {
   const language = useAppStore((s) => s.language);
   const setLanguage = useAppStore((s) => s.setLanguage);
+  const setUser = useAppStore((s) => s.setUser);
+  const setLocations = useAppStore((s) => s.setLocations);
   const t = (key: string) => i18n.t(key, { lng: language });
   const logout = useAppStore((s) => s.logout);
   const user: any = useAppStore((s) => s.user);
@@ -232,6 +241,90 @@ const MenuContent = (props: any) => {
     setAndroidNavBar(colors.background, 'dark');
     props.navigation.closeDrawer();
     props.navigation.getParent?.()?.navigate(screen);
+  };
+  const handleLanguageChange = async (code: string) => {
+    setLanguage(code);
+    i18n.changeLanguage(code).catch(() => undefined);
+
+    const nextLanguageLabel =
+      LANGUAGES.find((item) => item.code === code)?.label || 'English';
+    const mobile = String(
+      user?.mobileNumber || user?.LogInId || user?.MobileNumber || '',
+    ).trim();
+
+    if (!mobile) {
+      setLanguageModalOpen(false);
+      return;
+    }
+
+    try {
+      const response: any = await userService.login({
+        LogInId: mobile,
+        LogInPassword: '1234',
+        LanguageType: nextLanguageLabel,
+        Refreshdatetime: '2016-01-01',
+      });
+
+      const root = response?.result ?? response?.data ?? response;
+      const users =
+        root?.ObjUserList ||
+        root?.objUserList ||
+        response?.ObjUserList ||
+        response?.objUserList ||
+        root ||
+        [];
+      const data = Array.isArray(users) ? users[0] : users;
+
+      if (data && typeof data === 'object') {
+        const nextUser = {
+          ...user,
+          ...(
+            data?.StateID != null || data?.stateID != null
+              ? { stateID: data?.StateID ?? data?.stateID ?? 0 }
+              : {}
+          ),
+          ...(
+            data?.DistrictID != null || data?.districtID != null
+              ? { districtID: data?.DistrictID ?? data?.districtID ?? 0 }
+              : {}
+          ),
+          ...(
+            data?.BlockID != null || data?.blockID != null
+              ? { blockID: data?.BlockID ?? data?.blockID ?? 0 }
+              : {}
+          ),
+          ...(
+            data?.AsdID != null || data?.asdID != null
+              ? { asdID: data?.AsdID ?? data?.asdID ?? 0 }
+              : {}
+          ),
+          stateName: pickText(data?.StateName, data?.stateName, user?.stateName, user?.StateName),
+          districtName: pickText(data?.DistrictName, data?.districtName, user?.districtName, user?.DistrictName),
+          blockName: pickText(data?.BlockName, data?.blockName),
+          asdName: pickText(data?.AsdName, data?.asdName),
+          languageName: pickText(data?.LanguageName, data?.languageName, user?.languageName, user?.LanguageName),
+        };
+        setUser(nextUser);
+
+        const nextUserProfileId = getUserProfileId(nextUser);
+        if (nextUserProfileId > 0) {
+          const userLocationsResponse = await userService.getUserLocations({
+            UserProfileID: nextUserProfileId,
+            LanguageType: nextLanguageLabel,
+            RefreshDateTime: API_REFRESH_DATES.current(),
+          });
+          const nextLocations = mergeUserProfileLocation(
+            parseUserLocationsList(userLocationsResponse) as any[],
+            nextUser,
+          );
+          setLocations(nextLocations as any[]);
+        }
+      }
+    } catch {
+      // Ignore profile refresh failure; the app language still changes.
+    } finally {
+      setLanguageModalOpen(false);
+    }
   };
   const handleLogout = () => {
     Alert.alert(t('menu.logout'), t('menu.logoutConfirm'), [
@@ -314,9 +407,9 @@ const MenuContent = (props: any) => {
                     key={item.code}
                     style={[styles.langModalItem, active && styles.langModalItemActive]}
                     onPress={() => {
-                      setLanguage(item.code);
-                      i18n.changeLanguage(item.code).catch(() => undefined);
-                      setLanguageModalOpen(false);
+                      handleLanguageChange(item.code).catch(() => {
+                        setLanguageModalOpen(false);
+                      });
                     }}
                   >
                     <Text style={[styles.langModalItemText, active && styles.langModalItemTextActive]}>

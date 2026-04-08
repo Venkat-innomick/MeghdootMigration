@@ -1,6 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
 import { DashboardLocation, UserProfile } from '../types/domain';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 
@@ -44,100 +43,68 @@ interface AppState {
   logout: () => void;
 }
 
-export const useAppStore = create<AppState>()(
-  persist(
-    (set) => ({
-      isHydrated: false,
-      onboardingDone: false,
-      onboardingStarted: false,
-      language: 'en',
+export const useAppStore = create<AppState>()((set) => ({
+  isHydrated: false,
+  onboardingDone: false,
+  onboardingStarted: false,
+  language: 'en',
+  user: null,
+  locations: [],
+  selectedLocation: null,
+  promotedLocation: null,
+  currentLocationOverride: null,
+  temporarySearchLocations: [],
+  temporarySearchAdvisories: [],
+  setHydrated: (ready) => set({ isHydrated: ready }),
+  beginOnboarding: () => {
+    AsyncStorage.setItem(STORAGE_KEYS.onboardingStarted, 'true').catch(() => undefined);
+    set({ onboardingStarted: true });
+  },
+  completeOnboarding: () => {
+    AsyncStorage.setItem(STORAGE_KEYS.onboardingDone, 'true').catch(() => undefined);
+    AsyncStorage.setItem(STORAGE_KEYS.onboardingStarted, 'true').catch(() => undefined);
+    set({ onboardingDone: true, onboardingStarted: true });
+  },
+  setLanguage: (language) => {
+    AsyncStorage.setItem(STORAGE_KEYS.language, language).catch(() => undefined);
+    set({
+      language,
+      temporarySearchLocations: [],
+      temporarySearchAdvisories: [],
+      promotedLocation: null,
+    });
+  },
+  setUser: (user) => {
+    if (user) {
+      AsyncStorage.setItem(
+        STORAGE_KEYS.loggedInUser,
+        JSON.stringify(user),
+      ).catch(() => undefined);
+    } else {
+      AsyncStorage.removeItem(STORAGE_KEYS.loggedInUser).catch(() => undefined);
+    }
+    set({ user });
+  },
+  setLocations: (locations) => set({ locations }),
+  setSelectedLocation: (selectedLocation) => set({ selectedLocation }),
+  setPromotedLocation: (promotedLocation) => set({ promotedLocation }),
+  setCurrentLocationOverride: (currentLocationOverride) =>
+    set({ currentLocationOverride }),
+  setTemporarySearchData: ({ locations, advisories }) =>
+    set({
+      temporarySearchLocations: locations,
+      temporarySearchAdvisories: advisories,
+    }),
+  clearTemporarySearchData: () =>
+    set({ temporarySearchLocations: [], temporarySearchAdvisories: [] }),
+  logout: () =>
+    set({
       user: null,
-      locations: [],
       selectedLocation: null,
       promotedLocation: null,
       currentLocationOverride: null,
+      locations: [],
       temporarySearchLocations: [],
       temporarySearchAdvisories: [],
-      setHydrated: (ready) => set({ isHydrated: ready }),
-      beginOnboarding: () => set({ onboardingStarted: true }),
-      completeOnboarding: () => set({ onboardingDone: true, onboardingStarted: true }),
-      setLanguage: (language) =>
-        set({
-          language,
-          temporarySearchLocations: [],
-          temporarySearchAdvisories: [],
-          promotedLocation: null,
-        }),
-      setUser: (user) => set({ user }),
-      setLocations: (locations) => set({ locations }),
-      setSelectedLocation: (selectedLocation) => set({ selectedLocation }),
-      setPromotedLocation: (promotedLocation) => set({ promotedLocation }),
-      setCurrentLocationOverride: (currentLocationOverride) =>
-        set({ currentLocationOverride }),
-      setTemporarySearchData: ({ locations, advisories }) =>
-        set({
-          temporarySearchLocations: locations,
-          temporarySearchAdvisories: advisories,
-        }),
-      clearTemporarySearchData: () =>
-        set({ temporarySearchLocations: [], temporarySearchAdvisories: [] }),
-      logout: () =>
-        set({
-          user: null,
-          selectedLocation: null,
-          promotedLocation: null,
-          currentLocationOverride: null,
-          locations: [],
-          temporarySearchLocations: [],
-          temporarySearchAdvisories: [],
-        }),
     }),
-    {
-      name: STORAGE_KEYS.auth,
-      version: 5,
-      storage: createJSONStorage(() => AsyncStorage),
-      partialize: (state) => ({
-        onboardingDone: state.onboardingDone,
-        onboardingStarted: state.onboardingStarted,
-        language: state.language,
-        user: state.user,
-      }),
-      migrate: (persistedState: any, version) => {
-        // Force onboarding to show once after migration from older app state.
-        if (version < 2 && persistedState) {
-          return {
-            ...persistedState,
-            onboardingDone: false,
-            onboardingStarted: false,
-            selectedLocation: null,
-          };
-        }
-        if (version < 3 && persistedState) {
-          return { ...persistedState, onboardingStarted: false, selectedLocation: null };
-        }
-        if (version < 4 && persistedState) {
-          return {
-            ...persistedState,
-            onboardingStarted: Boolean(
-              persistedState.onboardingStarted ??
-                (persistedState.onboardingDone ? true : persistedState.language)
-            ),
-            locations: [],
-            selectedLocation: null,
-          };
-        }
-        if (version < 5 && persistedState) {
-          return {
-            ...persistedState,
-            locations: [],
-            selectedLocation: null,
-          };
-        }
-        return persistedState as AppState;
-      },
-      onRehydrateStorage: () => (state) => {
-        state?.setHydrated(true);
-      },
-    }
-  )
-);
+}));

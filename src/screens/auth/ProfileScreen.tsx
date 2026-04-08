@@ -389,22 +389,8 @@ export const ProfileScreen = () => {
       if (mode === "camera") {
         const cameraPermission =
           await ImagePicker.requestCameraPermissionsAsync();
-        const libraryPermission =
-          await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (
-          cameraPermission?.status !== "granted" ||
-          libraryPermission?.status !== "granted"
-        ) {
+        if (cameraPermission?.status !== "granted") {
           Alert.alert("", i18n.t("profile.cameraPhotosDenied"), [
-            { text: i18n.t("common.ok") },
-          ]);
-          return;
-        }
-      } else {
-        const libraryPermission =
-          await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (libraryPermission?.status !== "granted") {
-          Alert.alert("", i18n.t("profile.photosDenied"), [
             { text: i18n.t("common.ok") },
           ]);
           return;

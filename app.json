@@ -31,7 +31,7 @@
     },
     "android": {
       "package": "com.aas.meghdoot",
-      "versionCode": 6,
+      "versionCode": 7,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/AppIconAdaptiveForeground.png",
         "backgroundColor": "#749C53"
@@ -40,9 +40,13 @@
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.CAMERA",
-        "android.permission.READ_MEDIA_IMAGES",
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.RECORD_AUDIO"
+      ],
+      "blockedPermissions": [
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
       ],
       "googleServicesFile": "./google-services.json"
     },

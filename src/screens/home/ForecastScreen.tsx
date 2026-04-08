@@ -22,6 +22,7 @@ import { useAppStore } from '../../store/appStore';
 import {
   getLanguageLabel,
   getUserProfileId,
+  mergeUserProfileLocation,
   parseUserLocationsList,
   toText as normalizeText,
 } from '../../utils/locationApi';
@@ -249,6 +250,7 @@ export const ForecastScreen = () => {
   const { t } = useTranslation();
   const user = useAppStore((s) => s.user);
   const language = useAppStore((s) => s.language);
+  const appLocations = useAppStore((s) => s.locations);
   const selectedLocationRef = useAppStore((s) => s.selectedLocation);
   const currentLocationOverride = useAppStore((s) => s.currentLocationOverride);
   const userId = getUserProfileId(user);
@@ -363,13 +365,18 @@ export const ForecastScreen = () => {
               ?.objWeatherForecastNextList ||
             []) as DashboardLocation[];
         list = dedupeForecastLocations(rawList as any[]) as DashboardLocation[];
+      } else if (appLocations?.length) {
+        list = dedupeForecastLocations(appLocations as any[]) as DashboardLocation[];
       } else {
         const response = await userService.getUserLocations({
           UserProfileID: userId,
           LanguageType: languageLabel,
           RefreshDateTime: API_REFRESH_DATES.current(),
         });
-        const rawList = parseUserLocationsList(response) as DashboardLocation[];
+        const rawList = mergeUserProfileLocation(
+          parseUserLocationsList(response) as DashboardLocation[],
+          user,
+        );
         list = dedupeForecastLocations(rawList as any[]) as DashboardLocation[];
         useAppStore.getState().setLocations(list);
       }
@@ -446,7 +453,7 @@ export const ForecastScreen = () => {
         return;
       }
       loadLocations();
-    }, [currentLocationOverride, languageLabel, selectedLocationRef, t, userId]);
+    }, [appLocations, currentLocationOverride, languageLabel, selectedLocationRef, t, userId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -469,7 +476,7 @@ export const ForecastScreen = () => {
   };
 
   return (
-    <Screen>
+    <Screen edges={['left', 'right']}>
       <View style={styles.container}>
         <Pressable style={styles.locationBar} onPress={() => setPickerOpen(true)}>
           <Text style={styles.locationText} numberOfLines={1}>{locationLabel}</Text>

@@ -18,7 +18,8 @@ export const SplashScreen = ({ navigation }: Props) => {
       const startedAt = Date.now();
       let storedUser: any = null;
       let directOnboardingDone = false;
-      const persistApi = (useAppStore as any).persist;
+      let storedLanguage = 'en';
+      let onboardingStarted = false;
 
       try {
         const directUser = await AsyncStorage.getItem(
@@ -37,22 +38,30 @@ export const SplashScreen = ({ navigation }: Props) => {
       }
 
       try {
-        await persistApi?.rehydrate?.();
+        storedLanguage =
+          (await AsyncStorage.getItem(STORAGE_KEYS.language)) || 'en';
       } catch {
-        // ignore; startup will use whatever store state is available
+        storedLanguage = 'en';
+      }
+
+      try {
+        onboardingStarted =
+          (await AsyncStorage.getItem(STORAGE_KEYS.onboardingStarted)) === 'true';
+      } catch {
+        onboardingStarted = false;
       }
 
       if (!mounted) {
         return;
       }
 
-      const state = useAppStore.getState();
-      if (storedUser && !state.user) {
-        useAppStore.setState({
-          isHydrated: true,
-          user: storedUser,
-        });
-      }
+      useAppStore.setState({
+        isHydrated: true,
+        user: storedUser,
+        language: storedLanguage,
+        onboardingDone: directOnboardingDone,
+        onboardingStarted,
+      });
 
       const remainingDelay = Math.max(0, 4000 - (Date.now() - startedAt));
       if (remainingDelay > 0) {
@@ -63,6 +72,7 @@ export const SplashScreen = ({ navigation }: Props) => {
         return;
       }
 
+      const state = useAppStore.getState();
       const nextRoute =
         storedUser || state.user
           ? "Main"

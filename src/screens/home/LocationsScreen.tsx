@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -18,7 +18,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Screen } from '../../components/Screen';
 import { colors } from '../../theme/colors';
-import { mastersService, userService } from '../../api/services';
+import { mastersService, userService, weatherService } from '../../api/services';
 import { useAppStore } from '../../store/appStore';
 import { API_REFRESH_DATES } from '../../utils/apiDates';
 import { DistrictMasterItem, StateMasterItem } from '../../types/domain';
@@ -26,6 +26,8 @@ import {
   getLanguageLabel,
   getUserProfileId,
   isApiSuccess,
+  mergeUserProfileLocation,
+  parseLocationWeatherList,
   parseUserLocationsList,
   toNum,
   toText,
@@ -140,6 +142,42 @@ const isAlreadyExistsMessage = (value: unknown) =>
 const getSubLocationLabel = (stateID: number, t: (key: string) => string) =>
   usesAsdMasters(stateID) ? t('home.asd') : t('home.block');
 
+const pickLocationWeatherRow = (savedLocation: any, weatherRows: any[]) => {
+  const stateID = toNum(savedLocation?.stateID ?? savedLocation?.StateID, 0);
+  const districtID = toNum(savedLocation?.districtID ?? savedLocation?.DistrictID, 0);
+  const blockID = toNum(savedLocation?.blockID ?? savedLocation?.BlockID, 0);
+  const asdID = toNum(savedLocation?.asdID ?? savedLocation?.AsdID, 0);
+
+  const exactRow = weatherRows.find((row: any) => {
+    const rowStateID = toNum(row?.stateID ?? row?.StateID, 0);
+    const rowDistrictID = toNum(row?.districtID ?? row?.DistrictID, 0);
+    const rowBlockID = toNum(row?.blockID ?? row?.BlockID, 0);
+    const rowAsdID = toNum(row?.asdID ?? row?.AsdID, 0);
+
+    if (rowStateID !== stateID || rowDistrictID !== districtID) return false;
+    if (asdID > 0) return rowAsdID === asdID;
+    return rowBlockID === blockID;
+  });
+
+  if (exactRow) return exactRow;
+
+  return (
+    weatherRows.find((row: any) => {
+      const rowStateID = toNum(row?.stateID ?? row?.StateID, 0);
+      const rowDistrictID = toNum(row?.districtID ?? row?.DistrictID, 0);
+      const rowBlockID = toNum(row?.blockID ?? row?.BlockID, 0);
+      const rowAsdID = toNum(row?.asdID ?? row?.AsdID, 0);
+
+      return (
+        rowStateID === stateID &&
+        rowDistrictID === districtID &&
+        rowBlockID === 0 &&
+        rowAsdID === 0
+      );
+    }) || null
+  );
+};
+
 export const LocationsScreen = () => {
   useAndroidNavigationBar(colors.darkGreen, 'light');
   const { t } = useTranslation();
@@ -169,6 +207,7 @@ export const LocationsScreen = () => {
 
   const userId = useMemo(() => getUserProfileId(user), [user]);
   const languageLabel = useMemo(() => getLanguageLabel(language), [language]);
+  const lastLanguageRef = useRef(languageLabel);
   const canSubmitAddLocation = Boolean(
     selectedState && selectedDistrict,
   );
@@ -216,6 +255,45 @@ export const LocationsScreen = () => {
     return shapeLocationRows(mapped.filter((x) => x.districtID > 0));
   }, [t]);
 
+  const enrichLocationsWithWeather = React.useCallback(
+    async (baseList: any[]) => {
+      if (!userId) return mapRawLocations(baseList as any[]);
+
+      try {
+        const weatherResponse = await weatherService.getByLocation({
+          Id: userId,
+          LanguageType: languageLabel,
+          RefreshDateTime: API_REFRESH_DATES.current(),
+        });
+        const weatherRows = parseLocationWeatherList(weatherResponse) as any[];
+        if (!weatherRows.length) return mapRawLocations(baseList as any[]);
+
+        const mergedList = (baseList || []).map((item: any) => {
+          const weatherRow = pickLocationWeatherRow(item, weatherRows);
+          if (!weatherRow) return item;
+
+          return {
+            ...weatherRow,
+            ...item,
+            stateID: toNum(item?.stateID ?? item?.StateID, toNum(weatherRow?.stateID ?? weatherRow?.StateID, 0)),
+            districtID: toNum(item?.districtID ?? item?.DistrictID, toNum(weatherRow?.districtID ?? weatherRow?.DistrictID, 0)),
+            blockID: toNum(item?.blockID ?? item?.BlockID, toNum(weatherRow?.blockID ?? weatherRow?.BlockID, 0)),
+            asdID: toNum(item?.asdID ?? item?.AsdID, toNum(weatherRow?.asdID ?? weatherRow?.AsdID, 0)),
+            stateName: toText(item?.stateName ?? item?.StateName, weatherRow?.stateName ?? weatherRow?.StateName),
+            districtName: toText(item?.districtName ?? item?.DistrictName, weatherRow?.districtName ?? weatherRow?.DistrictName),
+            blockName: toText(item?.blockName ?? item?.BlockName, weatherRow?.blockName ?? weatherRow?.BlockName),
+            asdName: toText(item?.asdName ?? item?.AsdName, weatherRow?.asdName ?? weatherRow?.AsdName),
+          };
+        });
+
+        return mapRawLocations(mergedList as any[]);
+      } catch {
+        return mapRawLocations(baseList as any[]);
+      }
+    },
+    [languageLabel, mapRawLocations, userId],
+  );
+
   const normalizedLocations = useMemo(() => {
     const map = new Map<string, LocationRow>();
     for (const raw of locations) {
@@ -235,10 +313,15 @@ export const LocationsScreen = () => {
     [normalizedLocations]
   );
 
-  const loadLocations = async () => {
+  const loadLocations = async (forceRemote = false) => {
     if (!userId) {
       setLocations([]);
       return [] as LocationRow[];
+    }
+    if (!forceRemote && appLocations?.length) {
+      const filtered = await enrichLocationsWithWeather(appLocations as any[]);
+      setLocations(filtered);
+      return filtered;
     }
     setLoading(true);
     try {
@@ -247,9 +330,12 @@ export const LocationsScreen = () => {
         LanguageType: languageLabel,
         RefreshDateTime: API_REFRESH_DATES.current(),
       });
-      const list = parseUserLocationsList(response);
+      const list = mergeUserProfileLocation(
+        parseUserLocationsList(response) as any[],
+        user,
+      );
       setAppLocations(list as any[]);
-      const filtered = mapRawLocations(list as any[]);
+      const filtered = await enrichLocationsWithWeather(list as any[]);
       setLocations(filtered);
       return filtered;
     } catch {
@@ -261,9 +347,11 @@ export const LocationsScreen = () => {
 
   useEffect(() => {
     if (appLocations?.length) {
-      setLocations(mapRawLocations(appLocations as any[]));
+      enrichLocationsWithWeather(appLocations as any[])
+        .then(setLocations)
+        .catch(() => setLocations(mapRawLocations(appLocations as any[])));
     }
-  }, [appLocations, mapRawLocations]);
+  }, [appLocations, enrichLocationsWithWeather, mapRawLocations]);
 
   const loadStates = async () => {
     const res = await mastersService.getStates(
@@ -466,7 +554,7 @@ export const LocationsScreen = () => {
         {
           text: t('common.ok'),
           onPress: async () => {
-            let refreshed = await loadLocations();
+            let refreshed = await loadLocations(true);
             let existsAfterRefresh = refreshed.some(
               (x) =>
                 x.stateID === optimistic.stateID &&
@@ -476,7 +564,7 @@ export const LocationsScreen = () => {
             );
             if (!existsAfterRefresh) {
               await new Promise((resolve) => setTimeout(resolve, 700));
-              refreshed = await loadLocations();
+              refreshed = await loadLocations(true);
               existsAfterRefresh = refreshed.some(
                 (x) =>
                   x.stateID === optimistic.stateID &&
@@ -545,32 +633,40 @@ export const LocationsScreen = () => {
       payload.BlockID = resolvedBlockID;
     }
 
-    try {
-      setLocations((prev) =>
-        prev.filter(
-          (x) =>
-            !(
-              (x.tempDistrictID || x.districtID) === resolvedDistrictID &&
-              (x.tempBlockID || x.blockID) === resolvedBlockID &&
-              (x.tempAsdID || x.asdID) === resolvedAsdID &&
-              !x.isCurrentLocation
-            )
-        )
-      );
-      const response: any = await userService.deleteLocation(payload);
-      if (!isApiSuccess(response)) {
-        Alert.alert('', response?.errorMessage || response?.ErrorMessage || t('home.unableDeleteLocation'), [
-          { text: t('common.ok') },
-        ]);
-        await loadLocations();
-        return;
-      }
-      await loadLocations();
-    } catch (e: any) {
-      Alert.alert('', e.message || t('home.unableDeleteLocation'), [
-        { text: t('common.ok') },
-      ]);
-    }
+    Alert.alert('', `${t('home.delete')} ${item.cityName || t('home.location')}?`, [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('common.ok'),
+        onPress: async () => {
+          try {
+            setLocations((prev) =>
+              prev.filter(
+                (x) =>
+                  !(
+                    (x.tempDistrictID || x.districtID) === resolvedDistrictID &&
+                    (x.tempBlockID || x.blockID) === resolvedBlockID &&
+                    (x.tempAsdID || x.asdID) === resolvedAsdID &&
+                    !x.isCurrentLocation
+                  )
+              )
+            );
+            const response: any = await userService.deleteLocation(payload);
+            if (!isApiSuccess(response)) {
+              Alert.alert('', response?.errorMessage || response?.ErrorMessage || t('home.unableDeleteLocation'), [
+                { text: t('common.ok') },
+              ]);
+              await loadLocations();
+              return;
+            }
+            await loadLocations(true);
+          } catch (e: any) {
+            Alert.alert('', e.message || t('home.unableDeleteLocation'), [
+              { text: t('common.ok') },
+            ]);
+          }
+        },
+      },
+    ]);
   };
 
   useEffect(() => {
@@ -579,10 +675,23 @@ export const LocationsScreen = () => {
     }
   }, [userId, languageLabel]);
 
+  useEffect(() => {
+    if (lastLanguageRef.current !== languageLabel) {
+      lastLanguageRef.current = languageLabel;
+      loadLocations(true).catch(() => setLocations([]));
+    }
+  }, [languageLabel]);
+
   useFocusEffect(
     React.useCallback(() => {
+      if (appLocations?.length) {
+        enrichLocationsWithWeather(appLocations as any[])
+          .then(setLocations)
+          .catch(() => setLocations(mapRawLocations(appLocations as any[])));
+        return;
+      }
       loadLocations().catch(() => setLocations([]));
-    }, [userId, languageLabel])
+    }, [appLocations, enrichLocationsWithWeather, mapRawLocations, userId, languageLabel])
   );
 
   const renderCardBody = (item: LocationRow) => {
@@ -650,10 +759,10 @@ export const LocationsScreen = () => {
     navigation.navigate('Home');
   };
 
-  const listBottomPadding = insets.bottom + 24;
+  const listBottomPadding = 24;
 
   return (
-    <Screen>
+    <Screen edges={['left', 'right']}>
       <View style={styles.root}>
         {loading ? (
           <View style={styles.loaderWrap}>

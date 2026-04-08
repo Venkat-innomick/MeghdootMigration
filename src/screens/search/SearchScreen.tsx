@@ -29,6 +29,7 @@ import {
   getLanguageLabel,
   getUserProfileId,
   isApiSuccess,
+  mergeUserProfileLocation,
   parseLocationWeatherList,
   parseUserLocationsList,
   sameLocation,
@@ -442,9 +443,10 @@ export const SearchScreen = () => {
                 LanguageType: languageLabel,
                 RefreshDateTime: API_REFRESH_DATES.current(),
               });
-            const refreshedLocations = parseUserLocationsList(
-              refreshedUserLocationsResponse,
-            ) as any[];
+            const refreshedLocations = mergeUserProfileLocation(
+              parseUserLocationsList(refreshedUserLocationsResponse) as any[],
+              user,
+            );
             const savedExists = refreshedLocations.some((loc) =>
               sameLocation(loc, {
                 districtID: item.districtID,
@@ -557,7 +559,12 @@ export const SearchScreen = () => {
         LanguageType: languageLabel,
         RefreshDateTime: API_REFRESH_DATES.current(),
       });
-      setAppLocations(parseUserLocationsList(refreshedUserLocationsResponse) as any[]);
+      setAppLocations(
+        mergeUserProfileLocation(
+          parseUserLocationsList(refreshedUserLocationsResponse) as any[],
+          user,
+        ) as any[],
+      );
     } catch (e: any) {
       setTimeout(() => {
         Alert.alert("", e.message || t("home.unableDeleteLocation"), [

@@ -32,6 +32,7 @@ import {
   buildByLocationPayload,
   getLanguageLabel,
   getUserProfileId,
+  mergeUserProfileLocation,
   parseLocationWeatherList,
   parseUserLocationsList,
 } from "../../utils/locationApi";
@@ -547,6 +548,7 @@ export const DashboardScreen = () => {
   const [activeTab, setActiveTab] = useState<"block" | "district">("block");
   const carouselRef = useRef<RNFlatList<any> | null>(null);
   const userDraggingCarouselRef = useRef(false);
+  const lastLanguageRef = useRef(languageLabel);
 
   const openCropAdvisory = (params: Record<string, unknown>) => {
     const parent = navigation.getParent?.();
@@ -575,7 +577,10 @@ export const DashboardScreen = () => {
         }),
       ]);
       const locationList = parseLocationWeatherList(weather) as DashboardLocation[];
-      const savedLocations = parseUserLocationsList(userLocationsResponse);
+      const savedLocations = mergeUserProfileLocation(
+        parseUserLocationsList(userLocationsResponse) as DashboardLocation[],
+        useAppStore.getState().user,
+      );
       const cropPayload = await buildHomeCropPayload(
         userId,
         languageLabel,
@@ -687,6 +692,7 @@ export const DashboardScreen = () => {
     temporarySearchAdvisories,
     temporarySearchLocations,
     t,
+    user,
     userId,
   ]);
 
@@ -695,6 +701,13 @@ export const DashboardScreen = () => {
       loadData();
     }, [loadData]),
   );
+
+  useEffect(() => {
+    if (lastLanguageRef.current !== languageLabel) {
+      lastLanguageRef.current = languageLabel;
+      loadData();
+    }
+  }, [languageLabel, loadData]);
 
   const carouselLocations = useMemo(() => {
     if (activeTab === "block") {
@@ -944,7 +957,7 @@ export const DashboardScreen = () => {
 
   if (loading) {
     return (
-      <Screen>
+      <Screen edges={["left", "right"]}>
         <View style={styles.loader}>
           <ActivityIndicator color={colors.primary} />
         </View>
@@ -953,7 +966,7 @@ export const DashboardScreen = () => {
   }
 
   return (
-    <Screen>
+    <Screen edges={["left", "right"]}>
       <FlatList
         contentContainerStyle={styles.container}
         refreshControl={
