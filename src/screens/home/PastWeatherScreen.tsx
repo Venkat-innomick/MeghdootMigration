@@ -283,6 +283,35 @@ const dedupePastWeatherLocations = (items: any[]) => {
   });
 };
 
+const findPastWeatherLocationIndex = (
+  list: any[],
+  selectedLocationRef:
+    | {
+        districtID: number;
+        blockID: number;
+        asdID: number;
+      }
+    | null
+    | undefined,
+) => {
+  if (!selectedLocationRef) return -1;
+
+  const exactIndex = list.findIndex((loc: any) => {
+    const ids = getLocationIds(loc);
+    return (
+      ids.districtID === selectedLocationRef.districtID &&
+      ids.blockID === selectedLocationRef.blockID &&
+      ids.asdID === selectedLocationRef.asdID
+    );
+  });
+  if (exactIndex >= 0) return exactIndex;
+
+  return list.findIndex((loc: any) => {
+    const ids = getLocationIds(loc);
+    return ids.districtID === selectedLocationRef.districtID;
+  });
+};
+
 export const PastWeatherScreen = () => {
   useAndroidNavigationBar(colors.darkGreen, 'light');
   const { t } = useTranslation();
@@ -378,19 +407,10 @@ export const PastWeatherScreen = () => {
         const currentIndex = currentLocationOverride
           ? list.findIndex((loc: any) => Boolean(loc?.isCurrentLocation || loc?.IsCurrentLocation))
           : -1;
-        const selectedIndex = currentIndex >= 0
-          ? currentIndex
-          : selectedLocationRef
-            ? list.findIndex((loc: any) => {
-                const districtID = pickNum(
-                  loc?.districtID,
-                  loc?.DistrictID,
-                  loc?.tempDistrictID,
-                  loc?.TempDistrictID,
-                );
-                return districtID === selectedLocationRef.districtID;
-              })
-            : -1;
+        const selectedIndex =
+          currentIndex >= 0
+            ? currentIndex
+            : findPastWeatherLocationIndex(list as any[], selectedLocationRef);
         const indexToUse = selectedIndex >= 0 ? selectedIndex : 0;
         const target = list[indexToUse] as any;
         setSelectedLocationIndex(indexToUse);
@@ -444,17 +464,10 @@ export const PastWeatherScreen = () => {
         const list = dedupePastWeatherLocations(cachedLocations as any[]) as DashboardLocation[];
         setLocations(list);
         if (list.length) {
-          const selectedIndex = selectedLocationRef
-            ? list.findIndex((loc: any) => {
-                const districtID = pickNum(
-                  loc?.districtID,
-                  loc?.DistrictID,
-                  loc?.tempDistrictID,
-                  loc?.TempDistrictID,
-                );
-                return districtID === selectedLocationRef.districtID;
-              })
-            : -1;
+          const selectedIndex = findPastWeatherLocationIndex(
+            list as any[],
+            selectedLocationRef,
+          );
           const indexToUse = selectedIndex >= 0 ? selectedIndex : 0;
           const target = list[indexToUse] as any;
           setSelectedLocationIndex(indexToUse);

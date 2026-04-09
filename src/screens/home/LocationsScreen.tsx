@@ -112,29 +112,7 @@ const pickXamarinCloudImageName = (item: any) => {
   return cloudKeyByCover(toNum(item.cloudCover ?? item.CloudCover, -1));
 };
 
-const isDistrictOnlyRow = (item: LocationRow) =>
-  item.blockID === 0 &&
-  item.asdID === 0 &&
-  !toText(item.blockName) &&
-  !toText(item.asdName);
-
-const shapeLocationRows = (rows: LocationRow[]) => {
-  const districtRows = rows.filter(isDistrictOnlyRow);
-  const blockRows = rows.filter((item) => !isDistrictOnlyRow(item));
-
-  if (!blockRows.length) return districtRows;
-
-  const standaloneDistricts = districtRows.filter(
-    (district) =>
-      !blockRows.some(
-        (item) =>
-          item.stateID === district.stateID &&
-          item.districtID === district.districtID,
-      ),
-  );
-
-  return [...blockRows, ...standaloneDistricts];
-};
+const shapeLocationRows = (rows: LocationRow[]) => rows;
 
 const usesAsdMasters = (stateID: number) => stateID === 28 || stateID === 36;
 const isAlreadyExistsMessage = (value: unknown) =>

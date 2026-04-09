@@ -158,7 +158,8 @@ export const SearchScreen = () => {
       return blockID === item.blockID;
     });
 
-    return [...exactRows, ...districtRows];
+    if (exactRows.length) return exactRows;
+    return districtRows;
   };
 
   const ensureSelectedWeatherCard = (item: SearchBlockItem, rows: any[]) => {
