@@ -331,13 +331,7 @@ const MenuContent = (props: any) => {
       {
         text: t('common.ok'),
         onPress: async () => {
-          const userProfileId = Number(
-            user?.userProfileId ??
-              user?.UserProfileID ??
-              user?.typeOfRole ??
-              user?.TypeOfRole ??
-              0
-          );
+          const userProfileId = getUserProfileId(user);
           await unregisterPushTokenForUser(userProfileId);
           await AsyncStorage.removeItem(STORAGE_KEYS.loggedInUser);
           logout();

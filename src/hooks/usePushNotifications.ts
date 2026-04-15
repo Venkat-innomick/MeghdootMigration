@@ -7,17 +7,9 @@ import { notificationService } from '../api/services';
 import { registerForPushNotifications } from '../utils/notification';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { navigateFromPush, rootNavigationRef } from '../navigation/navigationRef';
+import { getUserProfileId } from '../utils/locationApi';
 
 const PUSH_TOKEN_KEY = 'agromet_push_token';
-
-const getUserProfileId = (user: any) =>
-  Number(
-    user?.userProfileId ??
-      user?.UserProfileID ??
-      user?.typeOfRole ??
-      user?.TypeOfRole ??
-      0,
-  );
 
 export const unregisterPushTokenForUser = async (userProfileId: number) => {
   if (!userProfileId) return;
@@ -43,6 +35,7 @@ export const usePushNotifications = () => {
   const inFlightRef = useRef(false);
   const registeredRef = useRef(false);
   const foregroundAlertShownRef = useRef(false);
+  const handledInitialResponseRef = useRef(false);
 
   useEffect(() => {
     if (!userProfileId) {
@@ -87,16 +80,47 @@ export const usePushNotifications = () => {
       }, 80);
     };
 
+    const getNotificationText = (
+      notification:
+        | Notifications.Notification
+        | Notifications.NotificationResponse['notification']
+        | null
+        | undefined,
+    ) => {
+      const content = notification?.request?.content;
+      const data = (content?.data || {}) as Record<string, any>;
+      const title =
+        (typeof data.title === 'string' && data.title.trim()) ||
+        (typeof content?.title === 'string' && content.title.trim()) ||
+        'Notification';
+      const message =
+        (typeof data.body === 'string' && data.body.trim()) ||
+        (typeof content?.body === 'string' && content.body.trim()) ||
+        '';
+      return { title, message };
+    };
+
+    const handleNotificationOpen = () => {
+      openNowcast();
+    };
+
+    const handleInitialNotificationResponse = async () => {
+      if (handledInitialResponseRef.current) return;
+      const response = await Notifications.getLastNotificationResponseAsync();
+      if (!response) return;
+      handledInitialResponseRef.current = true;
+      handleNotificationOpen();
+    };
+
     const receivedSub = Notifications.addNotificationReceivedListener((event) => {
       if (foregroundAlertShownRef.current) return;
       foregroundAlertShownRef.current = true;
-      const title = event.request.content.title || 'Notification';
-      const message = event.request.content.body || '';
+      const { title, message } = getNotificationText(event);
       Alert.alert(title, message, [
         {
           text: 'Open',
           onPress: () => {
-            openNowcast();
+            handleNotificationOpen();
             foregroundAlertShownRef.current = false;
           },
         },
@@ -111,8 +135,11 @@ export const usePushNotifications = () => {
     });
 
     const responseSub = Notifications.addNotificationResponseReceivedListener(() => {
-      openNowcast();
+      handledInitialResponseRef.current = true;
+      handleNotificationOpen();
     });
+
+    handleInitialNotificationResponse().catch(() => undefined);
 
     return () => {
       receivedSub.remove();

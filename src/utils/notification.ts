@@ -1,6 +1,15 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
+
 export const registerForPushNotifications = async () => {
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('default', {
