@@ -3,7 +3,7 @@
     "name": "MEGHDOOT",
     "slug": "meghdoot-app",
     "owner": "india-meteorological-department",
-    "version": "1.0.0",
+    "version": "3.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/AppIcon.png",
     "scheme": "meghdoot-app",
@@ -26,8 +26,11 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.imd.meghdoot",
-      "buildNumber": "1",
-      "googleServicesFile": "./GoogleService-Info.plist"
+      "buildNumber": "3.0.1",
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.aas.meghdoot",

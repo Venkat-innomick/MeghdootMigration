@@ -1,12 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  ActionSheetIOS,
   Alert,
   FlatList,
   Image,
   ImageBackground,
   ImageSourcePropType,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -187,9 +189,31 @@ export const LocationsScreen = () => {
   const userId = useMemo(() => getUserProfileId(user), [user]);
   const languageLabel = useMemo(() => getLanguageLabel(language), [language]);
   const lastLanguageRef = useRef(languageLabel);
+  const isIOS = Platform.OS === 'ios';
   const canSubmitAddLocation = Boolean(
     selectedState && selectedDistrict,
   );
+
+  const openIosPicker = (
+    title: string,
+    labels: string[],
+    onSelect: (index: number) => void,
+  ) => {
+    const options = [...labels, t('common.cancel')];
+    const cancelButtonIndex = options.length - 1;
+    ActionSheetIOS.showActionSheetWithOptions(
+      {
+        title,
+        options,
+        cancelButtonIndex,
+        userInterfaceStyle: 'light',
+      },
+      (buttonIndex) => {
+        if (buttonIndex === cancelButtonIndex || buttonIndex < 0) return;
+        onSelect(buttonIndex);
+      },
+    );
+  };
 
   const mapRawLocations = React.useCallback((list: any[]): LocationRow[] => {
     const mapped: LocationRow[] = (list || []).map((item: any) => {
@@ -456,6 +480,58 @@ export const LocationsScreen = () => {
     } finally {
       setAddLoading(false);
     }
+  };
+
+  const openStatePicker = () => {
+    if (isIOS) {
+      openIosPicker(
+        t('register.selectStateMandatory'),
+        states.map((item) => item.stateName),
+        (index) => {
+          const item = states[index];
+          if (!item) return;
+          onStateSelect(item).catch(() => undefined);
+        },
+      );
+      return;
+    }
+    setStatePickerOpen(true);
+  };
+
+  const openDistrictPicker = () => {
+    if (!selectedState) return;
+    if (isIOS) {
+      openIosPicker(
+        t('register.selectDistrictMandatory'),
+        districts.map((item) => item.districtName),
+        (index) => {
+          const item = districts[index];
+          if (!item) return;
+          onDistrictSelect(item).catch(() => undefined);
+        },
+      );
+      return;
+    }
+    setDistrictPickerOpen(true);
+  };
+
+  const openBlockPicker = () => {
+    if (!selectedDistrict) return;
+    if (isIOS) {
+      openIosPicker(
+        t('home.selectLabel', {
+          label: getSubLocationLabel(selectedState?.stateID || 0, t),
+        }),
+        blocks.map((item) => item.label),
+        (index) => {
+          const item = blocks[index];
+          if (!item) return;
+          setSelectedBlock(item);
+        },
+      );
+      return;
+    }
+    setBlockPickerOpen(true);
   };
 
   const saveAddedLocation = async () => {
@@ -789,14 +865,14 @@ export const LocationsScreen = () => {
           <View style={[styles.modalSheet, { paddingBottom: bottomSafeInset + 24 }]}>
             <Text style={styles.modalTitle}>{t('home.addLocation')}</Text>
 
-            <Pressable style={styles.selector} onPress={() => setStatePickerOpen(true)}>
+            <Pressable style={styles.selector} onPress={openStatePicker}>
               <Text style={[styles.selectorText, !selectedState && styles.selectorPlaceholder]}>
                 {selectedState?.stateName || t('register.selectStateMandatory')}
               </Text>
               <Image source={require('../../../assets/images/dropdown.png')} style={styles.dropdownIcon} resizeMode="contain" />
             </Pressable>
 
-            <Pressable style={[styles.selector, { marginTop: 10 }]} onPress={() => selectedState && setDistrictPickerOpen(true)}>
+            <Pressable style={[styles.selector, { marginTop: 10 }]} onPress={openDistrictPicker}>
               <Text style={[styles.selectorText, !selectedDistrict && styles.selectorPlaceholder]}>
                 {selectedDistrict?.districtName || t('register.selectDistrictMandatory')}
               </Text>
@@ -805,7 +881,7 @@ export const LocationsScreen = () => {
 
             <Pressable
               style={[styles.selector, { marginTop: 10 }]}
-              onPress={() => selectedDistrict && setBlockPickerOpen(true)}
+              onPress={openBlockPicker}
             >
               <Text style={[styles.selectorText, !selectedBlock && styles.selectorPlaceholder]}>
                 {selectedBlock?.label ||
