@@ -1,12 +1,14 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  ActionSheetIOS,
   Alert,
   FlatList,
   Image,
   ImageBackground,
   ImageSourcePropType,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -23,11 +25,12 @@ import { useAppStore } from '../../store/appStore';
 import { API_REFRESH_DATES } from '../../utils/apiDates';
 import { DistrictMasterItem, StateMasterItem } from '../../types/domain';
 import {
-  buildByLocationPayload,
   getLanguageLabel,
   getUserProfileId,
   isApiSuccess,
+  mergeUserProfileLocation,
   parseLocationWeatherList,
+  parseUserLocationsList,
   toNum,
   toText,
 } from '../../utils/locationApi';
@@ -111,29 +114,7 @@ const pickXamarinCloudImageName = (item: any) => {
   return cloudKeyByCover(toNum(item.cloudCover ?? item.CloudCover, -1));
 };
 
-const isDistrictOnlyRow = (item: LocationRow) =>
-  item.blockID === 0 &&
-  item.asdID === 0 &&
-  !toText(item.blockName) &&
-  !toText(item.asdName);
-
-const shapeLocationRows = (rows: LocationRow[]) => {
-  const districtRows = rows.filter(isDistrictOnlyRow);
-  const blockRows = rows.filter((item) => !isDistrictOnlyRow(item));
-
-  if (!blockRows.length) return districtRows;
-
-  const standaloneDistricts = districtRows.filter(
-    (district) =>
-      !blockRows.some(
-        (item) =>
-          item.stateID === district.stateID &&
-          item.districtID === district.districtID,
-      ),
-  );
-
-  return [...blockRows, ...standaloneDistricts];
-};
+const shapeLocationRows = (rows: LocationRow[]) => rows;
 
 const usesAsdMasters = (stateID: number) => stateID === 28 || stateID === 36;
 const isAlreadyExistsMessage = (value: unknown) =>
@@ -141,10 +122,47 @@ const isAlreadyExistsMessage = (value: unknown) =>
 const getSubLocationLabel = (stateID: number, t: (key: string) => string) =>
   usesAsdMasters(stateID) ? t('home.asd') : t('home.block');
 
+const pickLocationWeatherRow = (savedLocation: any, weatherRows: any[]) => {
+  const stateID = toNum(savedLocation?.stateID ?? savedLocation?.StateID, 0);
+  const districtID = toNum(savedLocation?.districtID ?? savedLocation?.DistrictID, 0);
+  const blockID = toNum(savedLocation?.blockID ?? savedLocation?.BlockID, 0);
+  const asdID = toNum(savedLocation?.asdID ?? savedLocation?.AsdID, 0);
+
+  const exactRow = weatherRows.find((row: any) => {
+    const rowStateID = toNum(row?.stateID ?? row?.StateID, 0);
+    const rowDistrictID = toNum(row?.districtID ?? row?.DistrictID, 0);
+    const rowBlockID = toNum(row?.blockID ?? row?.BlockID, 0);
+    const rowAsdID = toNum(row?.asdID ?? row?.AsdID, 0);
+
+    if (rowStateID !== stateID || rowDistrictID !== districtID) return false;
+    if (asdID > 0) return rowAsdID === asdID;
+    return rowBlockID === blockID;
+  });
+
+  if (exactRow) return exactRow;
+
+  return (
+    weatherRows.find((row: any) => {
+      const rowStateID = toNum(row?.stateID ?? row?.StateID, 0);
+      const rowDistrictID = toNum(row?.districtID ?? row?.DistrictID, 0);
+      const rowBlockID = toNum(row?.blockID ?? row?.BlockID, 0);
+      const rowAsdID = toNum(row?.asdID ?? row?.AsdID, 0);
+
+      return (
+        rowStateID === stateID &&
+        rowDistrictID === districtID &&
+        rowBlockID === 0 &&
+        rowAsdID === 0
+      );
+    }) || null
+  );
+};
+
 export const LocationsScreen = () => {
   useAndroidNavigationBar(colors.darkGreen, 'light');
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
+  const bottomSafeInset = insets.bottom > 0 ? insets.bottom : 24;
   const navigation = useNavigation<any>();
   const user: any = useAppStore((s) => s.user);
   const language = useAppStore((s) => s.language);
@@ -170,9 +188,32 @@ export const LocationsScreen = () => {
 
   const userId = useMemo(() => getUserProfileId(user), [user]);
   const languageLabel = useMemo(() => getLanguageLabel(language), [language]);
+  const lastLanguageRef = useRef(languageLabel);
+  const isIOS = Platform.OS === 'ios';
   const canSubmitAddLocation = Boolean(
     selectedState && selectedDistrict,
   );
+
+  const openIosPicker = (
+    title: string,
+    labels: string[],
+    onSelect: (index: number) => void,
+  ) => {
+    const options = [...labels, t('common.cancel')];
+    const cancelButtonIndex = options.length - 1;
+    ActionSheetIOS.showActionSheetWithOptions(
+      {
+        title,
+        options,
+        cancelButtonIndex,
+        userInterfaceStyle: 'light',
+      },
+      (buttonIndex) => {
+        if (buttonIndex === cancelButtonIndex || buttonIndex < 0) return;
+        onSelect(buttonIndex);
+      },
+    );
+  };
 
   const mapRawLocations = React.useCallback((list: any[]): LocationRow[] => {
     const mapped: LocationRow[] = (list || []).map((item: any) => {
@@ -217,6 +258,45 @@ export const LocationsScreen = () => {
     return shapeLocationRows(mapped.filter((x) => x.districtID > 0));
   }, [t]);
 
+  const enrichLocationsWithWeather = React.useCallback(
+    async (baseList: any[]) => {
+      if (!userId) return mapRawLocations(baseList as any[]);
+
+      try {
+        const weatherResponse = await weatherService.getByLocation({
+          Id: userId,
+          LanguageType: languageLabel,
+          RefreshDateTime: API_REFRESH_DATES.current(),
+        });
+        const weatherRows = parseLocationWeatherList(weatherResponse) as any[];
+        if (!weatherRows.length) return mapRawLocations(baseList as any[]);
+
+        const mergedList = (baseList || []).map((item: any) => {
+          const weatherRow = pickLocationWeatherRow(item, weatherRows);
+          if (!weatherRow) return item;
+
+          return {
+            ...weatherRow,
+            ...item,
+            stateID: toNum(item?.stateID ?? item?.StateID, toNum(weatherRow?.stateID ?? weatherRow?.StateID, 0)),
+            districtID: toNum(item?.districtID ?? item?.DistrictID, toNum(weatherRow?.districtID ?? weatherRow?.DistrictID, 0)),
+            blockID: toNum(item?.blockID ?? item?.BlockID, toNum(weatherRow?.blockID ?? weatherRow?.BlockID, 0)),
+            asdID: toNum(item?.asdID ?? item?.AsdID, toNum(weatherRow?.asdID ?? weatherRow?.AsdID, 0)),
+            stateName: toText(item?.stateName ?? item?.StateName, weatherRow?.stateName ?? weatherRow?.StateName),
+            districtName: toText(item?.districtName ?? item?.DistrictName, weatherRow?.districtName ?? weatherRow?.DistrictName),
+            blockName: toText(item?.blockName ?? item?.BlockName, weatherRow?.blockName ?? weatherRow?.BlockName),
+            asdName: toText(item?.asdName ?? item?.AsdName, weatherRow?.asdName ?? weatherRow?.AsdName),
+          };
+        });
+
+        return mapRawLocations(mergedList as any[]);
+      } catch {
+        return mapRawLocations(baseList as any[]);
+      }
+    },
+    [languageLabel, mapRawLocations, userId],
+  );
+
   const normalizedLocations = useMemo(() => {
     const map = new Map<string, LocationRow>();
     for (const raw of locations) {
@@ -236,18 +316,29 @@ export const LocationsScreen = () => {
     [normalizedLocations]
   );
 
-  const loadLocations = async () => {
+  const loadLocations = async (forceRemote = false) => {
     if (!userId) {
       setLocations([]);
       return [] as LocationRow[];
     }
+    if (!forceRemote && appLocations?.length) {
+      const filtered = await enrichLocationsWithWeather(appLocations as any[]);
+      setLocations(filtered);
+      return filtered;
+    }
     setLoading(true);
     try {
-      const payload = buildByLocationPayload(userId, languageLabel);
-      const response = await weatherService.getByLocation(payload);
-      const list = parseLocationWeatherList(response);
+      const response = await userService.getUserLocations({
+        UserProfileID: userId,
+        LanguageType: languageLabel,
+        RefreshDateTime: API_REFRESH_DATES.current(),
+      });
+      const list = mergeUserProfileLocation(
+        parseUserLocationsList(response) as any[],
+        user,
+      );
       setAppLocations(list as any[]);
-      const filtered = mapRawLocations(list as any[]);
+      const filtered = await enrichLocationsWithWeather(list as any[]);
       setLocations(filtered);
       return filtered;
     } catch {
@@ -259,9 +350,11 @@ export const LocationsScreen = () => {
 
   useEffect(() => {
     if (appLocations?.length) {
-      setLocations(mapRawLocations(appLocations as any[]));
+      enrichLocationsWithWeather(appLocations as any[])
+        .then(setLocations)
+        .catch(() => setLocations(mapRawLocations(appLocations as any[])));
     }
-  }, [appLocations, mapRawLocations]);
+  }, [appLocations, enrichLocationsWithWeather, mapRawLocations]);
 
   const loadStates = async () => {
     const res = await mastersService.getStates(
@@ -389,6 +482,58 @@ export const LocationsScreen = () => {
     }
   };
 
+  const openStatePicker = () => {
+    if (isIOS) {
+      openIosPicker(
+        t('register.selectStateMandatory'),
+        states.map((item) => item.stateName),
+        (index) => {
+          const item = states[index];
+          if (!item) return;
+          onStateSelect(item).catch(() => undefined);
+        },
+      );
+      return;
+    }
+    setStatePickerOpen(true);
+  };
+
+  const openDistrictPicker = () => {
+    if (!selectedState) return;
+    if (isIOS) {
+      openIosPicker(
+        t('register.selectDistrictMandatory'),
+        districts.map((item) => item.districtName),
+        (index) => {
+          const item = districts[index];
+          if (!item) return;
+          onDistrictSelect(item).catch(() => undefined);
+        },
+      );
+      return;
+    }
+    setDistrictPickerOpen(true);
+  };
+
+  const openBlockPicker = () => {
+    if (!selectedDistrict) return;
+    if (isIOS) {
+      openIosPicker(
+        t('home.selectLabel', {
+          label: getSubLocationLabel(selectedState?.stateID || 0, t),
+        }),
+        blocks.map((item) => item.label),
+        (index) => {
+          const item = blocks[index];
+          if (!item) return;
+          setSelectedBlock(item);
+        },
+      );
+      return;
+    }
+    setBlockPickerOpen(true);
+  };
+
   const saveAddedLocation = async () => {
     if (!userId) {
       Alert.alert('', t('home.userNotFoundPleaseLoginAgain'), [
@@ -464,7 +609,7 @@ export const LocationsScreen = () => {
         {
           text: t('common.ok'),
           onPress: async () => {
-            let refreshed = await loadLocations();
+            let refreshed = await loadLocations(true);
             let existsAfterRefresh = refreshed.some(
               (x) =>
                 x.stateID === optimistic.stateID &&
@@ -474,7 +619,7 @@ export const LocationsScreen = () => {
             );
             if (!existsAfterRefresh) {
               await new Promise((resolve) => setTimeout(resolve, 700));
-              refreshed = await loadLocations();
+              refreshed = await loadLocations(true);
               existsAfterRefresh = refreshed.some(
                 (x) =>
                   x.stateID === optimistic.stateID &&
@@ -543,32 +688,40 @@ export const LocationsScreen = () => {
       payload.BlockID = resolvedBlockID;
     }
 
-    try {
-      setLocations((prev) =>
-        prev.filter(
-          (x) =>
-            !(
-              (x.tempDistrictID || x.districtID) === resolvedDistrictID &&
-              (x.tempBlockID || x.blockID) === resolvedBlockID &&
-              (x.tempAsdID || x.asdID) === resolvedAsdID &&
-              !x.isCurrentLocation
-            )
-        )
-      );
-      const response: any = await userService.deleteLocation(payload);
-      if (!isApiSuccess(response)) {
-        Alert.alert('', response?.errorMessage || response?.ErrorMessage || t('home.unableDeleteLocation'), [
-          { text: t('common.ok') },
-        ]);
-        await loadLocations();
-        return;
-      }
-      await loadLocations();
-    } catch (e: any) {
-      Alert.alert('', e.message || t('home.unableDeleteLocation'), [
-        { text: t('common.ok') },
-      ]);
-    }
+    Alert.alert('', `${t('home.delete')} ${item.cityName || t('home.location')}?`, [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('common.ok'),
+        onPress: async () => {
+          try {
+            setLocations((prev) =>
+              prev.filter(
+                (x) =>
+                  !(
+                    (x.tempDistrictID || x.districtID) === resolvedDistrictID &&
+                    (x.tempBlockID || x.blockID) === resolvedBlockID &&
+                    (x.tempAsdID || x.asdID) === resolvedAsdID &&
+                    !x.isCurrentLocation
+                  )
+              )
+            );
+            const response: any = await userService.deleteLocation(payload);
+            if (!isApiSuccess(response)) {
+              Alert.alert('', response?.errorMessage || response?.ErrorMessage || t('home.unableDeleteLocation'), [
+                { text: t('common.ok') },
+              ]);
+              await loadLocations();
+              return;
+            }
+            await loadLocations(true);
+          } catch (e: any) {
+            Alert.alert('', e.message || t('home.unableDeleteLocation'), [
+              { text: t('common.ok') },
+            ]);
+          }
+        },
+      },
+    ]);
   };
 
   useEffect(() => {
@@ -577,10 +730,23 @@ export const LocationsScreen = () => {
     }
   }, [userId, languageLabel]);
 
+  useEffect(() => {
+    if (lastLanguageRef.current !== languageLabel) {
+      lastLanguageRef.current = languageLabel;
+      loadLocations(true).catch(() => setLocations([]));
+    }
+  }, [languageLabel]);
+
   useFocusEffect(
     React.useCallback(() => {
+      if (appLocations?.length) {
+        enrichLocationsWithWeather(appLocations as any[])
+          .then(setLocations)
+          .catch(() => setLocations(mapRawLocations(appLocations as any[])));
+        return;
+      }
       loadLocations().catch(() => setLocations([]));
-    }, [userId, languageLabel])
+    }, [appLocations, enrichLocationsWithWeather, mapRawLocations, userId, languageLabel])
   );
 
   const renderCardBody = (item: LocationRow) => {
@@ -648,10 +814,10 @@ export const LocationsScreen = () => {
     navigation.navigate('Home');
   };
 
-  const listBottomPadding = insets.bottom + 24;
+  const listBottomPadding = 24;
 
   return (
-    <Screen>
+    <Screen edges={['left', 'right']}>
       <View style={styles.root}>
         {loading ? (
           <View style={styles.loaderWrap}>
@@ -687,19 +853,26 @@ export const LocationsScreen = () => {
         </Pressable>
       </View>
 
-      <Modal visible={addOpen} transparent animationType="slide" onRequestClose={() => setAddOpen(false)}>
+      <Modal
+        visible={addOpen}
+        transparent
+        animationType="slide"
+        statusBarTranslucent
+        navigationBarTranslucent
+        onRequestClose={() => setAddOpen(false)}
+      >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
+          <View style={[styles.modalSheet, { paddingBottom: bottomSafeInset + 24 }]}>
             <Text style={styles.modalTitle}>{t('home.addLocation')}</Text>
 
-            <Pressable style={styles.selector} onPress={() => setStatePickerOpen(true)}>
+            <Pressable style={styles.selector} onPress={openStatePicker}>
               <Text style={[styles.selectorText, !selectedState && styles.selectorPlaceholder]}>
                 {selectedState?.stateName || t('register.selectStateMandatory')}
               </Text>
               <Image source={require('../../../assets/images/dropdown.png')} style={styles.dropdownIcon} resizeMode="contain" />
             </Pressable>
 
-            <Pressable style={[styles.selector, { marginTop: 10 }]} onPress={() => selectedState && setDistrictPickerOpen(true)}>
+            <Pressable style={[styles.selector, { marginTop: 10 }]} onPress={openDistrictPicker}>
               <Text style={[styles.selectorText, !selectedDistrict && styles.selectorPlaceholder]}>
                 {selectedDistrict?.districtName || t('register.selectDistrictMandatory')}
               </Text>
@@ -708,7 +881,7 @@ export const LocationsScreen = () => {
 
             <Pressable
               style={[styles.selector, { marginTop: 10 }]}
-              onPress={() => selectedDistrict && setBlockPickerOpen(true)}
+              onPress={openBlockPicker}
             >
               <Text style={[styles.selectorText, !selectedBlock && styles.selectorPlaceholder]}>
                 {selectedBlock?.label ||

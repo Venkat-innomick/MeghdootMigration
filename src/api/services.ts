@@ -109,6 +109,13 @@ export const userService = {
     );
     return data;
   },
+  getUserLocations: async (payload: Record<string, unknown>) => {
+    const { data } = await apiClient.post<ApiResponse<any[]>>(
+      API_ENDPOINTS.users.getUserLocations,
+      payload,
+    );
+    return data;
+  },
   saveLocation: async (payload: Record<string, unknown>) => {
     const { data } = await apiClient.post<ApiResponse>(
       API_ENDPOINTS.users.saveUserLocations,

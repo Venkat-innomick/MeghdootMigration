@@ -197,6 +197,9 @@ export default {
     unableUpdateImage: 'Unable to update profile image',
     loginAgain: 'Unable to update image. Please login again.',
     imageUpdated: 'Profile image updated successfully',
+    accountDeletionTitle: 'Account Deletion',
+    accountDeletionMessage:
+      'To delete your account, please contact us at the email below. Your account and all associated data will be permanently deleted within 7 days.',
   },
   menu: {
     allCrops: 'All Crops',

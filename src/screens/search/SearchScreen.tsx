@@ -26,11 +26,12 @@ import {
 import { useAppStore } from "../../store/appStore";
 import { DistrictMasterItem, StateMasterItem } from "../../types/domain";
 import {
-  buildByLocationPayload,
   getLanguageLabel,
   getUserProfileId,
   isApiSuccess,
+  mergeUserProfileLocation,
   parseLocationWeatherList,
+  parseUserLocationsList,
   sameLocation,
   toNum,
   toText,
@@ -83,10 +84,7 @@ export const SearchScreen = () => {
   const languageLabel = useMemo(() => getLanguageLabel(language), [language]);
 
   const refreshFavouriteFlags = async (items: SearchBlockItem[]) => {
-    if (!userId) return items;
-    const payload = buildByLocationPayload(userId, languageLabel);
-    const weather = await weatherService.getByLocation(payload);
-    const locations = parseLocationWeatherList(weather) as any[];
+    const locations = appLocations as any[];
     return items.map((item) => {
       const exists = locations.some((loc) =>
         sameLocation(loc, {
@@ -111,6 +109,17 @@ export const SearchScreen = () => {
       blockID: item.isAsd ? 0 : item.blockID,
       asdID: item.isAsd ? item.blockID : 0,
     });
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+    navigation.navigate("Main", {
+      screen: "MainTabs",
+      params: { screen: "Home" },
+    });
+  };
+
+  const returnToPreviousScreen = () => {
     if (navigation.canGoBack()) {
       navigation.goBack();
       return;
@@ -149,7 +158,8 @@ export const SearchScreen = () => {
       return blockID === item.blockID;
     });
 
-    return [...exactRows, ...districtRows];
+    if (exactRows.length) return exactRows;
+    return districtRows;
   };
 
   const ensureSelectedWeatherCard = (item: SearchBlockItem, rows: any[]) => {
@@ -428,12 +438,16 @@ export const SearchScreen = () => {
               ),
             );
 
-            const refreshedWeather = await weatherService.getByLocation(
-              buildByLocationPayload(userId, languageLabel),
+            const refreshedUserLocationsResponse =
+              await userService.getUserLocations({
+                UserProfileID: userId,
+                LanguageType: languageLabel,
+                RefreshDateTime: API_REFRESH_DATES.current(),
+              });
+            const refreshedLocations = mergeUserProfileLocation(
+              parseUserLocationsList(refreshedUserLocationsResponse) as any[],
+              user,
             );
-            const refreshedLocations = parseLocationWeatherList(
-              refreshedWeather,
-            ) as any[];
             const savedExists = refreshedLocations.some((loc) =>
               sameLocation(loc, {
                 districtID: item.districtID,
@@ -459,23 +473,7 @@ export const SearchScreen = () => {
             }
 
             const result = await loadSelectedLocationData(item);
-            const nextLocations = [...refreshedLocations];
-            result.locations.forEach((row) => {
-              const exists = nextLocations.some((loc) =>
-                sameLocation(loc, {
-                  districtID: toNum(
-                    (row as any)?.districtID ?? (row as any)?.DistrictID,
-                  ),
-                  blockID: toNum(
-                    (row as any)?.blockID ?? (row as any)?.BlockID,
-                  ),
-                  asdID: toNum((row as any)?.asdID ?? (row as any)?.AsdID),
-                }),
-              );
-              if (!exists) nextLocations.push(row as any);
-            });
-
-            setAppLocations(nextLocations as any[]);
+            setAppLocations(refreshedLocations as any[]);
             setCurrentLocationOverride(null);
             setSelectedLocation({
               districtID: item.districtID,
@@ -557,20 +555,16 @@ export const SearchScreen = () => {
             : b,
         ),
       );
-      const currentLocations = useAppStore.getState().locations || [];
+      const refreshedUserLocationsResponse = await userService.getUserLocations({
+        UserProfileID: userId,
+        LanguageType: languageLabel,
+        RefreshDateTime: API_REFRESH_DATES.current(),
+      });
       setAppLocations(
-        currentLocations.filter((loc) => {
-          const districtID = toNum(
-            (loc as any)?.districtID ?? (loc as any)?.DistrictID,
-          );
-          const blockID = toNum((loc as any)?.blockID ?? (loc as any)?.BlockID);
-          const asdID = toNum((loc as any)?.asdID ?? (loc as any)?.AsdID);
-          return !(
-            districtID === item.districtID &&
-            blockID === (item.isAsd ? 0 : item.blockID) &&
-            asdID === (item.isAsd ? item.blockID : 0)
-          );
-        }),
+        mergeUserProfileLocation(
+          parseUserLocationsList(refreshedUserLocationsResponse) as any[],
+          user,
+        ) as any[],
       );
     } catch (e: any) {
       setTimeout(() => {
@@ -589,17 +583,7 @@ export const SearchScreen = () => {
         await moveToHomeForItem(item);
         return;
       }
-
-      const result = await loadSelectedLocationData(item);
-      if (!result.locations.length && !result.advisories.length) {
-        Alert.alert("", t("search.noDataForSelectedLocation"), [
-          { text: t("common.ok") },
-        ]);
-        return;
-      }
-      setAppLocations(result.locations as any[]);
-      setTemporarySearchData(result);
-      await moveToHomeForItem(item);
+      returnToPreviousScreen();
     } catch (e: any) {
       setTimeout(() => {
         Alert.alert("", e?.message || t("search.unableOpenSelectedLocation"), [
@@ -638,15 +622,8 @@ export const SearchScreen = () => {
       });
       setPromotedLocation(null);
       setTemporarySearchData({ locations: [], advisories: [] });
-      setAppLocations([]);
       setSelectedLocation(null);
-
-      if (navigation.canGoBack()) navigation.goBack();
-      else
-        navigation.navigate("Main", {
-          screen: "MainTabs",
-          params: { screen: "Home" },
-        });
+      returnToPreviousScreen();
     } catch (e: any) {
       setTimeout(() => {
         Alert.alert("", e.message || t("search.unableGetCurrentLocation"), [

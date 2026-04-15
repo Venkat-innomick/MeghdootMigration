@@ -16,14 +16,14 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { Screen } from '../../components/Screen';
 import { colors } from '../../theme/colors';
-import { weatherService } from '../../api/services';
+import { userService, weatherService } from '../../api/services';
 import { DashboardLocation, WeatherForecastItem } from '../../types/domain';
 import { useAppStore } from '../../store/appStore';
 import {
-  buildByLocationPayload,
   getLanguageLabel,
   getUserProfileId,
-  parseLocationWeatherList,
+  mergeUserProfileLocation,
+  parseUserLocationsList,
   toText as normalizeText,
 } from '../../utils/locationApi';
 import { API_REFRESH_DATES } from '../../utils/apiDates';
@@ -250,6 +250,7 @@ export const ForecastScreen = () => {
   const { t } = useTranslation();
   const user = useAppStore((s) => s.user);
   const language = useAppStore((s) => s.language);
+  const appLocations = useAppStore((s) => s.locations);
   const selectedLocationRef = useAppStore((s) => s.selectedLocation);
   const currentLocationOverride = useAppStore((s) => s.currentLocationOverride);
   const userId = getUserProfileId(user);
@@ -348,14 +349,37 @@ export const ForecastScreen = () => {
   const loadLocations = async () => {
     if (!userId) return;
     try {
-      const payload = buildByLocationPayload(
-        userId,
-        languageLabel,
-        currentLocationOverride,
-      );
-      const response = await weatherService.getByLocation(payload);
-      const rawList = parseLocationWeatherList(response) as DashboardLocation[];
-      const list = dedupeForecastLocations(rawList as any[]) as DashboardLocation[];
+      let list: DashboardLocation[] = [];
+      if (currentLocationOverride) {
+        const response = await weatherService.getByLocation({
+          Id: userId,
+          LanguageType: languageLabel,
+          RefreshDateTime: API_REFRESH_DATES.current(),
+          Latitude: currentLocationOverride.latitude,
+          Longitude: currentLocationOverride.longitude,
+        });
+        const rawList =
+          (((response as any)?.result || (response as any)?.data || response)
+            ?.ObjWeatherForecastNextList ||
+            ((response as any)?.result || (response as any)?.data || response)
+              ?.objWeatherForecastNextList ||
+            []) as DashboardLocation[];
+        list = dedupeForecastLocations(rawList as any[]) as DashboardLocation[];
+      } else if (appLocations?.length) {
+        list = dedupeForecastLocations(appLocations as any[]) as DashboardLocation[];
+      } else {
+        const response = await userService.getUserLocations({
+          UserProfileID: userId,
+          LanguageType: languageLabel,
+          RefreshDateTime: API_REFRESH_DATES.current(),
+        });
+        const rawList = mergeUserProfileLocation(
+          parseUserLocationsList(response) as DashboardLocation[],
+          user,
+        );
+        list = dedupeForecastLocations(rawList as any[]) as DashboardLocation[];
+        useAppStore.getState().setLocations(list);
+      }
       setLocations(list);
       if (list.length) {
         const currentIndex = currentLocationOverride
@@ -429,7 +453,7 @@ export const ForecastScreen = () => {
         return;
       }
       loadLocations();
-    }, [currentLocationOverride, languageLabel, selectedLocationRef, t, userId]);
+    }, [appLocations, currentLocationOverride, languageLabel, selectedLocationRef, t, userId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -452,7 +476,7 @@ export const ForecastScreen = () => {
   };
 
   return (
-    <Screen>
+    <Screen edges={['left', 'right']}>
       <View style={styles.container}>
         <Pressable style={styles.locationBar} onPress={() => setPickerOpen(true)}>
           <Text style={styles.locationText} numberOfLines={1}>{locationLabel}</Text>

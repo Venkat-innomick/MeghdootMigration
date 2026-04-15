@@ -22,7 +22,8 @@ export type RootStackParamList = {
     advisoryId: number;
     userProfileId: number;
     feedbackId?: number;
-    avgFeedback?: number;
+    userRating?: number;
+    onSubmitted?: (payload: { feedbackId: number; userRating: number }) => void;
   };
   CropAudioPlayer: {
     audioUrl: string;

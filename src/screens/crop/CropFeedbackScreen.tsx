@@ -53,10 +53,16 @@ const RATING_OPTIONS: Array<{
 
 export const CropFeedbackScreen = ({ navigation, route }: Props) => {
   const { t } = useTranslation();
-  const { advisoryId, userProfileId, feedbackId = 0, avgFeedback = 0 } = route.params;
+  const {
+    advisoryId,
+    userProfileId,
+    feedbackId = 0,
+    userRating = 0,
+    onSubmitted,
+  } = route.params;
 
   const alreadySubmitted = feedbackId > 0;
-  const initialRating = pickNum(avgFeedback);
+  const initialRating = pickNum(userRating);
 
   const [rating, setRating] = useState<number>(initialRating);
   const [comments, setComments] = useState('');
@@ -67,6 +73,7 @@ export const CropFeedbackScreen = ({ navigation, route }: Props) => {
   const selectedValue = useMemo(() => {
     if (!rating) return 0;
     if (rating <= 1) return 1;
+    if (rating <= 2) return 2;
     if (rating <= 3) return 3;
     if (rating <= 4) return 4;
     return 5;
@@ -109,6 +116,18 @@ export const CropFeedbackScreen = ({ navigation, route }: Props) => {
               ]);
               return;
             }
+
+            const responseAny = response as any;
+            const savedFeedbackId = pickNum(
+              responseAny?.NewID,
+              responseAny?.newID,
+              responseAny?.result?.NewID,
+              responseAny?.result?.newID,
+            );
+            onSubmitted?.({
+              feedbackId: savedFeedbackId || feedbackId || 1,
+              userRating: selectedValue,
+            });
 
             Alert.alert('', t('crop.feedbackSubmittedSuccessfully'), [
               {

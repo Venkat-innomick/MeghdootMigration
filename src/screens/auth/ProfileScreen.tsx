@@ -12,6 +12,7 @@ import {
   Alert,
   Image,
   ImageSourcePropType,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -144,6 +145,7 @@ const InfoField = ({
 export const ProfileScreen = () => {
   useAndroidNavigationBar(colors.background, "dark");
   const { t } = useTranslation();
+  const accountDeletionEmail = "meghdoot.agro@imd.gov.in";
   const user: any = useAppStore((s) => s.user);
   const setUser = useAppStore((s) => s.setUser);
   const languageCode = useAppStore((s) => s.language);
@@ -387,22 +389,8 @@ export const ProfileScreen = () => {
       if (mode === "camera") {
         const cameraPermission =
           await ImagePicker.requestCameraPermissionsAsync();
-        const libraryPermission =
-          await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (
-          cameraPermission?.status !== "granted" ||
-          libraryPermission?.status !== "granted"
-        ) {
+        if (cameraPermission?.status !== "granted") {
           Alert.alert("", i18n.t("profile.cameraPhotosDenied"), [
-            { text: i18n.t("common.ok") },
-          ]);
-          return;
-        }
-      } else {
-        const libraryPermission =
-          await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (libraryPermission?.status !== "granted") {
-          Alert.alert("", i18n.t("profile.photosDenied"), [
             { text: i18n.t("common.ok") },
           ]);
           return;
@@ -458,6 +446,15 @@ export const ProfileScreen = () => {
 
     setPickerOpen(true);
   }, [pickAndSaveImage]);
+
+  const openDeletionEmail = useCallback(async () => {
+    const url = `mailto:${accountDeletionEmail}`;
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (!supported) return;
+      await Linking.openURL(url);
+    } catch {}
+  }, [accountDeletionEmail]);
 
   return (
     <Screen>
@@ -557,6 +554,21 @@ export const ProfileScreen = () => {
             value={pickText(user?.panchayatName, user?.PanchayatName)}
             divider={false}
           />
+
+          <View style={styles.deletionWrap}>
+            <Text style={styles.sectionTitle}>
+              {i18n.t("profile.accountDeletionTitle")}
+            </Text>
+            <Pressable style={styles.deletionButtonWrap} onPress={openDeletionEmail}>
+              <Text style={styles.deletionButtonText}>Delete Account</Text>
+            </Pressable>
+            <Text style={styles.deletionText}>
+              {i18n.t("profile.accountDeletionMessage")}
+            </Text>
+            <Pressable onPress={openDeletionEmail}>
+              <Text style={styles.deletionEmailText}>{accountDeletionEmail}</Text>
+            </Pressable>
+          </View>
         </View>
       </ScrollView>
       {loading ? (
@@ -646,6 +658,39 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     height: 1,
     backgroundColor: "#EBEBEB",
+  },
+  deletionWrap: {
+    marginTop: 16,
+    marginBottom: 8,
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: "#F6F8F4",
+    borderWidth: 1,
+    borderColor: "#D9E3D2",
+  },
+  deletionButtonWrap: {
+    marginTop: 10,
+  },
+  deletionButtonText: {
+    color: "red",
+    fontFamily: "RobotoMedium",
+    fontSize: 14,
+    textAlign: "center",
+  },
+  deletionText: {
+    marginTop: 10,
+    color: "#363636",
+    fontFamily: "RobotoRegular",
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  deletionEmailText: {
+    marginTop: 8,
+    color: colors.primary,
+    fontFamily: "RobotoMedium",
+    fontSize: 13,
+    lineHeight: 20,
+    textAlign: "center",
   },
   loaderOverlay: {
     ...StyleSheet.absoluteFillObject,

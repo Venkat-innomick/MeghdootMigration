@@ -45,6 +45,7 @@ export const API_ENDPOINTS = {
   },
   users: {
     getUserLoginDetails: "/api/Users/GetUserLoginDetails",
+    getUserLocations: "/api/Users/GetUserLocations",
     postUserProfile: "/api/Users/SaveUserProfilImage",
     saveUserLocations: "/api/Users/SaveUserLocations",
     deleteUserLocations: "/api/Users/RemoveUserLocations",

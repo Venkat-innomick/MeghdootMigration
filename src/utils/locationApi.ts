@@ -86,6 +86,77 @@ export const parseLocationWeatherList = (response: any) =>
     ],
   );
 
+export const parseUserLocationsList = (response: any) =>
+  pickList<any>((response as any)?.result || (response as any)?.data || response, [
+    "objUserLocationsList",
+    "ObjUserLocationsList",
+  ]);
+
+export const getUserProfileMappedLocation = (user: any) => {
+  if (!user) return null;
+
+  const stateID = toNum(user?.stateID ?? user?.StateID, 0);
+  const districtID = toNum(user?.districtID ?? user?.DistrictID, 0);
+  const blockID = toNum(user?.blockID ?? user?.BlockID, 0);
+  const asdID = toNum(user?.asdID ?? user?.AsdID, 0);
+
+  if (stateID <= 0 || districtID <= 0) {
+    return null;
+  }
+
+  return {
+    stateID,
+    districtID,
+    blockID,
+    asdID,
+    stateName: toText(user?.stateName, user?.StateName),
+    districtName: toText(user?.districtName, user?.DistrictName),
+    blockName: toText(user?.blockName, user?.BlockName),
+    asdName: toText(user?.asdName, user?.AsdName),
+  };
+};
+
+export const mergeUserProfileLocation = <T extends any>(
+  locations: T[],
+  user: any,
+): T[] => {
+  const profileLocation = getUserProfileMappedLocation(user);
+  if (!profileLocation) return locations;
+
+  const profileIndex = (locations || []).findIndex((item: any) => {
+    const stateID = toNum(item?.stateID ?? item?.StateID, 0);
+    const districtID = toNum(item?.districtID ?? item?.DistrictID, 0);
+    const blockID = toNum(item?.blockID ?? item?.BlockID, 0);
+    const asdID = toNum(item?.asdID ?? item?.AsdID, 0);
+
+    return (
+      stateID === profileLocation.stateID &&
+      districtID === profileLocation.districtID &&
+      blockID === profileLocation.blockID &&
+      asdID === profileLocation.asdID
+    );
+  });
+
+  if (profileIndex >= 0) {
+    const nextLocations = [...locations];
+    nextLocations[profileIndex] = {
+      ...(nextLocations[profileIndex] as any),
+      ...profileLocation,
+      StateID: profileLocation.stateID,
+      DistrictID: profileLocation.districtID,
+      BlockID: profileLocation.blockID,
+      AsdID: profileLocation.asdID,
+      StateName: profileLocation.stateName,
+      DistrictName: profileLocation.districtName,
+      BlockName: profileLocation.blockName,
+      AsdName: profileLocation.asdName,
+    };
+    return nextLocations as T[];
+  }
+
+  return ([...locations, profileLocation] as T[]);
+};
+
 export const isApiSuccess = (response: any) => {
   const value = response?.isSuccessful ?? response?.IsSuccessful;
   if (typeof value === "boolean") return value;

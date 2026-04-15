@@ -120,6 +120,10 @@ export const LoginScreen = ({ navigation }: Props) => {
           isLogout: false,
           typeOfRole,
           // Persist location/profile fields used by other screens.
+          ...(data.StateID ? { stateID: data.StateID } : {}),
+          ...(data.DistrictID ? { districtID: data.DistrictID } : {}),
+          ...(data.BlockID ? { blockID: data.BlockID } : {}),
+          ...(data.AsdID ? { asdID: data.AsdID } : {}),
           ...(data.StateName ? { stateName: data.StateName } : {}),
           ...(data.DistrictName ? { districtName: data.DistrictName } : {}),
           ...(data.BlockName ? { blockName: data.BlockName } : {}),
@@ -128,10 +132,6 @@ export const LoginScreen = ({ navigation }: Props) => {
           ...(data.PanchayatName ? { panchayatName: data.PanchayatName } : {}),
           ...(data.LanguageName ? { languageName: data.LanguageName } : {}),
         };
-        await AsyncStorage.setItem(
-          STORAGE_KEYS.loggedInUser,
-          JSON.stringify(storedUser),
-        );
         setUser(storedUser);
         navigation
           .getParent()

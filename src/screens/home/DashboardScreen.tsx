@@ -25,14 +25,16 @@ import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { Screen } from "../../components/Screen";
 import { colors } from "../../theme/colors";
 import { spacing } from "../../theme/spacing";
-import { cropService, weatherService } from "../../api/services";
+import { cropService, userService, weatherService } from "../../api/services";
 import { CropAdvisoryItem, DashboardLocation } from "../../types/domain";
 import { useAppStore } from "../../store/appStore";
 import {
   buildByLocationPayload,
   getLanguageLabel,
   getUserProfileId,
+  mergeUserProfileLocation,
   parseLocationWeatherList,
+  parseUserLocationsList,
 } from "../../utils/locationApi";
 import { API_REFRESH_DATES } from "../../utils/apiDates";
 import { useAndroidNavigationBar } from "../../hooks/useAndroidNavigationBar";
@@ -257,6 +259,108 @@ const isBlockLevelRow = (item: any) =>
 
 const isDistrictOnlyRow = (item: any) => !isBlockLevelRow(item);
 
+const debugTabRow = (item: any, index: number) => ({
+  index,
+  stateID: toNum(item?.stateID, item?.StateID),
+  districtID: toNum(item?.districtID, item?.DistrictID),
+  blockID: toNum(item?.blockID, item?.BlockID),
+  asdID: toNum(item?.asdID, item?.AsdID),
+  districtName: pickText(item?.districtName, item?.DistrictName),
+  blockName: pickText(item?.blockName, item?.BlockName),
+  asdName: pickText(item?.asdName, item?.AsdName),
+  placeName: pickText(item?.placeName, item?.PlaceName),
+});
+
+const sameSavedLocationRef = (item: any, target: any) => {
+  const itemStateID = toNum(item?.stateID, item?.StateID);
+  const itemDistrictID = toNum(item?.districtID, item?.DistrictID);
+  const itemBlockID = toNum(item?.blockID, item?.BlockID);
+  const itemAsdID = toNum(item?.asdID, item?.AsdID);
+  const targetStateID = toNum(target?.stateID, target?.StateID);
+  const targetDistrictID = toNum(target?.districtID, target?.DistrictID);
+  const targetBlockID = toNum(target?.blockID, target?.BlockID);
+  const targetAsdID = toNum(target?.asdID, target?.AsdID);
+
+  if (itemStateID !== targetStateID || itemDistrictID !== targetDistrictID) {
+    return false;
+  }
+
+  if (targetAsdID > 0) return itemAsdID === targetAsdID;
+  return itemBlockID === targetBlockID;
+};
+
+const buildMissingWeatherRow = (saved: any) => {
+  const stateID = toNum(saved?.stateID, saved?.StateID);
+  const districtID = toNum(saved?.districtID, saved?.DistrictID);
+  const blockID = toNum(saved?.blockID, saved?.BlockID);
+  const asdID = toNum(saved?.asdID, saved?.AsdID);
+  const districtName = pickText(saved?.districtName, saved?.DistrictName, "--");
+  const blockName = pickText(saved?.blockName, saved?.BlockName, "");
+  const asdName = pickText(saved?.asdName, saved?.AsdName, "");
+
+  return normalizeDashboardWeatherRow({
+    stateID,
+    districtID,
+    blockID,
+    asdID,
+    stateName: pickText(saved?.stateName, saved?.StateName, "--"),
+    districtName,
+    blockName,
+    asdName,
+    placeName: blockName || asdName || districtName,
+    colorCode: "#FFFFFF",
+    cloudCover: -1,
+    cloudImage: "",
+    WeatherType: "NA",
+    RainFall: "NA",
+    WindSpeed: "NA",
+    Humidity: "NA",
+    WindDirection: "NA",
+    MinTemp: "NA",
+    MaxTemp: "NA",
+    Date: pickText(saved?.refreshDateTime, saved?.RefreshDateTime, "NA"),
+    isCurrentLocation: false,
+  });
+};
+
+const buildDashboardBaseRows = (
+  weatherRows: any[],
+  savedLocations: any[],
+  useCurrentLocationRows = false,
+) => {
+  const normalizedWeather = weatherRows.map((item: any) =>
+    normalizeDashboardWeatherRow(item),
+  );
+
+  if (useCurrentLocationRows) return normalizedWeather;
+
+  if (!savedLocations.length) return normalizedWeather;
+
+  const savedBlockRows = savedLocations.map((saved: any) => {
+    const exactWeather = normalizedWeather.find((item: any) =>
+      sameSavedLocationRef(item, saved),
+    );
+    return exactWeather || buildMissingWeatherRow(saved);
+  });
+
+  const districtRows = normalizedWeather.filter((item: any) => {
+    if (!isDistrictOnlyRow(item)) return false;
+    return savedLocations.some(
+      (saved: any) =>
+        toNum(saved?.stateID, saved?.StateID) ===
+          toNum(item?.stateID, item?.StateID) &&
+        toNum(saved?.districtID, saved?.DistrictID) ===
+          toNum(item?.districtID, item?.DistrictID),
+    );
+  });
+
+  const currentLocationRows = normalizedWeather.filter((item: any) =>
+    Boolean(item?.isCurrentLocation || item?.IsCurrentLocation),
+  );
+
+  return mergeLocations(savedBlockRows, mergeLocations(districtRows, currentLocationRows));
+};
+
 const getAdvisoryScope = (item: any) => ({
   stateId: toNum(item?.stateID, item?.StateID),
   districtId: toNum(item?.districtID, item?.DistrictID),
@@ -343,16 +447,14 @@ const enrichDashboardLocationsWithCrops = (
 
 const shapeHomeLocations = (rows: any[]) => {
   const districtRows = rows.filter((item) => isDistrictOnlyRow(item));
-  const blockRows = rows.filter((item) => !isDistrictOnlyRow(item));
+  return rows.map((item) => {
+    if (isDistrictOnlyRow(item)) {
+      return {
+        ...item,
+        districtWiseWeatherData: item,
+      };
+    }
 
-  if (!blockRows.length) {
-    return districtRows.map((item) => ({
-      ...item,
-      districtWiseWeatherData: item,
-    }));
-  }
-
-  const mappedBlocks = blockRows.map((item) => {
     const districtMatch =
       districtRows.find(
         (district) =>
@@ -367,37 +469,19 @@ const shapeHomeLocations = (rows: any[]) => {
       districtWiseWeatherData: districtMatch,
     };
   });
-
-  const districtOnlyCards = districtRows
-    .filter((district) => {
-      const hasMappedBlock = blockRows.some(
-        (item) =>
-          toNum(district?.districtID, district?.DistrictID) ===
-            toNum(item?.districtID, item?.DistrictID) &&
-          toNum(district?.stateID, district?.StateID) ===
-            toNum(item?.stateID, item?.StateID),
-      );
-      return !hasMappedBlock;
-    })
-    .map((item) => ({
-      ...item,
-      districtWiseWeatherData: item,
-    }));
-
-  return [...mappedBlocks, ...districtOnlyCards];
 };
 
-const orderLocationsBySelected = (
-  items: DashboardLocation[],
-  selected: { districtID: number; blockID: number; asdID: number } | null,
-) => {
-  if (!selected) return items;
-  const next = [...items];
-  const index = next.findIndex((item) => sameLocationRef(item, selected));
-  if (index <= 0) return next;
-  const [target] = next.splice(index, 1);
-  next.unshift(target);
-  return next;
+const buildDistrictTabLocations = (items: DashboardLocation[]) => {
+  const districtOnlyRows = items.filter((item) => isDistrictOnlyRow(item as any));
+  if (districtOnlyRows.length > 0) return districtOnlyRows;
+
+  const seen = new Set<string>();
+  return items.filter((item: any) => {
+    const key = `${toNum(item?.stateID, item?.StateID)}-${toNum(item?.districtID, item?.DistrictID)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 };
 
 const buildHomeCropPayload = async (
@@ -460,8 +544,14 @@ export const DashboardScreen = () => {
   const [locations, setLocations] = useState<DashboardLocation[]>([]);
   const [advisories, setAdvisories] = useState<CropAdvisoryItem[]>([]);
   const [activeTab, setActiveTab] = useState<"block" | "district">("block");
+  const [selectedDistrictIndex, setSelectedDistrictIndex] = useState(0);
+  const [selectedBlockIndex, setSelectedBlockIndex] = useState(0);
   const carouselRef = useRef<RNFlatList<any> | null>(null);
   const userDraggingCarouselRef = useRef(false);
+  const lastLanguageRef = useRef(languageLabel);
+  const rememberedScopedLocationRef = useRef<
+    Map<string, { blockID: number; asdID: number }>
+  >(new Map());
 
   const openCropAdvisory = (params: Record<string, unknown>) => {
     const parent = navigation.getParent?.();
@@ -481,10 +571,19 @@ export const DashboardScreen = () => {
         languageLabel,
         currentLocationOverride,
       );
-      const weather = await weatherService.getByLocation(payload);
-      const locationList = parseLocationWeatherList(
-        weather,
-      ) as DashboardLocation[];
+      const [weather, userLocationsResponse] = await Promise.all([
+        weatherService.getByLocation(payload),
+        userService.getUserLocations({
+          UserProfileID: userId,
+          LanguageType: languageLabel,
+          RefreshDateTime: API_REFRESH_DATES.current(),
+        }),
+      ]);
+      const locationList = parseLocationWeatherList(weather) as DashboardLocation[];
+      const savedLocations = mergeUserProfileLocation(
+        parseUserLocationsList(userLocationsResponse) as DashboardLocation[],
+        useAppStore.getState().user,
+      );
       const cropPayload = await buildHomeCropPayload(
         userId,
         languageLabel,
@@ -492,15 +591,14 @@ export const DashboardScreen = () => {
       );
       const crop = await cropService.getAdvisoryTop(cropPayload);
 
-      const mergedLocations = mergeLocations(
+      const baseLocations = buildDashboardBaseRows(
         locationList,
-        temporarySearchLocations,
+        savedLocations,
+        Boolean(currentLocationOverride),
       );
-      const normalizedLocations = mergedLocations.map((item: any) =>
-        normalizeDashboardWeatherRow(item),
-      );
+      const mergedLocations = mergeLocations(baseLocations, temporarySearchLocations);
       const shapedLocations = shapeHomeLocations(
-        normalizedLocations,
+        mergedLocations,
       ) as DashboardLocation[];
       const currentSelected = useAppStore.getState().selectedLocation;
       const nextAdvisories = mergeAdvisories(
@@ -511,42 +609,20 @@ export const DashboardScreen = () => {
         shapedLocations,
         nextAdvisories,
       ) as DashboardLocation[];
-      const currentLocationRow: any = currentLocationOverride
-        ? enrichedLocations.find((item: any) =>
-            Boolean(item?.isCurrentLocation || item?.IsCurrentLocation),
-          )
-        : null;
-      const orderingTarget = currentLocationRow
-        ? {
-            districtID: toNum(
-              currentLocationRow?.districtID,
-              currentLocationRow?.DistrictID,
-            ),
-            blockID: toNum(
-              currentLocationRow?.blockID,
-              currentLocationRow?.BlockID,
-            ),
-            asdID: toNum(currentLocationRow?.asdID, currentLocationRow?.AsdID),
-          }
-        : promotedLocation || currentSelected;
-      const nextLocations = orderLocationsBySelected(
-        enrichedLocations,
-        orderingTarget,
-      );
+      const nextLocations = enrichedLocations;
       setLocations(nextLocations);
-      // Keep shared locations aligned with the rendered Home carousel list
-      // so Forecast/PastWeather read the same ordering/content as Home.
-      setAppLocations(nextLocations as DashboardLocation[]);
+      setAppLocations(savedLocations as DashboardLocation[]);
       if (locationList.length > 0) {
-        const match = currentSelected
+        const effectiveSelection = promotedLocation || currentSelected;
+        const match = effectiveSelection
           ? nextLocations.find((item: any) => {
               const districtID = toNum(item.districtID, item.DistrictID);
               const blockID = toNum(item.blockID, item.BlockID);
               const asdID = toNum(item.asdID, item.AsdID);
               return (
-                districtID === currentSelected.districtID &&
-                blockID === currentSelected.blockID &&
-                asdID === currentSelected.asdID
+                districtID === effectiveSelection.districtID &&
+                blockID === effectiveSelection.blockID &&
+                asdID === effectiveSelection.asdID
               );
             })
           : null;
@@ -598,11 +674,9 @@ export const DashboardScreen = () => {
     currentLocationOverride,
     promotedLocation,
     setAppLocations,
-    setPromotedLocation,
     setSelectedLocation,
     temporarySearchAdvisories,
     temporarySearchLocations,
-    t,
     userId,
   ]);
 
@@ -612,108 +686,197 @@ export const DashboardScreen = () => {
     }, [loadData]),
   );
 
-  const carouselLocations = useMemo(() => {
-    if (activeTab === "block") {
-      return locations.filter((item) => isBlockLevelRow(item as any));
+  useEffect(() => {
+    if (lastLanguageRef.current !== languageLabel) {
+      lastLanguageRef.current = languageLabel;
+      loadData();
     }
-    return locations;
-  }, [activeTab, locations]);
+  }, [languageLabel, loadData]);
 
-  const currentLocation = useMemo(() => {
-    if (!carouselLocations.length) return null;
+  const districtLocations = useMemo(
+    () => buildDistrictTabLocations(locations),
+    [locations],
+  );
+
+  const blockLocations = useMemo(
+    () => locations.filter((item) => isBlockLevelRow(item as any)),
+    [locations],
+  );
+
+  const rememberScopedLocation = useCallback((item: any) => {
+    const stateID = toNum(item?.stateID, item?.StateID);
+    const districtID = toNum(item?.districtID, item?.DistrictID);
+    const blockID = toNum(item?.blockID, item?.BlockID);
+    const asdID = toNum(item?.asdID, item?.AsdID);
+
+    if (districtID <= 0 || (blockID <= 0 && asdID <= 0)) return;
+
+    rememberedScopedLocationRef.current.set(`${stateID}-${districtID}`, {
+      blockID,
+      asdID,
+    });
+  }, []);
+
+  const findMappedBlockForDistrict = useCallback(
+    (districtItem: any) => {
+      if (!districtItem) return null;
+
+      const districtStateID = toNum(
+        districtItem?.stateID,
+        districtItem?.StateID,
+      );
+      const districtID = toNum(
+        districtItem?.districtID,
+        districtItem?.DistrictID,
+      );
+
+      const exactSelectedBlockIdx =
+        selectedLocation &&
+        selectedLocation.districtID === districtID &&
+        (selectedLocation.blockID > 0 || selectedLocation.asdID > 0)
+          ? blockLocations.findIndex((item: any) =>
+              sameLocationRef(item, selectedLocation),
+            )
+          : -1;
+
+      if (exactSelectedBlockIdx >= 0) {
+        return blockLocations[exactSelectedBlockIdx] as any;
+      }
+
+      const rememberedScoped =
+        rememberedScopedLocationRef.current.get(
+          `${districtStateID}-${districtID}`,
+        ) || null;
+
+      const rememberedBlockIdx = rememberedScoped
+        ? blockLocations.findIndex(
+            (item: any) =>
+              toNum(item?.districtID, item?.DistrictID) === districtID &&
+              toNum(item?.blockID, item?.BlockID) === rememberedScoped.blockID &&
+              toNum(item?.asdID, item?.AsdID) === rememberedScoped.asdID,
+          )
+        : -1;
+
+      if (rememberedBlockIdx >= 0) {
+        return blockLocations[rememberedBlockIdx] as any;
+      }
+
+      const firstBlockIdx = blockLocations.findIndex(
+        (item: any) =>
+          toNum(item?.districtID, item?.DistrictID) === districtID,
+      );
+
+      return firstBlockIdx >= 0 ? (blockLocations[firstBlockIdx] as any) : null;
+    },
+    [blockLocations, selectedLocation],
+  );
+
+  const carouselLocations = useMemo(
+    () => (activeTab === "block" ? blockLocations : districtLocations),
+    [activeTab, blockLocations, districtLocations],
+  );
+
+  useEffect(() => {
+    const effectiveSelection = promotedLocation || selectedLocation;
+
     if (currentLocationOverride) {
-      const currentMatch = carouselLocations.find((item: any) =>
+      const currentBlockIdx = blockLocations.findIndex((item: any) =>
         Boolean(item?.isCurrentLocation || item?.IsCurrentLocation),
       );
-      if (currentMatch) return currentMatch as any;
-    }
-    if (!selectedLocation) return carouselLocations[0] as any;
-    const exactMatch = carouselLocations.find((item: any) => {
-      const districtID = toNum(item.districtID, item.DistrictID);
-      const blockID = toNum(item.blockID, item.BlockID);
-      const asdID = toNum(item.asdID, item.AsdID);
-      return (
-        districtID === selectedLocation.districtID &&
-        blockID === selectedLocation.blockID &&
-        asdID === selectedLocation.asdID
-      );
-    });
-    if (exactMatch) return exactMatch as any;
-
-    if (activeTab === "block") {
-      const blockDistrictMatch = carouselLocations.find((item: any) => {
-        const districtID = toNum(item.districtID, item.DistrictID);
-        const blockID = toNum(item.blockID, item.BlockID);
-        const asdID = toNum(item.asdID, item.AsdID);
-        return (
-          districtID === selectedLocation.districtID &&
-          (blockID > 0 || asdID > 0)
+      if (currentBlockIdx >= 0) {
+        setSelectedBlockIndex(currentBlockIdx);
+        const currentBlock = blockLocations[currentBlockIdx] as any;
+        const currentDistrictIdx = districtLocations.findIndex(
+          (item: any) =>
+            toNum(item?.districtID, item?.DistrictID) ===
+            toNum(currentBlock?.districtID, currentBlock?.DistrictID),
         );
-      });
-      if (blockDistrictMatch) return blockDistrictMatch as any;
+        if (currentDistrictIdx >= 0) setSelectedDistrictIndex(currentDistrictIdx);
+      }
+      return;
     }
 
-    if (activeTab === "district") {
-      const districtMatch = carouselLocations.find((item: any) => {
-        const districtID = toNum(item.districtID, item.DistrictID);
-        return districtID === selectedLocation.districtID;
-      });
-      if (districtMatch) return districtMatch as any;
+    if (!effectiveSelection) return;
+
+    const districtIdx = districtLocations.findIndex(
+      (item: any) =>
+        toNum(item?.districtID, item?.DistrictID) === effectiveSelection.districtID,
+    );
+    if (districtIdx >= 0) setSelectedDistrictIndex(districtIdx);
+
+    const exactBlockIdx = blockLocations.findIndex((item: any) =>
+      sameLocationRef(item, effectiveSelection),
+    );
+    if (exactBlockIdx >= 0) {
+      setSelectedBlockIndex(exactBlockIdx);
+      rememberScopedLocation(blockLocations[exactBlockIdx]);
+      return;
     }
 
-    return carouselLocations[0] as any;
-  }, [activeTab, carouselLocations, currentLocationOverride, selectedLocation]);
+    const rememberedScoped =
+      rememberedScopedLocationRef.current.get(
+        `${(districtLocations[districtIdx] as any)?.stateID ?? (districtLocations[districtIdx] as any)?.StateID ?? 0}-${effectiveSelection.districtID}`,
+      ) || null;
 
-  const currentLocationIndex = useMemo(() => {
-    if (!carouselLocations.length) return 0;
-    if (!currentLocation) return 0;
-    const idx = carouselLocations.findIndex((item: any) => {
-      return (
-        toNum(item.districtID, item.DistrictID) ===
-          toNum(
-            (currentLocation as any).districtID,
-            (currentLocation as any).DistrictID,
-          ) &&
-        toNum(item.blockID, item.BlockID) ===
-          toNum(
-            (currentLocation as any).blockID,
-            (currentLocation as any).BlockID,
-          ) &&
-        toNum(item.asdID, item.AsdID) ===
-          toNum((currentLocation as any).asdID, (currentLocation as any).AsdID)
-      );
-    });
-    if (idx >= 0) return idx;
+    const rememberedBlockIdx = rememberedScoped
+      ? blockLocations.findIndex(
+          (item: any) =>
+            toNum(item?.districtID, item?.DistrictID) ===
+              effectiveSelection.districtID &&
+            toNum(item?.blockID, item?.BlockID) === rememberedScoped.blockID &&
+            toNum(item?.asdID, item?.AsdID) === rememberedScoped.asdID,
+        )
+      : -1;
 
-    if (currentLocationOverride) {
-      const currentIdx = carouselLocations.findIndex((item: any) =>
-        Boolean(item?.isCurrentLocation || item?.IsCurrentLocation),
-      );
-      if (currentIdx >= 0) return currentIdx;
+    if (rememberedBlockIdx >= 0) {
+      setSelectedBlockIndex(rememberedBlockIdx);
+      return;
     }
 
-    if (activeTab === "district" && selectedLocation) {
-      const districtIdx = carouselLocations.findIndex((item: any) => {
-        return (
-          toNum(item.districtID, item.DistrictID) ===
-          selectedLocation.districtID
-        );
-      });
-      if (districtIdx >= 0) return districtIdx;
-    }
-
-    return 0;
+    const districtBlockIdx = blockLocations.findIndex(
+      (item: any) =>
+        toNum(item?.districtID, item?.DistrictID) === effectiveSelection.districtID,
+    );
+    if (districtBlockIdx >= 0) setSelectedBlockIndex(districtBlockIdx);
   }, [
-    activeTab,
-    carouselLocations,
-    currentLocation,
+    blockLocations,
     currentLocationOverride,
+    districtLocations,
+    promotedLocation,
+    rememberScopedLocation,
     selectedLocation,
   ]);
 
+  const currentDistrictIndex = useMemo(
+    () =>
+      Math.max(0, Math.min(selectedDistrictIndex, districtLocations.length - 1)),
+    [districtLocations.length, selectedDistrictIndex],
+  );
+
+  const currentBlockIndex = useMemo(
+    () => Math.max(0, Math.min(selectedBlockIndex, blockLocations.length - 1)),
+    [blockLocations.length, selectedBlockIndex],
+  );
+
+  const currentDistrictLocation = useMemo(() => {
+    if (!districtLocations.length) return null;
+    return (districtLocations[currentDistrictIndex] as any) || null;
+  }, [currentDistrictIndex, districtLocations]);
+
+  const currentBlockLocation = useMemo(() => {
+    if (!blockLocations.length) return null;
+    return (blockLocations[currentBlockIndex] as any) || null;
+  }, [blockLocations, currentBlockIndex]);
+
+  const currentLocation =
+    activeTab === "block" ? currentBlockLocation : currentDistrictLocation;
+
+  const currentLocationIndex =
+    activeTab === "block" ? currentBlockIndex : currentDistrictIndex;
+
   const canUseBlockTab = useMemo(() => {
     if (!locations.length) return false;
-    const target: any = currentLocation || locations[0];
+    const target: any = currentDistrictLocation || currentBlockLocation || locations[0];
     if (!target) return false;
     const targetState = toNum(target.stateID, target.StateID);
     const targetDistrict = toNum(target.districtID, target.DistrictID);
@@ -724,16 +887,18 @@ export const DashboardScreen = () => {
         isBlockLevelRow(row)
       );
     });
-  }, [currentLocation, locations]);
+  }, [currentBlockLocation, currentDistrictLocation, locations]);
 
   const blockTabLabel = useMemo(() => {
     const stateID = toNum(
-      (currentLocation as any)?.stateID,
-      (currentLocation as any)?.StateID,
+      (currentDistrictLocation as any)?.stateID,
+      (currentDistrictLocation as any)?.StateID,
+      (currentBlockLocation as any)?.stateID,
+      (currentBlockLocation as any)?.StateID,
       0,
     );
     return stateID === 28 || stateID === 36 ? "ASD" : t("home.block");
-  }, [currentLocation, t]);
+  }, [currentBlockLocation, currentDistrictLocation, t]);
 
   useEffect(() => {
     if (!carouselLocations.length) return;
@@ -741,7 +906,7 @@ export const DashboardScreen = () => {
       index: currentLocationIndex,
       animated: false,
     });
-  }, [currentLocationIndex, carouselLocations.length]);
+  }, [currentLocationIndex, carouselLocations]);
 
   useEffect(() => {
     if (activeTab === "block" && !canUseBlockTab) {
@@ -756,6 +921,59 @@ export const DashboardScreen = () => {
       Math.min(currentLocationIndex, carouselLocations.length - 1),
     );
   }, [currentLocationIndex, carouselLocations.length]);
+
+  useEffect(() => {
+    if (activeTab === "district") {
+      const activeDistrict = currentDistrictLocation
+        ? pickText(
+            (currentDistrictLocation as any)?.districtName,
+            (currentDistrictLocation as any)?.DistrictName,
+            "",
+          )
+        : "";
+      const mappedBlock = currentBlockLocation
+        ? pickText(
+            (currentBlockLocation as any)?.blockName,
+            (currentBlockLocation as any)?.BlockName,
+            (currentBlockLocation as any)?.asdName,
+            (currentBlockLocation as any)?.AsdName,
+            "",
+          )
+        : "";
+
+      console.log(
+        `[Dashboard] district tab index=${currentDistrictIndex} district=${activeDistrict} mappedBlock=${mappedBlock}`,
+      );
+      return;
+    }
+
+    const activeBlock = currentBlockLocation
+      ? pickText(
+          (currentBlockLocation as any)?.blockName,
+          (currentBlockLocation as any)?.BlockName,
+          (currentBlockLocation as any)?.asdName,
+          (currentBlockLocation as any)?.AsdName,
+          "",
+        )
+      : "";
+    const parentDistrict = currentBlockLocation
+      ? pickText(
+          (currentBlockLocation as any)?.districtName,
+          (currentBlockLocation as any)?.DistrictName,
+          "",
+        )
+      : "";
+
+    console.log(
+      `[Dashboard] block tab index=${currentBlockIndex} block=${activeBlock} district=${parentDistrict}`,
+    );
+  }, [
+    activeTab,
+    currentBlockIndex,
+    currentBlockLocation,
+    currentDistrictIndex,
+    currentDistrictLocation,
+  ]);
 
   const currentWeatherLocation = useMemo(() => {
     if (!currentLocation) return null;
@@ -860,7 +1078,7 @@ export const DashboardScreen = () => {
 
   if (loading) {
     return (
-      <Screen>
+      <Screen edges={["left", "right"]}>
         <View style={styles.loader}>
           <ActivityIndicator color={colors.primary} />
         </View>
@@ -869,7 +1087,7 @@ export const DashboardScreen = () => {
   }
 
   return (
-    <Screen>
+    <Screen edges={["left", "right"]}>
       <FlatList
         contentContainerStyle={styles.container}
         refreshControl={
@@ -895,7 +1113,37 @@ export const DashboardScreen = () => {
                   !canUseBlockTab && styles.topTabDisabled,
                 ]}
                 onPress={() => {
-                  if (canUseBlockTab) setActiveTab("block");
+                  if (!canUseBlockTab) return;
+
+                  const districtItem: any =
+                    currentDistrictLocation || districtLocations[0];
+                  if (districtItem) {
+                    const mappedBlock = findMappedBlockForDistrict(districtItem);
+                    if (mappedBlock) {
+                      const mappedBlockIdx = blockLocations.findIndex((item: any) =>
+                        sameLocationRef(item, {
+                          districtID: toNum(
+                            mappedBlock?.districtID,
+                            mappedBlock?.DistrictID,
+                          ),
+                          blockID: toNum(mappedBlock?.blockID, mappedBlock?.BlockID),
+                          asdID: toNum(mappedBlock?.asdID, mappedBlock?.AsdID),
+                        }),
+                      );
+                      if (mappedBlockIdx >= 0) setSelectedBlockIndex(mappedBlockIdx);
+                      rememberScopedLocation(mappedBlock);
+                      setSelectedLocation({
+                        districtID: toNum(
+                          mappedBlock?.districtID,
+                          mappedBlock?.DistrictID,
+                        ),
+                        blockID: toNum(mappedBlock?.blockID, mappedBlock?.BlockID),
+                        asdID: toNum(mappedBlock?.asdID, mappedBlock?.AsdID),
+                      });
+                    }
+                  }
+
+                  setActiveTab("block");
                 }}
                 disabled={!canUseBlockTab}
               >
@@ -914,7 +1162,30 @@ export const DashboardScreen = () => {
                   styles.topTab,
                   activeTab === "district" && styles.topTabActive,
                 ]}
-                onPress={() => setActiveTab("district")}
+                onPress={() => {
+                  const blockItem: any = currentBlockLocation || blockLocations[0];
+                  if (blockItem) {
+                    const mappedDistrictIdx = districtLocations.findIndex(
+                      (item: any) =>
+                        toNum(item?.districtID, item?.DistrictID) ===
+                        toNum(blockItem?.districtID, blockItem?.DistrictID),
+                    );
+
+                    if (mappedDistrictIdx >= 0) {
+                      setSelectedDistrictIndex(mappedDistrictIdx);
+                      setSelectedLocation({
+                        districtID: toNum(
+                          blockItem?.districtID,
+                          blockItem?.DistrictID,
+                        ),
+                        blockID: toNum(blockItem?.blockID, blockItem?.BlockID),
+                        asdID: toNum(blockItem?.asdID, blockItem?.AsdID),
+                      });
+                    }
+                  }
+
+                  setActiveTab("district");
+                }}
               >
                 <Text
                   style={
@@ -930,14 +1201,16 @@ export const DashboardScreen = () => {
 
             {carouselLocations.length ? (
               <RNFlatList
+                key={`weather-carousel-${activeTab}`}
                 ref={carouselRef}
                 horizontal
                 pagingEnabled
                 showsHorizontalScrollIndicator={false}
                 data={carouselLocations}
-                initialScrollIndex={0}
+                extraData={`${activeTab}-${currentLocationIndex}-${carouselLocations.length}`}
+                initialScrollIndex={currentLocationIndex}
                 keyExtractor={(item: any, index) =>
-                  `${toNum(item.stateID, item.StateID)}-${toNum(item.districtID, item.DistrictID)}-${toNum(item.blockID, item.BlockID)}-${toNum(item.asdID, item.AsdID)}-${index}`
+                  `${toNum(item.stateID, item.StateID)}-${toNum(item.districtID, item.DistrictID)}-${toNum(item.blockID, item.BlockID)}-${toNum(item.asdID, item.AsdID)}`
                 }
                 getItemLayout={(_, index) => ({
                   length: cardWidth,
@@ -1095,7 +1368,7 @@ export const DashboardScreen = () => {
                         onPress={() => {
                           const selectedSource: any =
                             activeTab === "district"
-                              ? (item as any)?.districtWiseWeatherData || weatherItem
+                              ? findMappedBlockForDistrict(item) || item
                               : item;
                           setSelectedLocation({
                             districtID: toNum(
@@ -1219,18 +1492,37 @@ export const DashboardScreen = () => {
                   const index = Math.round(x / cardWidth);
                   const item: any = carouselLocations[index];
                   if (!item) return;
-                  const selectedSource: any =
-                    activeTab === "district"
-                      ? item?.districtWiseWeatherData || item
-                      : item;
-                  setSelectedLocation({
-                    districtID: toNum(
-                      selectedSource?.districtID,
-                      selectedSource?.DistrictID,
-                    ),
-                    blockID: toNum(selectedSource?.blockID, selectedSource?.BlockID),
-                    asdID: toNum(selectedSource?.asdID, selectedSource?.AsdID),
-                  });
+                  if (activeTab === "district") {
+                    setSelectedDistrictIndex(index);
+                    const selectedSource: any =
+                      findMappedBlockForDistrict(item) || item;
+                    setSelectedLocation({
+                      districtID: toNum(
+                        selectedSource?.districtID,
+                        selectedSource?.DistrictID,
+                      ),
+                      blockID: toNum(
+                        selectedSource?.blockID,
+                        selectedSource?.BlockID,
+                      ),
+                      asdID: toNum(
+                        selectedSource?.asdID,
+                        selectedSource?.AsdID,
+                      ),
+                    });
+                  } else {
+                    setSelectedBlockIndex(index);
+                    rememberScopedLocation(item);
+                    const selectedSource: any = item;
+                    setSelectedLocation({
+                      districtID: toNum(
+                        selectedSource?.districtID,
+                        selectedSource?.DistrictID,
+                      ),
+                      blockID: toNum(selectedSource?.blockID, selectedSource?.BlockID),
+                      asdID: toNum(selectedSource?.asdID, selectedSource?.AsdID),
+                    });
+                  }
                   setCurrentLocationOverride(null);
                   setPromotedLocation(null);
                 }}

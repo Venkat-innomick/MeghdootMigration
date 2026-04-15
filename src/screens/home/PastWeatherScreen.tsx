@@ -16,14 +16,14 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { Screen } from '../../components/Screen';
 import { colors } from '../../theme/colors';
-import { weatherService } from '../../api/services';
+import { userService, weatherService } from '../../api/services';
 import { DashboardLocation, WeatherForecastItem } from '../../types/domain';
 import { useAppStore } from '../../store/appStore';
 import {
-  buildByLocationPayload,
   getLanguageLabel,
   getUserProfileId,
-  parseLocationWeatherList,
+  mergeUserProfileLocation,
+  parseUserLocationsList,
   toText as normalizeText,
 } from '../../utils/locationApi';
 import { API_REFRESH_DATES } from '../../utils/apiDates';
@@ -283,11 +283,41 @@ const dedupePastWeatherLocations = (items: any[]) => {
   });
 };
 
+const findPastWeatherLocationIndex = (
+  list: any[],
+  selectedLocationRef:
+    | {
+        districtID: number;
+        blockID: number;
+        asdID: number;
+      }
+    | null
+    | undefined,
+) => {
+  if (!selectedLocationRef) return -1;
+
+  const exactIndex = list.findIndex((loc: any) => {
+    const ids = getLocationIds(loc);
+    return (
+      ids.districtID === selectedLocationRef.districtID &&
+      ids.blockID === selectedLocationRef.blockID &&
+      ids.asdID === selectedLocationRef.asdID
+    );
+  });
+  if (exactIndex >= 0) return exactIndex;
+
+  return list.findIndex((loc: any) => {
+    const ids = getLocationIds(loc);
+    return ids.districtID === selectedLocationRef.districtID;
+  });
+};
+
 export const PastWeatherScreen = () => {
   useAndroidNavigationBar(colors.darkGreen, 'light');
   const { t } = useTranslation();
   const user = useAppStore((s) => s.user);
   const language = useAppStore((s) => s.language);
+  const appLocations = useAppStore((s) => s.locations);
   const selectedLocationRef = useAppStore((s) => s.selectedLocation);
   const currentLocationOverride = useAppStore((s) => s.currentLocationOverride);
   const userId = getUserProfileId(user);
@@ -341,32 +371,46 @@ export const PastWeatherScreen = () => {
   const loadLocations = async () => {
     if (!userId) return;
     try {
-      const payload = buildByLocationPayload(
-        userId,
-        languageLabel,
-        currentLocationOverride,
-      );
-      const response = await weatherService.getByLocation(payload);
-      const rawList = parseLocationWeatherList(response) as DashboardLocation[];
-      const list = dedupePastWeatherLocations(rawList as any[]) as DashboardLocation[];
+      let list: DashboardLocation[] = [];
+      if (currentLocationOverride) {
+        const response = await weatherService.getByLocation({
+          Id: userId,
+          LanguageType: languageLabel,
+          RefreshDateTime: API_REFRESH_DATES.current(),
+          Latitude: currentLocationOverride.latitude,
+          Longitude: currentLocationOverride.longitude,
+        });
+        const rawList =
+          (((response as any)?.result || (response as any)?.data || response)
+            ?.ObjWeatherForecastNextList ||
+            ((response as any)?.result || (response as any)?.data || response)
+              ?.objWeatherForecastNextList ||
+            []) as DashboardLocation[];
+        list = dedupePastWeatherLocations(rawList as any[]) as DashboardLocation[];
+      } else if (appLocations?.length) {
+        list = dedupePastWeatherLocations(appLocations as any[]) as DashboardLocation[];
+      } else {
+        const response = await userService.getUserLocations({
+          UserProfileID: userId,
+          LanguageType: languageLabel,
+          RefreshDateTime: API_REFRESH_DATES.current(),
+        });
+        const rawList = mergeUserProfileLocation(
+          parseUserLocationsList(response) as DashboardLocation[],
+          user,
+        );
+        list = dedupePastWeatherLocations(rawList as any[]) as DashboardLocation[];
+        useAppStore.getState().setLocations(list);
+      }
       setLocations(list);
       if (list.length) {
         const currentIndex = currentLocationOverride
           ? list.findIndex((loc: any) => Boolean(loc?.isCurrentLocation || loc?.IsCurrentLocation))
           : -1;
-        const selectedIndex = currentIndex >= 0
-          ? currentIndex
-          : selectedLocationRef
-            ? list.findIndex((loc: any) => {
-                const districtID = pickNum(
-                  loc?.districtID,
-                  loc?.DistrictID,
-                  loc?.tempDistrictID,
-                  loc?.TempDistrictID,
-                );
-                return districtID === selectedLocationRef.districtID;
-              })
-            : -1;
+        const selectedIndex =
+          currentIndex >= 0
+            ? currentIndex
+            : findPastWeatherLocationIndex(list as any[], selectedLocationRef);
         const indexToUse = selectedIndex >= 0 ? selectedIndex : 0;
         const target = list[indexToUse] as any;
         setSelectedLocationIndex(indexToUse);
@@ -420,17 +464,10 @@ export const PastWeatherScreen = () => {
         const list = dedupePastWeatherLocations(cachedLocations as any[]) as DashboardLocation[];
         setLocations(list);
         if (list.length) {
-          const selectedIndex = selectedLocationRef
-            ? list.findIndex((loc: any) => {
-                const districtID = pickNum(
-                  loc?.districtID,
-                  loc?.DistrictID,
-                  loc?.tempDistrictID,
-                  loc?.TempDistrictID,
-                );
-                return districtID === selectedLocationRef.districtID;
-              })
-            : -1;
+          const selectedIndex = findPastWeatherLocationIndex(
+            list as any[],
+            selectedLocationRef,
+          );
           const indexToUse = selectedIndex >= 0 ? selectedIndex : 0;
           const target = list[indexToUse] as any;
           setSelectedLocationIndex(indexToUse);
@@ -441,7 +478,7 @@ export const PastWeatherScreen = () => {
         return;
       }
       loadLocations();
-    }, [currentLocationOverride, languageLabel, selectedLocationRef, t, userId]);
+    }, [appLocations, currentLocationOverride, languageLabel, selectedLocationRef, t, userId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -464,7 +501,7 @@ export const PastWeatherScreen = () => {
   };
 
   return (
-    <Screen>
+    <Screen edges={['left', 'right']}>
       <View style={styles.container}>
         <Pressable style={styles.locationBar} onPress={() => setPickerOpen(true)}>
           <Text style={styles.locationText} numberOfLines={1}>{locationLabel}</Text>

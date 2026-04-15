@@ -3,12 +3,14 @@
     "name": "MEGHDOOT",
     "slug": "meghdoot-app",
     "owner": "india-meteorological-department",
-    "version": "1.0.0",
+    "version": "3.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/AppIcon.png",
     "scheme": "meghdoot-app",
     "userInterfaceStyle": "light",
     "splash": {
+      "image": "./assets/images/splash.png",
+      "resizeMode": "contain",
       "backgroundColor": "#749C53"
     },
     "androidStatusBar": {
@@ -24,12 +26,15 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.imd.meghdoot",
-      "buildNumber": "1",
-      "googleServicesFile": "./GoogleService-Info.plist"
+      "buildNumber": "3.0.1",
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.aas.meghdoot",
-      "versionCode": 2,
+      "versionCode": 8,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/AppIconAdaptiveForeground.png",
         "backgroundColor": "#749C53"
@@ -38,14 +43,26 @@
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.CAMERA",
-        "android.permission.READ_MEDIA_IMAGES",
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.RECORD_AUDIO"
+      ],
+      "blockedPermissions": [
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
       ],
       "googleServicesFile": "./google-services.json"
     },
     "plugins": [
       "expo-location",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#749C53"
+        }
+      ],
       [
         "expo-image-picker",
         {
