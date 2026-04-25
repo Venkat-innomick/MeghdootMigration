@@ -24,6 +24,33 @@ const pickText = (...values: any[]) => {
   return "";
 };
 
+const pickNotificationId = (item: any) =>
+  Number(item?.notificationId ?? item?.NotificationId ?? item?.id ?? item?.Id ?? 0);
+
+const notificationKeyFor = (item: any, index: number) => {
+  const notificationId = pickNotificationId(item);
+  if (notificationId > 0) return `notification-${notificationId}`;
+
+  const title = pickText(
+    item?.notificationTitle,
+    item?.NotificationTitle,
+    item?.title,
+    item?.Title,
+    "",
+  );
+  const issue = pickText(
+    item?.timeOfIssueMessage,
+    item?.TimeOfIssueMessage,
+    item?.issueDate,
+    item?.IssueDate,
+    item?.date,
+    item?.Date,
+    "",
+  );
+
+  return `notification-${title}-${issue}-${index}`;
+};
+
 const SEE_MORE_THRESHOLD = 100;
 
 export const NotificationsScreen = () => {
@@ -34,7 +61,7 @@ export const NotificationsScreen = () => {
 
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<any[]>([]);
-  const [expanded, setExpanded] = useState<Record<number, boolean>>({});
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   const load = useCallback(async () => {
     if (!userId) return;
@@ -46,8 +73,6 @@ export const NotificationsScreen = () => {
         (Array.isArray(root) && root) ||
         root?.objNotificationsDetailsList ||
         root?.ObjNotificationsDetailsList ||
-        root?.objDistrictwiseNowcastList ||
-        root?.ObjDistrictwiseNowcastList ||
         [];
       setItems(Array.isArray(list) ? list : []);
     } finally {
@@ -112,9 +137,10 @@ export const NotificationsScreen = () => {
 
         <FlatList
           data={items}
-          keyExtractor={(_, index) => String(index)}
+          keyExtractor={(item, index) => notificationKeyFor(item, index)}
           contentContainerStyle={styles.listContent}
           renderItem={({ item, index }) => {
+            const itemKey = notificationKeyFor(item, index);
             const title = pickText(
               item.notificationTitle,
               item.NotificationTitle,
@@ -138,7 +164,7 @@ export const NotificationsScreen = () => {
               item.Message,
               "-",
             );
-            const isExpanded = !!expanded[index];
+            const isExpanded = !!expanded[itemKey];
             const shouldTrim = message.length > SEE_MORE_THRESHOLD;
 
             return (
@@ -157,7 +183,7 @@ export const NotificationsScreen = () => {
                   <Pressable
                     style={styles.seeMoreWrap}
                     onPress={() =>
-                      setExpanded((prev) => ({ ...prev, [index]: !isExpanded }))
+                      setExpanded((prev) => ({ ...prev, [itemKey]: !isExpanded }))
                     }
                   >
                     <Text style={styles.seeMoreText}>

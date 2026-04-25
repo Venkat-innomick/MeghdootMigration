@@ -7,6 +7,7 @@ import {
   BlockMasterItem,
   CropAdvisoryItem,
   DashboardLocation,
+  DistrictWarningItem,
   DistrictMasterItem,
   NotificationItem,
   StateMasterItem,
@@ -253,6 +254,27 @@ export const notificationService = {
   getNowcast: async (userProfileId: number) => {
     const { data } = await apiClient.get<NotificationItem[]>(
       `${API_ENDPOINTS.notifications.nowCast}?userProfileId=${userProfileId}`,
+    );
+    return data;
+  },
+  getDistrictNowCast: async (payload: Record<string, unknown>) => {
+    const { data } = await apiClient.post<ApiResponse<any[]>>(
+      API_ENDPOINTS.notifications.getDistrictNowCast,
+      payload,
+    );
+    return data;
+  },
+  getDistrictWarnings: async (payload: Record<string, unknown>) => {
+    const { data } = await apiClient.post<ApiResponse<DistrictWarningItem[]>>(
+      API_ENDPOINTS.notifications.getDistrictWarnings,
+      payload,
+    );
+    return data;
+  },
+  updateSeenNotification: async (notificationId: number) => {
+    const { data } = await apiClient.post<ApiResponse>(
+      `${API_ENDPOINTS.notifications.updateSeenNotification}?notificationId=${notificationId}`,
+      {},
     );
     return data;
   },

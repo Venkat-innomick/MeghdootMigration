@@ -26,6 +26,7 @@ interface AppState {
   currentLocationOverride: CurrentLocationOverride | null;
   temporarySearchLocations: DashboardLocation[];
   temporarySearchAdvisories: any[];
+  nowcastRefreshTick: number;
   setHydrated: (ready: boolean) => void;
   beginOnboarding: () => void;
   completeOnboarding: () => void;
@@ -40,6 +41,7 @@ interface AppState {
     advisories: any[];
   }) => void;
   clearTemporarySearchData: () => void;
+  triggerNowcastRefresh: () => void;
   logout: () => void;
 }
 
@@ -55,6 +57,7 @@ export const useAppStore = create<AppState>()((set) => ({
   currentLocationOverride: null,
   temporarySearchLocations: [],
   temporarySearchAdvisories: [],
+  nowcastRefreshTick: 0,
   setHydrated: (ready) => set({ isHydrated: ready }),
   beginOnboarding: () => {
     AsyncStorage.setItem(STORAGE_KEYS.onboardingStarted, 'true').catch(() => undefined);
@@ -97,6 +100,8 @@ export const useAppStore = create<AppState>()((set) => ({
     }),
   clearTemporarySearchData: () =>
     set({ temporarySearchLocations: [], temporarySearchAdvisories: [] }),
+  triggerNowcastRefresh: () =>
+    set((state) => ({ nowcastRefreshTick: state.nowcastRefreshTick + 1 })),
   logout: () =>
     set({
       user: null,
@@ -106,5 +111,6 @@ export const useAppStore = create<AppState>()((set) => ({
       locations: [],
       temporarySearchLocations: [],
       temporarySearchAdvisories: [],
+      nowcastRefreshTick: 0,
     }),
 }));

@@ -1,10 +1,18 @@
 import { useEffect, useRef } from 'react';
-import { Alert } from 'react-native';
-import * as Notifications from 'expo-notifications';
-import { DrawerActions } from '@react-navigation/native';
+import {
+  getInitialNotification,
+  getMessaging,
+  onMessage,
+  onNotificationOpenedApp,
+} from '@react-native-firebase/messaging';
 import { useAppStore } from '../store/appStore';
 import { notificationService } from '../api/services';
-import { registerForPushNotifications } from '../utils/notification';
+import {
+  presentForegroundNotification,
+  registerForPushNotifications,
+  subscribeToForegroundNotificationResponses,
+  subscribeToPushTokenRefresh,
+} from '../utils/notification';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { navigateFromPush, rootNavigationRef } from '../navigation/navigationRef';
 import { getUserProfileId } from '../utils/locationApi';
@@ -31,11 +39,31 @@ export const unregisterPushTokenForUser = async (userProfileId: number) => {
 
 export const usePushNotifications = () => {
   const user = useAppStore((s) => s.user);
+  const triggerNowcastRefresh = useAppStore((s) => s.triggerNowcastRefresh);
   const userProfileId = getUserProfileId(user);
   const inFlightRef = useRef(false);
   const registeredRef = useRef(false);
-  const foregroundAlertShownRef = useRef(false);
   const handledInitialResponseRef = useRef(false);
+
+  useEffect(() => {
+    if (!userProfileId) return;
+
+    const unsubscribe = subscribeToPushTokenRefresh(async (token) => {
+      if (!token) return;
+      try {
+        await notificationService.addOrUpdateToken({
+          Id: 0,
+          UserProfileId: userProfileId,
+          Token: token,
+        });
+        await AsyncStorage.setItem(PUSH_TOKEN_KEY, token);
+      } catch {
+        // Ignore token refresh failures; next app start will retry registration.
+      }
+    });
+
+    return unsubscribe;
+  }, [userProfileId]);
 
   useEffect(() => {
     if (!userProfileId) {
@@ -71,79 +99,88 @@ export const usePushNotifications = () => {
   }, [userProfileId]);
 
   useEffect(() => {
-    const openNowcast = () => {
-      navigateFromPush('Main');
+    const openScreenWhenReady = (
+      screen: 'Nowcast' | 'Notifications',
+      attempts = 0,
+    ) => {
+      if (rootNavigationRef.isReady()) {
+        navigateFromPush(screen);
+        return;
+      }
+
+      if (attempts >= 10) {
+        return;
+      }
+
       setTimeout(() => {
-        if (rootNavigationRef.isReady()) {
-          rootNavigationRef.dispatch(DrawerActions.jumpTo('Nowcast'));
-        }
-      }, 80);
+        openScreenWhenReady(screen, attempts + 1);
+      }, 120);
     };
 
-    const getNotificationText = (
-      notification:
-        | Notifications.Notification
-        | Notifications.NotificationResponse['notification']
-        | null
-        | undefined,
-    ) => {
-      const content = notification?.request?.content;
-      const data = (content?.data || {}) as Record<string, any>;
+    const openNowcast = () => {
+      // Xamarin always routes notification taps through the nowcast flow
+      // and refreshes the page when it is already visible.
+      triggerNowcastRefresh();
+      openScreenWhenReady('Nowcast');
+    };
+
+    const getNotificationData = (message: any | null | undefined) =>
+      (message?.data || {}) as Record<string, any>;
+
+    const getNotificationText = (remoteMessage: any | null | undefined) => {
+      const notification = remoteMessage?.notification;
+      const data = getNotificationData(remoteMessage);
       const title =
         (typeof data.title === 'string' && data.title.trim()) ||
-        (typeof content?.title === 'string' && content.title.trim()) ||
+        (typeof notification?.title === 'string' && notification.title.trim()) ||
         'Notification';
-      const message =
+      const body =
         (typeof data.body === 'string' && data.body.trim()) ||
-        (typeof content?.body === 'string' && content.body.trim()) ||
+        (typeof notification?.body === 'string' && notification.body.trim()) ||
         '';
-      return { title, message };
+      return { title, body };
     };
 
-    const handleNotificationOpen = () => {
+    const handleNotificationOpenFromData = (data: Record<string, any>) => {
+      void data;
       openNowcast();
+    };
+
+    const handleNotificationOpen = (message: any | null | undefined) => {
+      const data = getNotificationData(message);
+      handleNotificationOpenFromData(data);
     };
 
     const handleInitialNotificationResponse = async () => {
       if (handledInitialResponseRef.current) return;
-      const response = await Notifications.getLastNotificationResponseAsync();
-      if (!response) return;
+      const message = await getInitialNotification(getMessaging());
+      if (!message) return;
       handledInitialResponseRef.current = true;
-      handleNotificationOpen();
+      handleNotificationOpen(message);
     };
 
-    const receivedSub = Notifications.addNotificationReceivedListener((event) => {
-      if (foregroundAlertShownRef.current) return;
-      foregroundAlertShownRef.current = true;
-      const { title, message } = getNotificationText(event);
-      Alert.alert(title, message, [
-        {
-          text: 'Open',
-          onPress: () => {
-            handleNotificationOpen();
-            foregroundAlertShownRef.current = false;
-          },
-        },
-        {
-          text: 'Cancel',
-          style: 'cancel',
-          onPress: () => {
-            foregroundAlertShownRef.current = false;
-          },
-        },
-      ]);
+    const receivedSub = onMessage(getMessaging(), (message) => {
+      const { title, body } = getNotificationText(message);
+      presentForegroundNotification(title, body, getNotificationData(message)).catch(
+        () => undefined,
+      );
     });
 
-    const responseSub = Notifications.addNotificationResponseReceivedListener(() => {
+    const responseSub = onNotificationOpenedApp(getMessaging(), (message) => {
       handledInitialResponseRef.current = true;
-      handleNotificationOpen();
+      handleNotificationOpen(message);
+    });
+
+    const foregroundResponseSub = subscribeToForegroundNotificationResponses((data) => {
+      handleNotificationOpenFromData(data);
     });
 
     handleInitialNotificationResponse().catch(() => undefined);
 
     return () => {
-      receivedSub.remove();
-      responseSub.remove();
+      receivedSub();
+      responseSub();
+      foregroundResponseSub();
     };
-  }, []);
+  }, [triggerNowcastRefresh]);
 };

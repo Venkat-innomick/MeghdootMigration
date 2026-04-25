@@ -1,45 +1,139 @@
-import * as Notifications from 'expo-notifications';
-import { Platform } from 'react-native';
+import { PermissionsAndroid, Platform } from 'react-native';
+import notifee, {
+  AndroidImportance,
+  EventType,
+} from '@notifee/react-native';
+import { getApps } from '@react-native-firebase/app';
+import {
+  AuthorizationStatus,
+  getMessaging,
+  getToken,
+  onTokenRefresh,
+  requestPermission,
+  setBackgroundMessageHandler,
+} from '@react-native-firebase/messaging';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
+export const setupBackgroundMessaging = () => {
+  if (!getApps().length) {
+    return;
+  }
+  setBackgroundMessageHandler(getMessaging(), async () => {
+    // Background remote notifications are handled by the OS; keep the handler registered.
+  });
+};
 
-export const registerForPushNotifications = async () => {
+export const setupForegroundNotifications = async () => {
   if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('default', {
-      name: 'default',
-      importance: Notifications.AndroidImportance.DEFAULT,
+    await notifee.createChannel({
+      id: 'default',
+      name: 'Default',
+      importance: AndroidImportance.HIGH,
+      sound: 'default',
     });
   }
+};
 
-  const settings = await Notifications.getPermissionsAsync();
-  let finalStatus = settings.status;
+export const presentForegroundNotification = async (
+  title: string,
+  body: string,
+  data: Record<string, unknown> = {},
+) => {
+  const notificationData = data as Record<string, string | number | object>;
 
-  if (settings.status !== 'granted') {
-    const request = await Notifications.requestPermissionsAsync();
-    finalStatus = request.status;
+  await notifee.displayNotification({
+    title,
+    body,
+    data: notificationData,
+    android: {
+      channelId: 'default',
+      pressAction: {
+        id: 'default',
+      },
+      smallIcon: 'ic_notification',
+      color: '#749C53',
+      sound: 'default',
+    },
+    ios: {
+      sound: 'default',
+      foregroundPresentationOptions: {
+        alert: true,
+        badge: false,
+        sound: true,
+        banner: true,
+        list: true,
+      },
+    },
+  });
+};
+
+export const subscribeToForegroundNotificationResponses = (
+  listener: (data: Record<string, unknown>) => void,
+) => {
+  return notifee.onForegroundEvent(({ type, detail }) => {
+    if (type !== EventType.PRESS) {
+      return;
+    }
+
+    const data = (detail.notification?.data || {}) as Record<string, unknown>;
+    listener(data);
+  });
+};
+
+const ensurePushPermissions = async () => {
+  if (Platform.OS === 'android') {
+    if (Platform.Version < 33) {
+      return true;
+    }
+
+    const status = await PermissionsAndroid.request(
+      PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
+    );
+    return status === PermissionsAndroid.RESULTS.GRANTED;
   }
 
-  if (finalStatus !== 'granted') {
+  const status = await requestPermission(getMessaging());
+  if (
+    status === AuthorizationStatus.AUTHORIZED ||
+    status === AuthorizationStatus.PROVISIONAL
+  ) {
+    return true;
+  }
+  return false;
+};
+
+const getFirebaseMessagingToken = async () => {
+  if (!getApps().length) {
     return null;
   }
 
-  // Keep old Xamarin behavior: send raw platform token only (FCM/APNS).
+  const token = await getToken(getMessaging());
+  if (!token) {
+    return null;
+  }
+  return token;
+};
+
+export const registerForPushNotifications = async () => {
+  const granted = await ensurePushPermissions();
+  if (!granted) {
+    return null;
+  }
+
   try {
-    const deviceToken = await Notifications.getDevicePushTokenAsync();
-    const data =
-      typeof deviceToken?.data === 'string'
-        ? deviceToken.data
-        : String(deviceToken?.data || '');
-    if (data) return data;
+    return await getFirebaseMessagingToken();
   } catch {
     return null;
   }
-  return null;
+};
+
+export const subscribeToPushTokenRefresh = (
+  listener: (token: string) => void | Promise<void>,
+) => {
+  if (!getApps().length) {
+    return () => undefined;
+  }
+
+  return onTokenRefresh(getMessaging(), (token) => {
+    void listener(token);
+  });
 };

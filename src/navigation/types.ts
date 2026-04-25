@@ -1,3 +1,5 @@
+import { DistrictWarningItem } from "../types/domain";
+
 export type RootStackParamList = {
   Splash: undefined;
   Onboarding: undefined;
@@ -35,8 +37,19 @@ export type RootStackParamList = {
   };
   AllCrops: undefined;
   Favourites: undefined;
-  Nowcast: undefined;
+  Nowcast:
+    | {
+        items?: any[];
+        location?: string;
+      }
+    | undefined;
   Notifications: undefined;
+  WarningAlerts:
+    | {
+        items: DistrictWarningItem[];
+        location?: string;
+      }
+    | undefined;
   Disclaimer: undefined;
   About: undefined;
   Search: undefined;

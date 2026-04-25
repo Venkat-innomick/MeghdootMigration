@@ -13,8 +13,10 @@ import {
   Image,
   ImageBackground,
   ImageSourcePropType,
+  Modal,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -25,7 +27,12 @@ import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { Screen } from "../../components/Screen";
 import { colors } from "../../theme/colors";
 import { spacing } from "../../theme/spacing";
-import { cropService, userService, weatherService } from "../../api/services";
+import {
+  cropService,
+  notificationService,
+  userService,
+  weatherService,
+} from "../../api/services";
 import { CropAdvisoryItem, DashboardLocation } from "../../types/domain";
 import { useAppStore } from "../../store/appStore";
 import {
@@ -515,6 +522,92 @@ const buildHomeCropPayload = async (
   return payload;
 };
 
+const parseDistrictNowCastList = (response: any) => {
+  const root = response?.result || response?.data || response;
+  return (
+    (Array.isArray(root) && root) ||
+    root?.objDistrictwiseNowcastList ||
+    root?.ObjDistrictwiseNowcastList ||
+    []
+  ) as any[];
+};
+
+const parseDistrictWarningsList = (response: any) => {
+  const root = response?.result || response?.data || response;
+  return (
+    (Array.isArray(root) && root) ||
+    root?.objDistrictWarningsList ||
+    root?.ObjDistrictWarningsList ||
+    []
+  ) as any[];
+};
+
+const alertSignatureFor = (nowcastItems: any[], warningItems: any[]) => {
+  const nowcastRefresh = pickText(
+    nowcastItems?.[0]?.refreshDateTime,
+    nowcastItems?.[0]?.RefreshDateTime,
+    "",
+  );
+  const warningRefresh = pickText(
+    warningItems?.[0]?.refreshDateTime,
+    warningItems?.[0]?.RefreshDateTime,
+    "",
+  );
+  return `${nowcastItems.length}:${nowcastRefresh}|${warningItems.length}:${warningRefresh}`;
+};
+
+const alertPreviewKeyFor = (
+  item: any,
+  index: number,
+  prefix: "nowcast" | "warning",
+) => {
+  const label = pickText(
+    item?.notificationTitle,
+    item?.NotificationTitle,
+    item?.district,
+    item?.District,
+    "",
+  );
+  const identity = pickText(
+    item?.notificationId,
+    item?.NotificationId,
+    item?.id,
+    item?.Id,
+    item?.date,
+    item?.Date,
+    "",
+  );
+
+  return `${prefix}-${label}-${identity}-${index}`;
+};
+
+const nowcastAlertLocationFor = (item: any) =>
+  pickText(item?.state_District, item?.State_District, item?.districtName, item?.DistrictName, "");
+
+const warningAlertLocationFor = (item: any) =>
+  pickText(item?.district, item?.District, "");
+
+const buildGroupedAlertRows = (
+  items: any[],
+  type: "nowcast" | "warning",
+) => {
+  const seen = new Set<string>();
+  const rows: { location: string; item: any }[] = [];
+
+  items.forEach((item) => {
+    const location =
+      type === "nowcast"
+        ? nowcastAlertLocationFor(item)
+        : warningAlertLocationFor(item);
+
+    if (!location || seen.has(location)) return;
+    seen.add(location);
+    rows.push({ location, item });
+  });
+
+  return rows;
+};
+
 export const DashboardScreen = () => {
   useAndroidNavigationBar(colors.darkGreen, "light");
   const { t } = useTranslation();
@@ -546,9 +639,13 @@ export const DashboardScreen = () => {
   const [activeTab, setActiveTab] = useState<"block" | "district">("block");
   const [selectedDistrictIndex, setSelectedDistrictIndex] = useState(0);
   const [selectedBlockIndex, setSelectedBlockIndex] = useState(0);
+  const [alertsVisible, setAlertsVisible] = useState(false);
+  const [alertNowcastItems, setAlertNowcastItems] = useState<any[]>([]);
+  const [alertWarningItems, setAlertWarningItems] = useState<any[]>([]);
   const carouselRef = useRef<RNFlatList<any> | null>(null);
   const userDraggingCarouselRef = useRef(false);
   const lastLanguageRef = useRef(languageLabel);
+  const lastAlertSignatureRef = useRef("");
   const rememberedScopedLocationRef = useRef<
     Map<string, { blockID: number; asdID: number }>
   >(new Map());
@@ -558,6 +655,21 @@ export const DashboardScreen = () => {
     const root = parent?.getParent?.() || parent || navigation;
     root.navigate("CropAdvisory", params);
   };
+
+  const openRootScreen = (screen: string, params?: Record<string, unknown>) => {
+    const parent = navigation.getParent?.();
+    const root = parent?.getParent?.() || parent || navigation;
+    root.navigate(screen, params);
+  };
+
+  const groupedNowcastAlerts = useMemo(
+    () => buildGroupedAlertRows(alertNowcastItems, "nowcast"),
+    [alertNowcastItems],
+  );
+  const groupedWarningAlerts = useMemo(
+    () => buildGroupedAlertRows(alertWarningItems, "warning"),
+    [alertWarningItems],
+  );
 
   const loadData = useCallback(async () => {
     if (!userId) {
@@ -680,10 +792,50 @@ export const DashboardScreen = () => {
     userId,
   ]);
 
+  const loadAlertSummaries = useCallback(async () => {
+    if (!userId) return;
+
+    try {
+      const payload = {
+        UserID: userId,
+        LanguageType: languageLabel,
+        RefreshDateTime: API_REFRESH_DATES.current(),
+      };
+
+      const [nowcastResponse, warningResponse] = await Promise.all([
+        notificationService.getDistrictNowCast(payload),
+        notificationService.getDistrictWarnings(payload),
+      ]);
+
+      const nextNowcastItems = parseDistrictNowCastList(nowcastResponse);
+      const nextWarningItems = parseDistrictWarningsList(warningResponse);
+      const signature = alertSignatureFor(nextNowcastItems, nextWarningItems);
+
+      setAlertNowcastItems(nextNowcastItems);
+      setAlertWarningItems(nextWarningItems);
+      if (!nextNowcastItems.length && !nextWarningItems.length) {
+        setAlertsVisible(false);
+      }
+
+      if (
+        signature &&
+        signature !== "0:|0:" &&
+        signature !== lastAlertSignatureRef.current &&
+        (nextNowcastItems.length > 0 || nextWarningItems.length > 0)
+      ) {
+        lastAlertSignatureRef.current = signature;
+        setAlertsVisible(true);
+      }
+    } catch {
+      // Keep dashboard usable if summary alert APIs fail.
+    }
+  }, [languageLabel, userId]);
+
   useFocusEffect(
     useCallback(() => {
       loadData();
-    }, [loadData]),
+      loadAlertSummaries();
+    }, [loadAlertSummaries, loadData]),
   );
 
   useEffect(() => {
@@ -1088,6 +1240,77 @@ export const DashboardScreen = () => {
 
   return (
     <Screen edges={["left", "right"]}>
+      <Modal
+        visible={alertsVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAlertsVisible(false)}
+      >
+        <Pressable
+          style={styles.alertBackdrop}
+          onPress={() => setAlertsVisible(false)}
+        >
+          <Pressable style={styles.alertCard} onPress={() => undefined}>
+            <Text style={styles.alertTitle}>
+              {t("notification.alertsTitle", { defaultValue: "Weather Alerts" })}
+            </Text>
+            <ScrollView
+              style={styles.alertScroll}
+              showsVerticalScrollIndicator={false}
+            >
+              {groupedNowcastAlerts.length > 0 ? (
+                <View style={styles.alertSection}>
+                  <Text style={styles.alertSectionTitle}>
+                    {t("menu.nowcast")} ({groupedNowcastAlerts.length})
+                  </Text>
+                  {groupedNowcastAlerts.map(({ item, location }, index) => (
+                    <Pressable
+                      key={alertPreviewKeyFor(item, index, "nowcast")}
+                      style={styles.alertLocationRow}
+                      onPress={() => {
+                        setAlertsVisible(false);
+                        openRootScreen("Nowcast", {
+                          items: alertNowcastItems,
+                          location,
+                        });
+                      }}
+                    >
+                      <Text style={styles.alertRowText}>{location}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : null}
+
+              {groupedWarningAlerts.length > 0 ? (
+                <View style={styles.alertSection}>
+                  <Text style={styles.alertSectionTitle}>
+                    {t("notification.warningAlerts", {
+                      defaultValue: "Warning alerts",
+                    })}{" "}
+                    ({groupedWarningAlerts.length})
+                  </Text>
+                  {groupedWarningAlerts.map(({ item, location }, index) => (
+                    <Pressable
+                      key={alertPreviewKeyFor(item, index, "warning")}
+                      style={styles.alertLocationRow}
+                      onPress={() => {
+                        setAlertsVisible(false);
+                        openRootScreen("WarningAlerts", {
+                          items: alertWarningItems,
+                          location,
+                        });
+                      }}
+                    >
+                      <Text style={styles.alertRowText}>{location}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : null}
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       <FlatList
         contentContainerStyle={styles.container}
         refreshControl={
@@ -1699,6 +1922,62 @@ export const DashboardScreen = () => {
 
 const styles = StyleSheet.create({
   loader: { flex: 1, justifyContent: "center", alignItems: "center" },
+  alertBackdrop: {
+    flex: 1,
+    backgroundColor: "#00000077",
+    justifyContent: "center",
+    paddingHorizontal: 20,
+  },
+  alertCard: {
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    padding: 16,
+    maxHeight: "70%",
+  },
+  alertTitle: {
+    color: colors.primary,
+    fontFamily: "RobotoMedium",
+    fontSize: 18,
+    marginBottom: 12,
+  },
+  alertScroll: {
+    maxHeight: 420,
+  },
+  alertSection: {
+    marginBottom: 16,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#EEEEEE",
+  },
+  alertSectionTitle: {
+    color: colors.darkGreen,
+    fontFamily: "RobotoMedium",
+    fontSize: 15,
+    marginBottom: 8,
+  },
+  alertRowText: {
+    color: "#363636",
+    fontFamily: "RobotoRegular",
+    fontSize: 14,
+  },
+  alertLocationRow: {
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1F1F1",
+  },
+  alertAction: {
+    marginTop: 8,
+    alignSelf: "flex-start",
+    backgroundColor: colors.primary,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  alertActionText: {
+    color: "#fff",
+    fontFamily: "RobotoMedium",
+    fontSize: 13,
+  },
   container: { paddingBottom: 20 },
   topTabs: {
     marginHorizontal: 16,
