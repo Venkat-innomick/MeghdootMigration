@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -112,6 +112,7 @@ export const FavouritesScreen = () => {
 
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<any[]>([]);
+  const previewSwipeRef = useRef<Swipeable | null>(null);
 
   const load = useCallback(async () => {
     if (!userId) {
@@ -150,6 +151,15 @@ export const FavouritesScreen = () => {
       });
     }, [load, t]),
   );
+
+  useEffect(() => {
+    if (!items.length) return;
+    const timer = setTimeout(() => {
+      previewSwipeRef.current?.openRight();
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [items]);
 
   const removeFavourite = async (item: any) => {
     const cropAdvisoryId = pickNum(item.cropAdvisoryID, item.CropAdvisoryID);
@@ -243,6 +253,7 @@ export const FavouritesScreen = () => {
           return (
             <View style={styles.cardWrap}>
               <Swipeable
+                ref={index === 0 ? previewSwipeRef : undefined}
                 overshootRight={false}
                 renderRightActions={() => (
                   <Pressable
