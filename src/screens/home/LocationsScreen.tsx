@@ -185,6 +185,7 @@ export const LocationsScreen = () => {
   const [statePickerOpen, setStatePickerOpen] = useState(false);
   const [districtPickerOpen, setDistrictPickerOpen] = useState(false);
   const [blockPickerOpen, setBlockPickerOpen] = useState(false);
+  const previewSwipeRef = useRef<Swipeable | null>(null);
 
   const userId = useMemo(() => getUserProfileId(user), [user]);
   const languageLabel = useMemo(() => getLanguageLabel(language), [language]);
@@ -315,6 +316,15 @@ export const LocationsScreen = () => {
     () => normalizedLocations.filter((x) => !x.isCurrentLocation),
     [normalizedLocations]
   );
+
+  useEffect(() => {
+    if (!addedLocations.length) return;
+    const timer = setTimeout(() => {
+      previewSwipeRef.current?.openRight();
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [addedLocations]);
 
   const loadLocations = async (forceRemote = false) => {
     if (!userId) {
@@ -785,10 +795,15 @@ export const LocationsScreen = () => {
     );
   };
 
-  const renderCard = (item: LocationRow, showDelete = true) => (
+  const renderCard = (
+    item: LocationRow,
+    showDelete = true,
+    previewDelete = false,
+  ) => (
     <View style={styles.cardWrap}>
       {showDelete ? (
         <Swipeable
+          ref={previewDelete ? previewSwipeRef : undefined}
           overshootRight={false}
           renderRightActions={() => (
             <Pressable style={styles.swipeDelete} onPress={() => deleteLocation(item)}>
@@ -844,7 +859,11 @@ export const LocationsScreen = () => {
               </>
             }
             ListEmptyComponent={<Text style={styles.empty}>{t('home.noDataCurrentlyAvailable')}</Text>}
-            renderItem={({ item }) => <Pressable onPress={() => openInHome(item)}>{renderCard(item, true)}</Pressable>}
+            renderItem={({ item, index }) => (
+              <Pressable onPress={() => openInHome(item)}>
+                {renderCard(item, true, index === 0)}
+              </Pressable>
+            )}
           />
         )}
 

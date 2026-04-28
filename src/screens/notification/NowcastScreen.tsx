@@ -13,8 +13,9 @@ import { useAppStore } from "../../store/appStore";
 import { colors } from "../../theme/colors";
 import { useAndroidNavigationBar } from "../../hooks/useAndroidNavigationBar";
 import { getUserProfileId } from "../../utils/locationApi";
-import { useFocusEffect } from "@react-navigation/native";
+import { RouteProp, useFocusEffect, useRoute } from "@react-navigation/native";
 import { useTranslation } from "react-i18next";
+import { RootStackParamList } from "../../navigation/types";
 
 const pickText = (...values: any[]) => {
   for (const value of values) {
@@ -23,10 +24,102 @@ const pickText = (...values: any[]) => {
   return "";
 };
 
+const pickNotificationId = (item: any) =>
+  Number(item?.notificationId ?? item?.NotificationId ?? item?.id ?? item?.Id ?? 0);
+
+const extractNowcastItems = (payload: any) => {
+  const root = payload?.result || payload?.data || payload;
+  if (Array.isArray(root)) return root;
+
+  const list =
+    root?.objNotificationsDetailsList ||
+    root?.ObjNotificationsDetailsList ||
+    [];
+
+  return Array.isArray(list) ? list : [];
+};
+
+const filterPopupNowcastItems = (items: any[], location?: string) => {
+  if (!location) return items;
+  return items.filter(
+    (item) =>
+      pickText(
+        item?.state_District,
+        item?.State_District,
+        item?.districtName,
+        item?.DistrictName,
+      ) === location,
+  );
+};
+
+const buildPopupNowcastCards = (items: any[]) => {
+  if (!items.length) return [];
+
+  const lastItem = items[items.length - 1];
+  const combinedMessage = items
+    .map((item) =>
+      pickText(
+        item?.warningsDetails,
+        item?.WarningsDetails,
+        item?.message,
+        item?.Message,
+        item?.notificationMessage,
+        item?.NotificationMessage,
+      ),
+    )
+    .filter(Boolean)
+    .join("\n\n");
+
+  return [
+    {
+      notificationTitle: pickText(
+        lastItem?.notifyType,
+        lastItem?.NotifyType,
+        lastItem?.notificationTitle,
+        lastItem?.NotificationTitle,
+      ),
+      issueDate: pickText(
+        lastItem?.date,
+        lastItem?.Date,
+        lastItem?.full_date,
+        lastItem?.full_Date,
+        "-",
+      ),
+      notificationMessage: combinedMessage || "-",
+      timeOfIssueMessage: pickText(lastItem?.toi, lastItem?.TOI, ""),
+      validUpToMessage: pickText(lastItem?.vUpTo, lastItem?.VUpTo, ""),
+    },
+  ];
+};
+
+const nowcastKeyFor = (item: any, index: number) => {
+  const notificationId = pickNotificationId(item);
+  if (notificationId > 0) return `nowcast-${notificationId}`;
+
+  const title = pickText(
+    item?.notificationTitle,
+    item?.NotificationTitle,
+    item?.title,
+    item?.Title,
+    "",
+  );
+  const issue = pickText(
+    item?.issueDate,
+    item?.IssueDate,
+    item?.date,
+    item?.Date,
+    "",
+  );
+
+  return `nowcast-${title}-${issue}-${index}`;
+};
+
 export const NowcastScreen = () => {
   useAndroidNavigationBar(colors.background, "dark");
   const { t } = useTranslation();
+  const route = useRoute<RouteProp<RootStackParamList, "Nowcast">>();
   const user = useAppStore((s) => s.user);
+  const nowcastRefreshTick = useAppStore((s) => s.nowcastRefreshTick);
 
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<any[]>([]);
@@ -34,35 +127,36 @@ export const NowcastScreen = () => {
 
   useFocusEffect(
     React.useCallback(() => {
-    const load = async () => {
-      if (!userId) return;
-      setLoading(true);
-      try {
-        const response: any = await notificationService.getNowcast(userId);
-        const root = response?.result || response?.data || response;
-        const list =
-          (Array.isArray(root) && root) ||
-          root?.objNotificationsDetailsList ||
-          root?.ObjNotificationsDetailsList ||
-          root?.objDistrictwiseNowcastList ||
-          root?.ObjDistrictwiseNowcastList ||
-          [];
-        setItems(Array.isArray(list) ? list : []);
-      } finally {
-        setLoading(false);
-      }
-    };
+      const load = async () => {
+        const popupItems = route.params?.items || [];
+        const popupLocation = route.params?.location;
 
-    load().catch((error: any) => {
-      setItems([]);
-      setTimeout(() => {
-        Alert.alert("", error?.message || t("common.error"), [
-          { text: t("common.ok") },
-        ]);
-      }, 50);
-    });
-    return undefined;
-  }, [t, userId])
+        if (popupItems.length) {
+          const filtered = filterPopupNowcastItems(popupItems, popupLocation);
+          setItems(buildPopupNowcastCards(filtered));
+          return;
+        }
+
+        if (!userId) return;
+        setLoading(true);
+        try {
+          const response: any = await notificationService.getNowcast(userId);
+          setItems(extractNowcastItems(response));
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      load().catch((error: any) => {
+        setItems([]);
+        setTimeout(() => {
+          Alert.alert("", error?.message || t("common.error"), [
+            { text: t("common.ok") },
+          ]);
+        }, 50);
+      });
+      return undefined;
+    }, [nowcastRefreshTick, route.params?.items, route.params?.location, t, userId])
   );
 
   const content = useMemo(() => {
@@ -81,17 +175,10 @@ export const NowcastScreen = () => {
     return (
       <FlatList
         data={items}
-        keyExtractor={(item, index) =>
-          String(
-            item?.notificationId ??
-              item?.NotificationId ??
-              item?.id ??
-              item?.Id ??
-              index,
-          )
-        }
+        keyExtractor={(item, index) => nowcastKeyFor(item, index)}
         contentContainerStyle={styles.listContent}
-        renderItem={({ item }) => {
+        renderItem={({ item, index }) => {
+          void index;
           const title = pickText(
             item.notificationTitle,
             item.NotificationTitle,
@@ -129,14 +216,18 @@ export const NowcastScreen = () => {
             item.VUpTo,
             "",
           );
-
+          const validityLine =
+            validity ||
+            t("notification.validityLabel", {
+              defaultValue: "Validity",
+            });
           return (
             <View style={styles.card}>
               <Text style={styles.title}>{title}</Text>
               <Text style={styles.issueDate}>{issueDate}</Text>
               <Text style={styles.message}>{message}</Text>
               {toi ? <Text style={styles.metaText}>{toi}</Text> : null}
-              {validity ? <Text style={styles.metaText}>{validity}</Text> : null}
+              <Text style={styles.metaText}>{validityLine}</Text>
             </View>
           );
         }}

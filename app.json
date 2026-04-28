@@ -3,7 +3,7 @@
     "name": "MEGHDOOT",
     "slug": "meghdoot-app",
     "owner": "india-meteorological-department",
-    "version": "3.0.1",
+    "version": "3.0.2",
     "orientation": "portrait",
     "icon": "./assets/images/AppIcon.png",
     "scheme": "meghdoot-app",
@@ -26,7 +26,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.imd.meghdoot",
-      "buildNumber": "3.0.1",
+      "buildNumber": "3.0.4",
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
@@ -34,7 +34,7 @@
     },
     "android": {
       "package": "com.aas.meghdoot",
-      "versionCode": 8,
+      "versionCode": 9,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/AppIconAdaptiveForeground.png",
         "backgroundColor": "#749C53"
@@ -70,13 +70,7 @@
           "cameraPermission": "Allow MEGHDOOT to access your camera."
         }
       ],
-      [
-        "expo-notifications",
-        {
-          "icon": "./assets/images/AppIcon.png",
-          "color": "#749C53"
-        }
-      ]
+      "./plugins/with-rnfirebase-podfile"
     ],
     "extra": {
       "eas": {

@@ -48,10 +48,47 @@ export interface CropAdvisoryItem {
 
 export interface NotificationItem {
   id?: number;
+  notificationId?: number;
   title?: string;
+  notificationTitle?: string;
   message?: string;
+  notificationMessage?: string;
   date?: string;
+  issueDate?: string;
+  timeOfIssueMessage?: string;
+  validUpToMessage?: string;
+  colorCode?: string;
   isRead?: boolean;
+  flag?: boolean;
+}
+
+export interface DistrictWarningItem {
+  district?: string;
+  District?: string;
+  date?: string;
+  Date?: string;
+  refreshDateTime?: string;
+  RefreshDateTime?: string;
+  day1_Color?: string;
+  Day1_Color?: string;
+  day2_Color?: string;
+  Day2_Color?: string;
+  day3_Color?: string;
+  Day3_Color?: string;
+  day4_Color?: string;
+  Day4_Color?: string;
+  day5_Color?: string;
+  Day5_Color?: string;
+  day_1?: string;
+  Day_1?: string;
+  day_2?: string;
+  Day_2?: string;
+  day_3?: string;
+  Day_3?: string;
+  day_4?: string;
+  Day_4?: string;
+  day_5?: string;
+  Day_5?: string;
 }
 
 export interface StateMasterItem {

@@ -42,6 +42,7 @@ import { AllCropsScreen } from '../screens/menu/AllCropsScreen';
 import { FavouritesScreen } from '../screens/menu/FavouritesScreen';
 import { NowcastScreen } from '../screens/notification/NowcastScreen';
 import { NotificationsScreen } from '../screens/notification/NotificationsScreen';
+import { WarningAlertsScreen } from '../screens/notification/WarningAlertsScreen';
 import { DisclaimerScreen } from '../screens/menu/DisclaimerScreen';
 import { AboutScreen } from '../screens/menu/AboutScreen';
 import { CropAdvisoryScreen } from '../screens/crop/CropAdvisoryScreen';
@@ -331,13 +332,7 @@ const MenuContent = (props: any) => {
       {
         text: t('common.ok'),
         onPress: async () => {
-          const userProfileId = Number(
-            user?.userProfileId ??
-              user?.UserProfileID ??
-              user?.typeOfRole ??
-              user?.TypeOfRole ??
-              0
-          );
+          const userProfileId = getUserProfileId(user);
           await unregisterPushTokenForUser(userProfileId);
           await AsyncStorage.removeItem(STORAGE_KEYS.loggedInUser);
           logout();
@@ -542,6 +537,7 @@ export const AppNavigator = () => {
         <RootStack.Screen name="Favourites" component={FavouritesScreen} options={{ headerStyle: { backgroundColor: colors.primary }, headerTintColor: '#fff', title: t('menu.favourites') }} />
         <RootStack.Screen name="Nowcast" component={NowcastScreen} options={{ headerStyle: { backgroundColor: colors.primary }, headerTintColor: '#fff', title: t('menu.nowcast') }} />
         <RootStack.Screen name="Notifications" component={NotificationsScreen} options={{ headerStyle: { backgroundColor: colors.primary }, headerTintColor: '#fff', title: t('menu.notifications') }} />
+        <RootStack.Screen name="WarningAlerts" component={WarningAlertsScreen} options={{ headerStyle: { backgroundColor: colors.primary }, headerTintColor: '#fff', title: t('notification.warningAlerts') }} />
         <RootStack.Screen name="Disclaimer" component={DisclaimerScreen} options={{ headerStyle: { backgroundColor: colors.primary }, headerTintColor: '#fff', title: t('menu.disclaimer') }} />
         <RootStack.Screen name="About" component={AboutScreen} options={{ headerStyle: { backgroundColor: colors.primary }, headerTintColor: '#fff', title: t('menu.about') }} />
         <RootStack.Screen name="Search" component={SearchScreen} options={{ headerShown: false }} />

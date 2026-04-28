@@ -41,6 +41,7 @@ export const API_ENDPOINTS = {
     getMobileToken: "/api/Notifications/GetMobileTokens",
     userNotification: "/api/Notifications/GetNotificationDetails",
     nowCast: "/api/Notifications/GetValidNowCastNowDetails",
+    updateSeenNotification: "/api/Notifications/UpdateSeenNotification",
     clearNotification: "/api/Notifications/ClearNotificationDetails",
   },
   users: {

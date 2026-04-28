@@ -1,23 +1,23 @@
 import { useEffect, useRef } from 'react';
-import { Alert } from 'react-native';
-import * as Notifications from 'expo-notifications';
-import { DrawerActions } from '@react-navigation/native';
+import {
+  getInitialNotification,
+  getMessaging,
+  onMessage,
+  onNotificationOpenedApp,
+} from '@react-native-firebase/messaging';
 import { useAppStore } from '../store/appStore';
 import { notificationService } from '../api/services';
-import { registerForPushNotifications } from '../utils/notification';
+import {
+  presentForegroundNotification,
+  registerForPushNotifications,
+  subscribeToForegroundNotificationResponses,
+  subscribeToPushTokenRefresh,
+} from '../utils/notification';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { navigateFromPush, rootNavigationRef } from '../navigation/navigationRef';
+import { getUserProfileId } from '../utils/locationApi';
 
 const PUSH_TOKEN_KEY = 'agromet_push_token';
-
-const getUserProfileId = (user: any) =>
-  Number(
-    user?.userProfileId ??
-      user?.UserProfileID ??
-      user?.typeOfRole ??
-      user?.TypeOfRole ??
-      0,
-  );
 
 export const unregisterPushTokenForUser = async (userProfileId: number) => {
   if (!userProfileId) return;
@@ -39,10 +39,31 @@ export const unregisterPushTokenForUser = async (userProfileId: number) => {
 
 export const usePushNotifications = () => {
   const user = useAppStore((s) => s.user);
+  const triggerNowcastRefresh = useAppStore((s) => s.triggerNowcastRefresh);
   const userProfileId = getUserProfileId(user);
   const inFlightRef = useRef(false);
   const registeredRef = useRef(false);
-  const foregroundAlertShownRef = useRef(false);
+  const handledInitialResponseRef = useRef(false);
+
+  useEffect(() => {
+    if (!userProfileId) return;
+
+    const unsubscribe = subscribeToPushTokenRefresh(async (token) => {
+      if (!token) return;
+      try {
+        await notificationService.addOrUpdateToken({
+          Id: 0,
+          UserProfileId: userProfileId,
+          Token: token,
+        });
+        await AsyncStorage.setItem(PUSH_TOKEN_KEY, token);
+      } catch {
+        // Ignore token refresh failures; next app start will retry registration.
+      }
+    });
+
+    return unsubscribe;
+  }, [userProfileId]);
 
   useEffect(() => {
     if (!userProfileId) {
@@ -78,45 +99,88 @@ export const usePushNotifications = () => {
   }, [userProfileId]);
 
   useEffect(() => {
-    const openNowcast = () => {
-      navigateFromPush('Main');
+    const openScreenWhenReady = (
+      screen: 'Nowcast' | 'Notifications',
+      attempts = 0,
+    ) => {
+      if (rootNavigationRef.isReady()) {
+        navigateFromPush(screen);
+        return;
+      }
+
+      if (attempts >= 10) {
+        return;
+      }
+
       setTimeout(() => {
-        if (rootNavigationRef.isReady()) {
-          rootNavigationRef.dispatch(DrawerActions.jumpTo('Nowcast'));
-        }
-      }, 80);
+        openScreenWhenReady(screen, attempts + 1);
+      }, 120);
     };
 
-    const receivedSub = Notifications.addNotificationReceivedListener((event) => {
-      if (foregroundAlertShownRef.current) return;
-      foregroundAlertShownRef.current = true;
-      const title = event.request.content.title || 'Notification';
-      const message = event.request.content.body || '';
-      Alert.alert(title, message, [
-        {
-          text: 'Open',
-          onPress: () => {
-            openNowcast();
-            foregroundAlertShownRef.current = false;
-          },
-        },
-        {
-          text: 'Cancel',
-          style: 'cancel',
-          onPress: () => {
-            foregroundAlertShownRef.current = false;
-          },
-        },
-      ]);
+    const openNowcast = () => {
+      // Xamarin always routes notification taps through the nowcast flow
+      // and refreshes the page when it is already visible.
+      triggerNowcastRefresh();
+      openScreenWhenReady('Nowcast');
+    };
+
+    const getNotificationData = (message: any | null | undefined) =>
+      (message?.data || {}) as Record<string, any>;
+
+    const getNotificationText = (remoteMessage: any | null | undefined) => {
+      const notification = remoteMessage?.notification;
+      const data = getNotificationData(remoteMessage);
+      const title =
+        (typeof data.title === 'string' && data.title.trim()) ||
+        (typeof notification?.title === 'string' && notification.title.trim()) ||
+        'Notification';
+      const body =
+        (typeof data.body === 'string' && data.body.trim()) ||
+        (typeof notification?.body === 'string' && notification.body.trim()) ||
+        '';
+      return { title, body };
+    };
+
+    const handleNotificationOpenFromData = (data: Record<string, any>) => {
+      void data;
+      openNowcast();
+    };
+
+    const handleNotificationOpen = (message: any | null | undefined) => {
+      const data = getNotificationData(message);
+      handleNotificationOpenFromData(data);
+    };
+
+    const handleInitialNotificationResponse = async () => {
+      if (handledInitialResponseRef.current) return;
+      const message = await getInitialNotification(getMessaging());
+      if (!message) return;
+      handledInitialResponseRef.current = true;
+      handleNotificationOpen(message);
+    };
+
+    const receivedSub = onMessage(getMessaging(), (message) => {
+      const { title, body } = getNotificationText(message);
+      presentForegroundNotification(title, body, getNotificationData(message)).catch(
+        () => undefined,
+      );
     });
 
-    const responseSub = Notifications.addNotificationResponseReceivedListener(() => {
-      openNowcast();
+    const responseSub = onNotificationOpenedApp(getMessaging(), (message) => {
+      handledInitialResponseRef.current = true;
+      handleNotificationOpen(message);
     });
+
+    const foregroundResponseSub = subscribeToForegroundNotificationResponses((data) => {
+      handleNotificationOpenFromData(data);
+    });
+
+    handleInitialNotificationResponse().catch(() => undefined);
 
     return () => {
-      receivedSub.remove();
-      responseSub.remove();
+      receivedSub();
+      responseSub();
+      foregroundResponseSub();
     };
-  }, []);
+  }, [triggerNowcastRefresh]);
 };
